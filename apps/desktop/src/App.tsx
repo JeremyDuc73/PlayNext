@@ -21,6 +21,19 @@ type AppInfo = {
   platform: string;
 };
 
+function microsoftErrorMessage(reason: string): string {
+  if (reason === "enable_public_client") {
+    return "Lien Microsoft échoué : Entra traite encore l’app comme Web (secret requis). Ajoute la plateforme « Mobile and desktop applications » avec la même redirect, retire Web si besoin, public client = Yes. Voir docs/XBOX.md.";
+  }
+  if (reason === "code_expired") {
+    return "Lien Microsoft échoué : code déjà utilisé. Reclique « Connecter Microsoft » et valide tout de suite (un seul essai).";
+  }
+  if (reason === "xbox_link_failed") {
+    return "Lien Microsoft échoué. Vérifie CLIENT_ID + redirect + public client (docs/XBOX.md), puis réessaie.";
+  }
+  return `Lien Microsoft échoué (${reason}).`;
+}
+
 type HealthResponse = {
   ok: boolean;
   service: string;
@@ -55,7 +68,8 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (xbox === "error") {
       const reason = params.get("reason") ?? "unknown";
-      setAuthBanner(`Lien Microsoft échoué (${reason}).`);
+      setAuthBanner(microsoftErrorMessage(reason));
+      setMicrosoftLinkedSignal((n) => n + 1);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -70,7 +84,8 @@ export default function App() {
       if (parsed.kind === "microsoft") {
         if (!cancelled) {
           if (parsed.error) {
-            setAuthBanner(`Lien Microsoft échoué (${parsed.error}).`);
+            setAuthBanner(microsoftErrorMessage(parsed.error));
+            setMicrosoftLinkedSignal((n) => n + 1);
           } else if (parsed.ok) {
             setAuthBanner("Compte Microsoft / Xbox lié. Tu peux scanner Xbox.");
             setMicrosoftLinkedSignal((n) => n + 1);

@@ -67,9 +67,13 @@ export async function migrate(db: Db): Promise<void> {
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       provider TEXT NOT NULL,
       client TEXT NOT NULL,
+      code_verifier TEXT,
       expires_at TIMESTAMPTZ NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    ALTER TABLE oauth_pending
+      ADD COLUMN IF NOT EXISTS code_verifier TEXT;
 
     CREATE INDEX IF NOT EXISTS oauth_pending_expires_at_idx ON oauth_pending(expires_at);
 

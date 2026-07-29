@@ -21,6 +21,7 @@ const envSchema = z.object({
     .default("http://localhost:3001/auth/discord/callback"),
   STEAM_WEB_API_KEY: z.string().optional().default(""),
   MICROSOFT_CLIENT_ID: z.string().optional().default(""),
+  /** Fallback when Entra app is confidential (Web) and requires a secret. */
   MICROSOFT_CLIENT_SECRET: z.string().optional().default(""),
   MICROSOFT_REDIRECT_URI: z
     .string()
@@ -38,8 +39,20 @@ export function isMicrosoftConfigured(config: Env): boolean {
 
 export type Env = z.infer<typeof envSchema>;
 
+function trimEnv(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  // Strip accidental quotes / whitespace from .env pastes
+  return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = envSchema.safeParse(env);
+  const normalized = {
+    ...env,
+    MICROSOFT_CLIENT_ID: trimEnv(env.MICROSOFT_CLIENT_ID),
+    MICROSOFT_CLIENT_SECRET: trimEnv(env.MICROSOFT_CLIENT_SECRET),
+    MICROSOFT_REDIRECT_URI: trimEnv(env.MICROSOFT_REDIRECT_URI),
+  };
+  const parsed = envSchema.safeParse(normalized);
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)

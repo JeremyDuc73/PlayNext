@@ -67,6 +67,32 @@ export function XboxLibrary({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, microsoftLinkedSignal]);
 
+  // Desktop deep-link can miss the callback — poll until linked or timeout.
+  useEffect(() => {
+    if (!linking) return;
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      void fetchMicrosoftStatus()
+        .then((status) => {
+          if (status.linked) {
+            setLinked(true);
+            setLinking(false);
+            onBanner("Compte Microsoft / Xbox lié. Tu peux scanner Xbox.");
+          } else if (Date.now() - started > 120_000) {
+            setLinking(false);
+            onBanner(
+              "Toujours pas lié. Si tu as validé Microsoft, le secret .env est probablement faux (Value, pas Secret ID).",
+            );
+          }
+        })
+        .catch(() => {
+          /* ignore transient */
+        });
+    }, 2000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linking]);
+
   async function onConnect() {
     setLinking(true);
     try {

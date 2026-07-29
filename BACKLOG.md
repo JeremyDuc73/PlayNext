@@ -116,7 +116,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 - [x] Steam (manifestes, AppID, installé ; sync API sans chemins) — validé (~143 possédés)
 - [x] Steam Web API possession (profil) — via `STEAM_WEB_API_KEY` + steamId local
-- [~] Xbox / Microsoft Store — OAuth Live + title history PC + AppX installés (pfn) ; valider après rebuild Windows + `MICROSOFT_CLIENT_ID` (voir `docs/XBOX.md`)
+- [~] Xbox / Microsoft Store — OAuth public+PKCE + title history validés (~123 jeux web) ; scan AppX installés à valider sur app Windows (voir `docs/XBOX.md`)
 - [ ] Epic Games Store
 - [ ] Riot natif : League of Legends et VALORANT **séparés**, chemins perso OK ; pas de faux positif Client/Vanguard seuls
 - [ ] Battle.net

@@ -5,7 +5,10 @@ import { isMicrosoftConfigured } from "../config.js";
 import type { Db } from "../db.js";
 import { getSessionToken } from "../auth/request-session.js";
 import { findUserBySessionToken } from "../auth/session.js";
-import { buildMicrosoftAuthorizeUrl } from "../microsoft/oauth.js";
+import {
+  buildMicrosoftAuthorizeUrl,
+  createPkcePair,
+} from "../microsoft/oauth.js";
 import {
   deleteMicrosoftLink,
   getMicrosoftLinkStatus,
@@ -67,20 +70,22 @@ export const authMicrosoftRoutes: FastifyPluginAsync<
     const body = (request.body ?? {}) as { client?: string };
     const client = body.client === "desktop" ? "desktop" : "web";
     const state = randomBytes(24).toString("hex");
+    const pkce = createPkcePair();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await db.pool.query(
       `
-        INSERT INTO oauth_pending (state, user_id, provider, client, expires_at)
-        VALUES ($1, $2, 'microsoft', $3, $4)
+        INSERT INTO oauth_pending (state, user_id, provider, client, code_verifier, expires_at)
+        VALUES ($1, $2, 'microsoft', $3, $4, $5)
       `,
-      [state, userId, client, expiresAt],
+      [state, userId, client, pkce.verifier, expiresAt],
     );
 
     const url = buildMicrosoftAuthorizeUrl({
       clientId: config.MICROSOFT_CLIENT_ID,
       redirectUri: config.MICROSOFT_REDIRECT_URI,
       state,
+      codeChallenge: pkce.challenge,
     });
 
     return { ok: true, url };
@@ -93,15 +98,22 @@ export const authMicrosoftRoutes: FastifyPluginAsync<
       ? await db.pool.query<{
           user_id: string;
           client: string;
+          code_verifier: string | null;
         }>(
           `
-            SELECT user_id, client
+            SELECT user_id, client, code_verifier
             FROM oauth_pending
             WHERE state = $1 AND provider = 'microsoft' AND expires_at > now()
           `,
           [request.query.state],
         )
-      : { rows: [] as Array<{ user_id: string; client: string }> };
+      : {
+          rows: [] as Array<{
+            user_id: string;
+            client: string;
+            code_verifier: string | null;
+          }>,
+        };
 
     const row = pending.rows[0];
     const client = row?.client === "desktop" ? "desktop" : "web";
@@ -120,7 +132,12 @@ export const authMicrosoftRoutes: FastifyPluginAsync<
     if (request.query.error) {
       return fail(request.query.error);
     }
-    if (!row || !request.query.code || !request.query.state) {
+    if (
+      !row ||
+      !request.query.code ||
+      !request.query.state ||
+      !row.code_verifier
+    ) {
       return fail("invalid_state");
     }
 
@@ -134,9 +151,20 @@ export const authMicrosoftRoutes: FastifyPluginAsync<
         config,
         row.user_id,
         request.query.code,
+        row.code_verifier,
       );
     } catch (error) {
       request.log.error({ err: error }, "Microsoft / Xbox link failed");
+      const detail = error instanceof Error ? error.message : "";
+      if (
+        detail.includes("AADSTS70002") ||
+        detail.includes("must include a 'client_secret'")
+      ) {
+        return fail("enable_public_client");
+      }
+      if (detail.includes("AADSTS70000") || detail.includes("invalid_grant")) {
+        return fail("code_expired");
+      }
       return fail("xbox_link_failed");
     }
 

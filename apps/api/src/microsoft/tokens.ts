@@ -8,13 +8,6 @@ import {
 } from "./oauth.js";
 import { authenticateXboxLive, type XboxSession } from "./xbox.js";
 
-export type StoredMicrosoftLink = {
-  userId: string;
-  liveUserId: string | null;
-  xuid: string;
-  userHash: string;
-};
-
 type LinkRow = {
   user_id: string;
   refresh_token_enc: string;
@@ -26,10 +19,6 @@ type LinkRow = {
   xsts_token_enc: string | null;
   xsts_expires_at: Date | null;
 };
-
-function clientSecret(config: Env): string | undefined {
-  return config.MICROSOFT_CLIENT_SECRET || undefined;
-}
 
 async function persistLiveAndXbox(
   db: Db,
@@ -76,12 +65,13 @@ export async function saveMicrosoftLinkFromCode(
   config: Env,
   userId: string,
   code: string,
+  codeVerifier: string,
 ): Promise<void> {
   const live = await exchangeMicrosoftCode({
     clientId: config.MICROSOFT_CLIENT_ID,
-    clientSecret: clientSecret(config),
     redirectUri: config.MICROSOFT_REDIRECT_URI,
     code,
+    codeVerifier,
   });
   const xbox = await authenticateXboxLive(live.access_token);
   await persistLiveAndXbox(db, config, userId, live, xbox);
@@ -108,7 +98,6 @@ export async function deleteMicrosoftLink(
   ]);
 }
 
-/** Returns a valid Xbox session, refreshing Live + XSTS tokens as needed. */
 export async function getValidXboxSession(
   db: Db,
   config: Env,
@@ -158,8 +147,6 @@ export async function getValidXboxSession(
   if (!liveAccess || !accessFresh) {
     live = await refreshMicrosoftToken({
       clientId: config.MICROSOFT_CLIENT_ID,
-      clientSecret: clientSecret(config),
-      redirectUri: config.MICROSOFT_REDIRECT_URI,
       refreshToken,
     });
     liveAccess = live.access_token;

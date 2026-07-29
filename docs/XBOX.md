@@ -1,72 +1,45 @@
 # Xbox / Microsoft — configuration
 
-PlayNext importe la biblio Xbox **comme Playnite** :
+## Choix : public client + PKCE (pas de secret)
 
-1. Login compte Microsoft (OAuth Live)
-2. Échange tokens Xbox Live (user.auth → XSTS)
-3. Historique PC via `titlehub.xboxlive.com/.../titlehistory`
-4. Packages installés locaux (AppX / Store) matchés par **Package Family Name** (`pfn`)
+Pour PlayNext (desktop / localhost), on utilise **uniquement** :
 
-## Limites (honnêtes)
+- client **public** + **PKCE**
+- `MICROSOFT_CLIENT_ID` seul
+- **pas** de `client_secret`
 
-- Ce n’est **pas** l’API entitlements / catalogue Game Pass complète (réservée aux éditeurs).
-- Un jeu Game Pass **jamais lancé** peut manquer ; on tente un enrichissement des packages installés inconnus via `titles/batch`.
-- Après résiliation Game Pass, des titres **déjà joués** peuvent encore apparaître.
+C’est le modèle adapté aux apps desktop (proche de Playnite).  
+Le mode Web + secret a été abandonné ici : trop fragile (`AADSTS7000215` / bascules qui brûlent le code OAuth).
 
-## Prérequis : un répertoire (tenant) Entra
+## Setup Entra (une fois)
 
-Microsoft a **désactivé** la création d’apps « hors répertoire ». Un compte perso `@outlook.com` / `@live.com` seul ne suffit plus : il faut un **tenant** (annuaire).
-
-### Chemin le plus simple (recommandé)
-
-1. Ouvre [Créer un compte Azure gratuit](https://azure.microsoft.com/free/) avec **le même** compte Microsoft que ton Xbox.
-2. Ça crée automatiquement un répertoire Entra à ton nom.
-3. Va sur [Entra admin center — App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)  
-   (plus clair que le portail Azure général).
-4. En haut à droite : vérifie que tu es dans **ton** répertoire (pas « Microsoft Services »).
-
-Alternative gratuite sans carte : [Microsoft 365 Developer Program](https://developer.microsoft.com/microsoft-365/dev-program) (sandbox + tenant).
-
-### Erreurs fréquentes
-
-| Message | Cause | Fix |
-|--------|--------|-----|
-| « créer des applications hors d’un répertoire a été déconseillée » | Pas de tenant | Créer un compte Azure free / M365 dev program |
-| `AADSTS16000` / compte live.com absent du tenant « Microsoft Services » | Mauvais contexte de portail | Se déconnecter, rouvrir [entra.microsoft.com](https://entra.microsoft.com/), choisir **ton** directory |
-
-## Enregistrer l’app PlayNext
-
-1. **App registrations** → **New registration**
-2. Name : `PlayNext`
-3. Supported account types : **Personal Microsoft accounts only**  
-   (ou « Accounts in any org directory and personal Microsoft accounts » si l’option perso-only n’apparaît pas)
-4. Redirect URI :
-   - Platform : **Web**
+1. [Entra → App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) (ton directory, pas « Microsoft Services »)
+2. **New registration** → `PlayNext`
+3. Comptes : **Personal Microsoft accounts only**
+4. Onglet **Configuration d’URI de redirection** :
+   - Ajouter plateforme **Mobile and desktop applications** (pas seulement Web)
    - URI : `http://localhost:3001/auth/microsoft/callback`
-5. Copier **Application (client) ID** → `MICROSOFT_CLIENT_ID` dans `.env`
-6. **Certificates & secrets** → New client secret → `MICROSOFT_CLIENT_SECRET`  
-   (recommandé pour une redirect Web)
-
-Scopes OAuth utilisés : `Xboxlive.signin` `Xboxlive.offline_access`.
-
-## Variables `.env`
+   - Si tu as une entrée **Web** avec la même URI : **supprime-la**  
+     (Web = client confidentiel → `AADSTS70002` même avec public flows = Yes)
+5. Onglet **Paramètres** → **Allow public client flows** → **Yes**
+6. Copier **Application (client) ID** → `.env` :
 
 ```env
-MICROSOFT_CLIENT_ID=
-MICROSOFT_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 MICROSOFT_REDIRECT_URI=http://localhost:3001/auth/microsoft/callback
 ```
 
-Redémarrer l’API après modification.
+Tu peux ignorer / supprimer `MICROSOFT_CLIENT_SECRET`.
 
-## Flow utilisateur (desktop)
+Redémarrer l’API, puis **un seul** essai : Connecter Microsoft → valider tout de suite.
 
-1. Se connecter Discord (session PlayNext)
-2. **Connecter Microsoft** → navigateur → compte MS / Xbox
-3. Deep link `playnext://auth/microsoft?ok=1`
-4. **Scanner Xbox** → historique + installés locaux → sync `launcher: xbox`
+## Ce que fait PlayNext ensuite
 
-## Privacy
+1. OAuth Microsoft (PKCE)
+2. Tokens Xbox Live (user.auth → XSTS)
+3. Historique PC `titlehub` + packages installés locaux (`pfn`)
 
-Transmis : `pfn` / title id logique, nom, installé, possédé.  
-**Jamais** : chemins d’install, compte Windows, contenu des dossiers.
+## Limites
+
+- Pas le catalogue Game Pass entitlements complet
+- Un jeu jamais lancé peut manquer

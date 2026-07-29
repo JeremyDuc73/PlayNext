@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+build/
+apps/desktop/src-tauri/target/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Tooling (local Rust toolchain if installed in-repo)
+.tools/
+
+# Logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test / coverage
+coverage/
+
+# Misc
+*.tsbuildinfo
+.turbo/

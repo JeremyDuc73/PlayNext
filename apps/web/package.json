@@ -1,0 +1,11 @@
+{
+  "name": "@playnext/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PlayNext marketing site (Astro) — scaffold later",
+  "scripts": {
+    "dev": "echo \"Astro site not scaffolded yet — see apps/web/README.md\" && exit 1",
+    "build": "echo \"Astro site not scaffolded yet — see apps/web/README.md\" && exit 1",
+    "typecheck": "echo \"skip web typecheck until Astro scaffold\""
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "playnext",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PlayNext — choisir un jeu ensemble, sans friction",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @playnext/api",
+    "dev:desktop": "npm run tauri:dev -w @playnext/desktop",
+    "dev:ui": "npm run dev -w @playnext/desktop",
+    "build:api": "npm run build -w @playnext/api",
+    "build:desktop": "npm run build -w @playnext/desktop",
+    "typecheck": "npm run typecheck -w @playnext/api && npm run typecheck -w @playnext/desktop",
+    "lint": "npm run typecheck",
+    "docker:up": "docker compose up -d postgres redis",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

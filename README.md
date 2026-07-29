@@ -1,0 +1,86 @@
+# PlayNext
+
+Application Windows desktop-first pour aider un groupe d’amis à choisir un jeu rapidement : détection locale, bibliothèques croisées, votes masqués, veto, Discord.
+
+Cahier des charges : `PlayNext_Cahier_des_charges_PC_V1.1.pdf`  
+Suivi produit / anti-oubli : [`BACKLOG.md`](./BACKLOG.md)
+
+## Structure
+
+```
+apps/
+  desktop/   # Tauri 2 + React + TypeScript (produit principal)
+  api/       # Fastify + PostgreSQL
+  web/       # Site Astro (réservé, pas encore scaffoldé)
+docker-compose.yml
+```
+
+## Prérequis
+
+- Node.js 20+
+- Docker (Postgres + Redis)
+- Rust + dépendances Tauri pour lancer l’app native  
+  - Windows : cible principale V1  
+  - Linux/WSL : utile pour l’API ; `tauri dev` nécessite les libs WebKit GTK
+
+### Rust local (optionnel, déjà utilisable dans ce repo)
+
+Si besoin d’un toolchain dans le projet :
+
+```bash
+export RUSTUP_HOME="$PWD/.tools/rustup"
+export CARGO_HOME="$PWD/.tools/cargo"
+source "$CARGO_HOME/env"
+```
+
+`.tools/` est ignoré par git.
+
+## Démarrage rapide
+
+```bash
+cp .env.example .env
+npm install
+npm run docker:up
+npm run dev:api
+```
+
+Dans un autre terminal (UI navigateur, sans shell Tauri) :
+
+```bash
+npm run dev:ui
+```
+
+App native (quand la toolchain Tauri est prête) :
+
+```bash
+npm run dev:desktop
+```
+
+## Endpoints API utiles
+
+| Route | Rôle |
+|-------|------|
+| `GET /health` | Santé API + Postgres |
+| `GET /auth/discord/status` | Discord configuré ? |
+| `GET /auth/discord` | Démarre OAuth (nécessite credentials) |
+| `GET /auth/me` | Session (pas encore implémentée) |
+
+Renseigner `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` dans `.env` pour activer le login.
+
+## Scripts root
+
+| Script | Action |
+|--------|--------|
+| `npm run dev:api` | API en watch |
+| `npm run dev:ui` | Frontend Vite |
+| `npm run dev:desktop` | Tauri dev |
+| `npm run docker:up` | Postgres + Redis |
+| `npm run typecheck` | Types API + desktop |
+
+## Phase en cours
+
+**P0b — App Windows smoke-testable** : deep link Discord `playnext://`, build NSIS.  
+Ensuite **P1a — scan Steam** sur le PC réel.
+
+Déroulé complet : [`BACKLOG.md`](./BACKLOG.md) (section *Déroulé recommandé*).  
+Build Windows : [`docs/WINDOWS.md`](./docs/WINDOWS.md).

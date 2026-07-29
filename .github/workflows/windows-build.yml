@@ -1,0 +1,39 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "apps/desktop/**"
+      - "package-lock.json"
+      - ".github/workflows/windows-build.yml"
+
+jobs:
+  build-windows:
+    name: NSIS installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri (NSIS)
+        working-directory: apps/desktop
+        run: npm run tauri:build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: playnext-windows-nsis
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error

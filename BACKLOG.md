@@ -114,15 +114,15 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 ### Connecteurs (ne pas en faire 8 d’un coup, mais tous restent listés)
 
-- [~] Steam (manifestes, AppID, installé ; sync API sans chemins) — code prêt, valider après rebuild Windows
-- [ ] Steam Web API possession (profil) — plus tard si clé dispo
+- [x] Steam (manifestes, AppID, installé ; sync API sans chemins) — validé (~143 possédés)
+- [x] Steam Web API possession (profil) — via `STEAM_WEB_API_KEY` + steamId local
+- [~] Xbox / Microsoft Store — OAuth Live + title history PC + AppX installés (pfn) ; valider après rebuild Windows + `MICROSOFT_CLIENT_ID` (voir `docs/XBOX.md`)
 - [ ] Epic Games Store
 - [ ] Riot natif : League of Legends et VALORANT **séparés**, chemins perso OK ; pas de faux positif Client/Vanguard seuls
 - [ ] Battle.net
 - [ ] Ubisoft Connect
 - [ ] EA app
 - [ ] GOG Galaxy
-- [ ] Xbox / Microsoft Store (best-effort)
 - [ ] Ajout manuel / dossier choisi par l’utilisateur
 
 
@@ -140,9 +140,9 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 ### Sync & privacy scan
 
-- [x] Transmis : id jeu, launcher, installé, lançable, possédé déclaré, date sync — Steam
+- [x] Transmis : id jeu, launcher, installé, lançable, possédé déclaré, date sync — Steam + Xbox (pfn)
 - [x] Non transmis : chemins, exécutables, compte Windows, contenu dossiers — rejet API si paths
-- [x] Local only : chemins Steam jamais renvoyés par la commande native
+- [x] Local only : chemins Steam / Xbox jamais renvoyés par les commandes natives
 - [ ] Écran / page « Mes données »
 
 

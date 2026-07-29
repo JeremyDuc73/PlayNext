@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SteamLibrary } from "./components/SteamLibrary";
+import { XboxLibrary } from "./components/XboxLibrary";
 import {
   exchangeHandoff,
   fetchMe,
@@ -34,17 +35,27 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authBanner, setAuthBanner] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
+  const [microsoftLinkedSignal, setMicrosoftLinkedSignal] = useState(0);
   const isDesktop = runningInDesktopShell();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const auth = params.get("auth");
+    const xbox = params.get("xbox");
     if (auth === "ok") {
       setAuthBanner("Connexion Discord réussie.");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (auth === "error") {
       const reason = params.get("reason") ?? "unknown";
       setAuthBanner(`Connexion Discord échouée (${reason}).`);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (xbox === "ok") {
+      setAuthBanner("Compte Microsoft / Xbox lié.");
+      setMicrosoftLinkedSignal((n) => n + 1);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (xbox === "error") {
+      const reason = params.get("reason") ?? "unknown";
+      setAuthBanner(`Lien Microsoft échoué (${reason}).`);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -55,6 +66,18 @@ export default function App() {
     async function applyDeepLink(url: string) {
       const parsed = parseAuthDeepLink(url);
       if (!parsed) return;
+
+      if (parsed.kind === "microsoft") {
+        if (!cancelled) {
+          if (parsed.error) {
+            setAuthBanner(`Lien Microsoft échoué (${parsed.error}).`);
+          } else if (parsed.ok) {
+            setAuthBanner("Compte Microsoft / Xbox lié. Tu peux scanner Xbox.");
+            setMicrosoftLinkedSignal((n) => n + 1);
+          }
+        }
+        return;
+      }
 
       if (parsed.error) {
         if (!cancelled) {
@@ -209,8 +232,7 @@ export default function App() {
               <div>
                 <h1>Salut, {user.displayName}</h1>
                 <p>
-                  Scanne ta bibliothèque Steam locale, puis on pourra croiser
-                  avec tes amis.
+                  Scanne Steam et Xbox, puis on pourra croiser avec tes amis.
                 </p>
               </div>
               <div className="user-card compact">
@@ -241,6 +263,11 @@ export default function App() {
 
             <SteamLibrary
               enabled={Boolean(user)}
+              onBanner={(message) => setAuthBanner(message)}
+            />
+            <XboxLibrary
+              enabled={Boolean(user)}
+              microsoftLinkedSignal={microsoftLinkedSignal}
               onBanner={(message) => setAuthBanner(message)}
             />
           </>

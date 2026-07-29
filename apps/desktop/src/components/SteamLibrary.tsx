@@ -25,7 +25,9 @@ export function SteamLibrary({ enabled, onBanner }: Props) {
     setLoading(true);
     void fetchMyLibrary()
       .then((list) => {
-        if (!cancelled) setGames(list);
+        if (!cancelled) {
+          setGames(list.filter((g) => g.launcher === "steam"));
+        }
       })
       .catch(() => {
         if (!cancelled) onBanner("Impossible de charger la bibliothèque.");
@@ -58,7 +60,7 @@ export function SteamLibrary({ enabled, onBanner }: Props) {
 
       const sync = await syncSteamLibrary(result.games, result.steamId);
       const list = await fetchMyLibrary();
-      setGames(list);
+      setGames(list.filter((g) => g.launcher === "steam"));
 
       const warn =
         result.warnings.length > 0

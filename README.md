@@ -62,10 +62,14 @@ npm run dev:desktop
 |-------|------|
 | `GET /health` | Santé API + Postgres |
 | `GET /auth/discord/status` | Discord configuré ? |
-| `GET /auth/discord` | Démarre OAuth (nécessite credentials) |
-| `GET /auth/me` | Session (pas encore implémentée) |
+| `GET /auth/discord` | Démarre OAuth Discord |
+| `GET /auth/me` | Session courante |
+| `POST /auth/microsoft/start` | Démarre lien Microsoft / Xbox (session requise) |
+| `POST /library/sync` | Sync Steam |
+| `POST /library/xbox/sync` | Sync Xbox (title history + installés) |
+| `GET /library/me` | Bibliothèque sync |
 
-Renseigner `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` dans `.env` pour activer le login.
+Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`. Xbox : [`docs/XBOX.md`](./docs/XBOX.md).
 
 ## Scripts root
 
@@ -79,8 +83,8 @@ Renseigner `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` dans `.env` pour active
 
 ## Phase en cours
 
-**P0b — App Windows smoke-testable** : deep link Discord `playnext://`, build NSIS.  
-Ensuite **P1a — scan Steam** sur le PC réel.
+**P1 — Bibliothèque** : Steam validé ; Xbox (OAuth + title history) à valider sur Windows.
 
 Déroulé complet : [`BACKLOG.md`](./BACKLOG.md) (section *Déroulé recommandé*).  
-Build Windows : [`docs/WINDOWS.md`](./docs/WINDOWS.md).
+Build Windows : [`docs/WINDOWS.md`](./docs/WINDOWS.md).  
+Xbox : [`docs/XBOX.md`](./docs/XBOX.md).

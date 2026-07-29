@@ -1,7 +1,9 @@
 mod steam;
+mod xbox;
 
 use serde::Serialize;
 use steam::SteamScanResult;
+use xbox::XboxScanResult;
 
 /// Explicit allowlist of native commands. Add new commands here only after review.
 #[derive(Serialize)]
@@ -31,6 +33,11 @@ fn scan_steam() -> SteamScanResult {
     steam::scan_steam_libraries()
 }
 
+#[tauri::command]
+fn scan_xbox() -> XboxScanResult {
+    xbox::scan_xbox_installed()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -55,7 +62,12 @@ pub fn run() {
             let _ = app;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_app_info, ping_native, scan_steam])
+        .invoke_handler(tauri::generate_handler![
+            get_app_info,
+            ping_native,
+            scan_steam,
+            scan_xbox
+        ])
         .run(tauri::generate_context!())
         .expect("error while running PlayNext");
 }

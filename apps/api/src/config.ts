@@ -20,10 +20,20 @@ const envSchema = z.object({
     .url()
     .default("http://localhost:3001/auth/discord/callback"),
   STEAM_WEB_API_KEY: z.string().optional().default(""),
+  MICROSOFT_CLIENT_ID: z.string().optional().default(""),
+  MICROSOFT_CLIENT_SECRET: z.string().optional().default(""),
+  MICROSOFT_REDIRECT_URI: z
+    .string()
+    .url()
+    .default("http://localhost:3001/auth/microsoft/callback"),
 });
 
 export function isSteamWebApiConfigured(config: Env): boolean {
   return Boolean(config.STEAM_WEB_API_KEY);
+}
+
+export function isMicrosoftConfigured(config: Env): boolean {
+  return Boolean(config.MICROSOFT_CLIENT_ID);
 }
 
 export type Env = z.infer<typeof envSchema>;

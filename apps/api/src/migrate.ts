@@ -61,5 +61,30 @@ export async function migrate(db: Db): Promise<void> {
     );
 
     CREATE INDEX IF NOT EXISTS library_sync_runs_user_id_idx ON library_sync_runs(user_id);
+
+    CREATE TABLE IF NOT EXISTS oauth_pending (
+      state TEXT PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      client TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS oauth_pending_expires_at_idx ON oauth_pending(expires_at);
+
+    CREATE TABLE IF NOT EXISTS microsoft_links (
+      user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      refresh_token_enc TEXT NOT NULL,
+      access_token_enc TEXT,
+      access_expires_at TIMESTAMPTZ,
+      live_user_id TEXT,
+      xuid TEXT NOT NULL,
+      user_hash TEXT NOT NULL,
+      xsts_token_enc TEXT,
+      xsts_expires_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
 }

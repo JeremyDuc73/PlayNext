@@ -6,6 +6,7 @@ import type { Env } from "./config.js";
 import type { Db } from "./db.js";
 import { authDiscordRoutes } from "./routes/auth-discord.js";
 import { healthRoutes } from "./routes/health.js";
+import { libraryRoutes } from "./routes/library.js";
 
 export async function buildApp(config: Env, db: Db) {
   const app = Fastify({
@@ -18,13 +19,23 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(cookie, {
     secret: config.SESSION_SECRET,
   });
+  // Packaged Tauri on Windows uses https://tauri.localhost (not APP_URL).
+  const corsOrigins = [
+    config.APP_URL,
+    config.WEB_URL,
+    "https://tauri.localhost",
+    "http://tauri.localhost",
+    "tauri://localhost",
+  ];
+
   await app.register(cors, {
-    origin: [config.APP_URL, config.WEB_URL],
+    origin: corsOrigins,
     credentials: true,
   });
 
   await app.register(healthRoutes, { db });
   await app.register(authDiscordRoutes, { config, db });
+  await app.register(libraryRoutes, { db });
 
   app.get("/", async () => ({
     ok: true,
@@ -35,6 +46,8 @@ export async function buildApp(config: Env, db: Db) {
       discordLogin: "/auth/discord",
       me: "/auth/me",
       logout: "POST /auth/logout",
+      librarySync: "POST /library/sync",
+      libraryMe: "GET /library/me",
     },
   }));
 

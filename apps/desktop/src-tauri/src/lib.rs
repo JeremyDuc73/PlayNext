@@ -1,4 +1,7 @@
+mod steam;
+
 use serde::Serialize;
+use steam::SteamScanResult;
 
 /// Explicit allowlist of native commands. Add new commands here only after review.
 #[derive(Serialize)]
@@ -23,6 +26,11 @@ fn ping_native() -> &'static str {
     "pong"
 }
 
+#[tauri::command]
+fn scan_steam() -> SteamScanResult {
+    steam::scan_steam_libraries()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -42,13 +50,12 @@ pub fn run() {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                // Dev + portable runs: register schemes for the current executable.
                 let _ = app.deep_link().register_all();
             }
             let _ = app;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_app_info, ping_native])
+        .invoke_handler(tauri::generate_handler![get_app_info, ping_native, scan_steam])
         .run(tauri::generate_context!())
         .expect("error while running PlayNext");
 }

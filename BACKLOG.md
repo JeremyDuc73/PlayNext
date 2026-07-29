@@ -24,10 +24,9 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 1. **P0a — Socle API + Discord web** ✅  
    Monorepo, Docker, OAuth cookie sur `localhost`, profil `/auth/me`.
 
-2. **P0b — App Windows smoke-testable** ← *en cours*  
-   Login Discord via navigateur système + deep link `playnext://` (les cookies du browser ne passent pas dans Tauri).  
-   Build / installateur Windows (même non signé) pour ouvrir l’app sur le PC réel.  
-   *Avant* le scan Steam : sinon on ne valide rien sur la machine où Steam vit.
+2. **P0b — App Windows smoke-testable** ✅  
+   Login Discord via navigateur système + deep link `playnext://`.  
+   Build NSIS CI + install sur PC réel + API WSL + CORS `tauri.localhost` validés.
 
 3. **P1a — Scan Steam**  
    Connecteur Rust + fixtures, puis vrai scan sur le PC Windows. Sync API sans chemins. UI bibliothèque perso.
@@ -115,7 +114,8 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 ### Connecteurs (ne pas en faire 8 d’un coup, mais tous restent listés)
 
-- [ ] Steam (manifestes, AppID, installé ; API possession si dispo)
+- [~] Steam (manifestes, AppID, installé ; sync API sans chemins) — code prêt, valider après rebuild Windows
+- [ ] Steam Web API possession (profil) — plus tard si clé dispo
 - [ ] Epic Games Store
 - [ ] Riot natif : League of Legends et VALORANT **séparés**, chemins perso OK ; pas de faux positif Client/Vanguard seuls
 - [ ] Battle.net
@@ -129,7 +129,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 ### Moteur de scan
 
-- [ ] Priorité manifestes / registre / emplacements connus (pas de scan disque agressif)
+- [x] Priorité manifestes / registre / emplacements connus (pas de scan disque agressif) — Steam V1
 - [ ] Scan différentiel après premier passage
 - [ ] Correspondance catalogue + score de confiance
 - [ ] Validation UI des associations incertaines
@@ -140,9 +140,9 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 ### Sync & privacy scan
 
-- [ ] Transmis : id jeu, launcher, installé, lançable, possédé déclaré, date sync
-- [ ] Non transmis : chemins, exécutables, compte Windows, contenu dossiers
-- [ ] Local only : détails techniques scan, logs exportables à la demande
+- [x] Transmis : id jeu, launcher, installé, lançable, possédé déclaré, date sync — Steam
+- [x] Non transmis : chemins, exécutables, compte Windows, contenu dossiers — rejet API si paths
+- [x] Local only : chemins Steam jamais renvoyés par la commande native
 - [ ] Écran / page « Mes données »
 
 
@@ -396,5 +396,5 @@ Quand on reporte quelque chose hors phase prévue, ajouter une ligne :
 
 ## Prochaine action concrète
 
-**P0b en cours** — handoff desktop + doc/CI Windows.  
-Suite : build/install sur le PC Windows, valider Discord in-app, puis **P1a scan Steam**.
+**P1a en cours** — scan Steam + sync API implémentés (à rebuild Windows pour tester).  
+Commit/push de ton côté : CORS, HOST example, Steam Rust, routes `/library/*`, UI.

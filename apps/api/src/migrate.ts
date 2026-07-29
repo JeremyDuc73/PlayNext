@@ -32,5 +32,34 @@ export async function migrate(db: Db): Promise<void> {
       used_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS user_games (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      launcher TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      installed BOOLEAN NOT NULL DEFAULT false,
+      owned BOOLEAN NOT NULL DEFAULT true,
+      launchable BOOLEAN NOT NULL DEFAULT false,
+      hidden BOOLEAN NOT NULL DEFAULT false,
+      synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (user_id, launcher, external_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS user_games_user_id_idx ON user_games(user_id);
+    CREATE INDEX IF NOT EXISTS user_games_launcher_idx ON user_games(launcher);
+
+    CREATE TABLE IF NOT EXISTS library_sync_runs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      source TEXT NOT NULL,
+      game_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS library_sync_runs_user_id_idx ON library_sync_runs(user_id);
   `);
 }

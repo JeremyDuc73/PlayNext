@@ -80,3 +80,49 @@ export async function logoutRequest(): Promise<void> {
   await apiFetch("/auth/logout", { method: "POST" });
   setStoredSessionToken(null);
 }
+
+export type LibraryGame = {
+  id: string;
+  launcher: string;
+  externalId: string;
+  name: string;
+  installed: boolean;
+  owned: boolean;
+  launchable: boolean;
+};
+
+export type SteamGamePayload = {
+  launcher: "steam";
+  externalId: string;
+  name: string;
+  installed: boolean;
+  owned: boolean;
+  launchable: boolean;
+};
+
+export async function syncSteamLibrary(games: SteamGamePayload[]): Promise<{
+  synced: number;
+  installed: number;
+}> {
+  const response = await apiFetch("/library/sync", {
+    method: "POST",
+    body: JSON.stringify({ source: "steam", games }),
+  });
+  if (!response.ok) {
+    throw new Error(`sync_failed_${response.status}`);
+  }
+  const data = (await response.json()) as {
+    ok: boolean;
+    synced: number;
+    installed: number;
+  };
+  return { synced: data.synced, installed: data.installed };
+}
+
+export async function fetchMyLibrary(): Promise<LibraryGame[]> {
+  const response = await apiFetch("/library/me");
+  if (response.status === 401) return [];
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = (await response.json()) as { ok: boolean; games: LibraryGame[] };
+  return data.games;
+}

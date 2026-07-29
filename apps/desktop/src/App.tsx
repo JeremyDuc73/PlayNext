@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { SteamLibrary } from "./components/SteamLibrary";
 import {
   exchangeHandoff,
   fetchMe,
@@ -199,42 +200,49 @@ export default function App() {
         </div>
       </header>
 
-      <main className="hero">
+      <main className={user ? "main-logged" : "hero"}>
         {authBanner ? <p className="auth-banner">{authBanner}</p> : null}
 
         {user ? (
           <>
-            <h1>Salut, {user.displayName}</h1>
-            <p>
-              Compte Discord lié
-              {isDesktop ? " dans l’app Windows" : ""}. Prochaine étape : build
-              installable, puis scan Steam sur ton PC.
-            </p>
-            <div className="user-card">
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  width={48}
-                  height={48}
-                  className="user-avatar"
-                />
-              ) : (
-                <div className="user-avatar fallback" aria-hidden="true" />
-              )}
+            <div className="logged-header">
               <div>
-                <strong>{user.displayName}</strong>
-                <div className="muted">@{user.username}</div>
+                <h1>Salut, {user.displayName}</h1>
+                <p>
+                  Scanne ta bibliothèque Steam locale, puis on pourra croiser
+                  avec tes amis.
+                </p>
+              </div>
+              <div className="user-card compact">
+                {user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="user-avatar"
+                  />
+                ) : (
+                  <div className="user-avatar fallback" aria-hidden="true" />
+                )}
+                <div>
+                  <strong>{user.displayName}</strong>
+                  <div className="muted">@{user.username}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={logout}
+                >
+                  Quitter
+                </button>
               </div>
             </div>
-            <div className="actions">
-              <button type="button" className="btn btn-secondary" disabled>
-                Scan Steam — après build Windows
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={logout}>
-                Se déconnecter
-              </button>
-            </div>
+
+            <SteamLibrary
+              enabled={Boolean(user)}
+              onBanner={(message) => setAuthBanner(message)}
+            />
           </>
         ) : (
           <>
@@ -270,29 +278,30 @@ export default function App() {
         )}
       </main>
 
-      <section className="panel-row" aria-label="Prochaines étapes">
-        <article className="panel">
-          <h2>Où on en est</h2>
-          <ul>
-            <li>Discord web validé</li>
-            <li>Handoff desktop `playnext://`</li>
-            <li>Build Windows ensuite</li>
-            <li>Puis scan Steam réel</li>
-          </ul>
-        </article>
-        <article className="panel">
-          <h2>Mode</h2>
-          <p>{isDesktop ? "Shell Tauri (desktop)" : "Aperçu navigateur"}</p>
-        </article>
-        <article className="panel">
-          <h2>Runtime</h2>
-          <p>
-            {appInfo
-              ? `${appInfo.name} ${appInfo.version} · ${appInfo.platform}`
-              : "Chargement natif…"}
-          </p>
-        </article>
-      </section>
+      {!user ? (
+        <section className="panel-row" aria-label="Prochaines étapes">
+          <article className="panel">
+            <h2>Où on en est</h2>
+            <ul>
+              <li>Discord desktop OK</li>
+              <li>Scan Steam en cours d’intégration</li>
+              <li>Ensuite : groupes</li>
+            </ul>
+          </article>
+          <article className="panel">
+            <h2>Mode</h2>
+            <p>{isDesktop ? "Shell Tauri (desktop)" : "Aperçu navigateur"}</p>
+          </article>
+          <article className="panel">
+            <h2>Runtime</h2>
+            <p>
+              {appInfo
+                ? `${appInfo.name} ${appInfo.version} · ${appInfo.platform}`
+                : "Chargement natif…"}
+            </p>
+          </article>
+        </section>
+      ) : null}
 
       <footer className="footer">
         <span>

@@ -17,7 +17,7 @@ export function SteamLibrary({ enabled, onBanner }: Props) {
   const [games, setGames] = useState<LibraryGame[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [filter, setFilter] = useState<"all" | "installed">("installed");
+  const [filter, setFilter] = useState<"all" | "installed">("all");
 
   useEffect(() => {
     if (!enabled) return;
@@ -56,7 +56,7 @@ export function SteamLibrary({ enabled, onBanner }: Props) {
         return;
       }
 
-      const sync = await syncSteamLibrary(result.games);
+      const sync = await syncSteamLibrary(result.games, result.steamId);
       const list = await fetchMyLibrary();
       setGames(list);
 
@@ -64,8 +64,13 @@ export function SteamLibrary({ enabled, onBanner }: Props) {
         result.warnings.length > 0
           ? ` (${result.warnings.length} avertissement(s))`
           : "";
+      const ownedPart = sync.ownedEnriched
+        ? `, ${sync.ownedCount} possédés (API Steam)`
+        : sync.hint
+          ? ` — ${sync.hint}`
+          : "";
       onBanner(
-        `Steam OK — ${sync.synced} jeux sync, ${sync.installed} installés, ${result.libraryCount} bibliothèque(s)${warn}.`,
+        `Steam OK — ${sync.synced} jeux sync, ${sync.installed} installés${ownedPart}, ${result.libraryCount} biblio(s)${warn}.`,
       );
     } catch (error) {
       onBanner(

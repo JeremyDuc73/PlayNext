@@ -1,11 +1,14 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
+import type { Env } from "../config.js";
 import type { Db } from "../db.js";
 import { getSessionToken } from "../auth/request-session.js";
 import { findUserBySessionToken } from "../auth/session.js";
+import { fetchSteamOwnedGames, mergeSteamLibrary } from "../steam/owned.js";
 
 type LibraryRoutesOptions = {
   db: Db;
+  config: Env;
 };
 
 const syncGameSchema = z.object({
@@ -20,18 +23,27 @@ const syncGameSchema = z.object({
 const syncBodySchema = z.object({
   games: z.array(syncGameSchema).max(5000),
   source: z.literal("steam").default("steam"),
+  steamId: z
+    .string()
+    .regex(/^7656\d{13}$/)
+    .optional(),
 });
 
 export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
   app,
   opts,
 ) => {
-  const { db } = opts;
+  const { db, config } = opts;
 
   async function requireUserId(request: FastifyRequest): Promise<string | null> {
     const user = await findUserBySessionToken(db, getSessionToken(request));
     return user?.id ?? null;
   }
+
+  app.get("/library/steam/status", async () => ({
+    ok: true,
+    ownedApiConfigured: Boolean(config.STEAM_WEB_API_KEY),
+  }));
 
   app.post("/library/sync", async (request, reply) => {
     const userId = await requireUserId(request);
@@ -62,6 +74,30 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       });
     }
 
+    let games = parsed.data.games;
+    let ownedEnriched = false;
+    let ownedCount = 0;
+
+    if (parsed.data.steamId && config.STEAM_WEB_API_KEY) {
+      try {
+        const owned = await fetchSteamOwnedGames(
+          config.STEAM_WEB_API_KEY,
+          parsed.data.steamId,
+        );
+        ownedCount = owned.length;
+        games = mergeSteamLibrary(parsed.data.games, owned);
+        ownedEnriched = true;
+      } catch (error) {
+        request.log.warn({ err: error }, "Steam owned enrichment failed");
+        return reply.code(502).send({
+          ok: false,
+          error: "steam_owned_failed",
+          message:
+            "Impossible de récupérer la bibliothèque Steam possédée. Réessaie ou vérifie la clé API.",
+        });
+      }
+    }
+
     const client = await db.pool.connect();
     try {
       await client.query("begin");
@@ -74,7 +110,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         [userId],
       );
 
-      for (const game of parsed.data.games) {
+      for (const game of games) {
         await client.query(
           `
             INSERT INTO user_games (
@@ -100,7 +136,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
           INSERT INTO library_sync_runs (user_id, source, game_count)
           VALUES ($1, $2, $3)
         `,
-        [userId, parsed.data.source, parsed.data.games.length],
+        [userId, parsed.data.source, games.length],
       );
 
       await client.query("commit");
@@ -112,13 +148,20 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       client.release();
     }
 
-    const installed = parsed.data.games.filter((g) => g.installed).length;
+    const installed = games.filter((g) => g.installed).length;
 
     return {
       ok: true,
-      synced: parsed.data.games.length,
+      synced: games.length,
       installed,
+      ownedEnriched,
+      ownedCount,
       source: "steam",
+      hint: ownedEnriched
+        ? undefined
+        : config.STEAM_WEB_API_KEY
+          ? "Ajoute un steamId local pour enrichir avec les jeux non installés."
+          : "Configure STEAM_WEB_API_KEY pour synchroniser aussi les jeux non installés.",
     };
   });
 

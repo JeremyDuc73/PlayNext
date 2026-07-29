@@ -2,7 +2,9 @@ mod detect;
 mod parse;
 
 pub use detect::{scan_steam_libraries, SteamScanResult};
-pub use parse::{parse_app_manifest, parse_library_folders, SteamGameDraft};
+pub use parse::{
+    parse_app_manifest, parse_library_folders, parse_most_recent_steam_id, SteamGameDraft,
+};
 
 #[cfg(test)]
 mod tests {
@@ -58,6 +60,29 @@ mod tests {
         assert_eq!(game.name, "Counter-Strike 2");
         assert!(game.installed);
         assert!(game.launchable);
+    }
+
+    #[test]
+    fn parses_most_recent_steam_id() {
+        let raw = r#"
+"users"
+{
+	"76561198000000001"
+	{
+		"AccountName"		"old"
+		"MostRecent"		"0"
+	}
+	"76561198000000002"
+	{
+		"AccountName"		"current"
+		"MostRecent"		"1"
+	}
+}
+"#;
+        assert_eq!(
+            parse_most_recent_steam_id(raw).as_deref(),
+            Some("76561198000000002")
+        );
     }
 
     #[test]

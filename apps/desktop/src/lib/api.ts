@@ -100,13 +100,23 @@ export type SteamGamePayload = {
   launchable: boolean;
 };
 
-export async function syncSteamLibrary(games: SteamGamePayload[]): Promise<{
+export async function syncSteamLibrary(
+  games: SteamGamePayload[],
+  steamId?: string | null,
+): Promise<{
   synced: number;
   installed: number;
+  ownedEnriched: boolean;
+  ownedCount: number;
+  hint?: string;
 }> {
   const response = await apiFetch("/library/sync", {
     method: "POST",
-    body: JSON.stringify({ source: "steam", games }),
+    body: JSON.stringify({
+      source: "steam",
+      games,
+      ...(steamId ? { steamId } : {}),
+    }),
   });
   if (!response.ok) {
     throw new Error(`sync_failed_${response.status}`);
@@ -115,8 +125,17 @@ export async function syncSteamLibrary(games: SteamGamePayload[]): Promise<{
     ok: boolean;
     synced: number;
     installed: number;
+    ownedEnriched?: boolean;
+    ownedCount?: number;
+    hint?: string;
   };
-  return { synced: data.synced, installed: data.installed };
+  return {
+    synced: data.synced,
+    installed: data.installed,
+    ownedEnriched: Boolean(data.ownedEnriched),
+    ownedCount: data.ownedCount ?? 0,
+    hint: data.hint,
+  };
 }
 
 export async function fetchMyLibrary(): Promise<LibraryGame[]> {

@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::parse::{parse_app_manifest, parse_library_folders, SteamGameDraft};
+use super::parse::{
+    parse_app_manifest, parse_library_folders, parse_most_recent_steam_id, SteamGameDraft,
+};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +13,8 @@ pub struct SteamScanResult {
     pub steam_found: bool,
     /// Number of Steam libraries discovered (paths stay local, never returned).
     pub library_count: u32,
+    /// SteamID64 of the most recent local login (for owned-games API enrich).
+    pub steam_id: Option<String>,
     pub games: Vec<ScannedSteamGame>,
     pub warnings: Vec<String>,
 }
@@ -33,10 +37,13 @@ pub fn scan_steam_libraries() -> SteamScanResult {
         return SteamScanResult {
             steam_found: false,
             library_count: 0,
+            steam_id: None,
             games: vec![],
             warnings,
         };
     };
+
+    let steam_id = read_steam_id(&steam_root, &mut warnings);
 
     let library_paths = match resolve_library_paths(&steam_root, &mut warnings) {
         Ok(paths) => paths,
@@ -70,8 +77,23 @@ pub fn scan_steam_libraries() -> SteamScanResult {
     SteamScanResult {
         steam_found: true,
         library_count: library_paths.len() as u32,
+        steam_id,
         games,
         warnings,
+    }
+}
+
+fn read_steam_id(steam_root: &Path, warnings: &mut Vec<String>) -> Option<String> {
+    let path = steam_root.join("config").join("loginusers.vdf");
+    match fs::read_to_string(&path) {
+        Ok(content) => parse_most_recent_steam_id(&content).or_else(|| {
+            warnings.push("Compte Steam local non déterminé (loginusers).".into());
+            None
+        }),
+        Err(_) => {
+            warnings.push("Impossible de lire le compte Steam local.".into());
+            None
+        }
     }
 }
 

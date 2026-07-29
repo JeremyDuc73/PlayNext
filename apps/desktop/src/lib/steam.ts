@@ -4,6 +4,7 @@ import type { SteamGamePayload } from "./api";
 export type SteamScanResult = {
   steamFound: boolean;
   libraryCount: number;
+  steamId?: string | null;
   games: SteamGamePayload[];
   warnings: string[];
 };
@@ -14,6 +15,7 @@ export async function scanSteamLocal(): Promise<SteamScanResult> {
   return {
     steamFound: result.steamFound,
     libraryCount: result.libraryCount,
+    steamId: result.steamId ?? null,
     warnings: result.warnings ?? [],
     games: (result.games ?? []).map((game) => ({
       launcher: "steam" as const,

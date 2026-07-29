@@ -35,7 +35,7 @@ export async function buildApp(config: Env, db: Db) {
 
   await app.register(healthRoutes, { db });
   await app.register(authDiscordRoutes, { config, db });
-  await app.register(libraryRoutes, { db });
+  await app.register(libraryRoutes, { db, config });
 
   app.get("/", async () => ({
     ok: true,

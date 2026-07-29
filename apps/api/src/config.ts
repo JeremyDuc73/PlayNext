@@ -19,7 +19,12 @@ const envSchema = z.object({
     .string()
     .url()
     .default("http://localhost:3001/auth/discord/callback"),
+  STEAM_WEB_API_KEY: z.string().optional().default(""),
 });
+
+export function isSteamWebApiConfigured(config: Env): boolean {
+  return Boolean(config.STEAM_WEB_API_KEY);
+}
 
 export type Env = z.infer<typeof envSchema>;
 

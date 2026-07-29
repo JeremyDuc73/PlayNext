@@ -67,9 +67,12 @@ npm run dev:desktop
 | `POST /auth/microsoft/start` | Démarre lien Microsoft / Xbox (session requise) |
 | `POST /library/sync` | Sync Steam |
 | `POST /library/xbox/sync` | Sync Xbox (title history + installés) |
+| `POST /auth/epic/exchange` | Lien compte Epic (authorizationCode) |
+| `POST /library/epic/sync` | Sync Epic (possédés + installés) |
 | `GET /library/me` | Bibliothèque sync |
 
-Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`. Xbox : [`docs/XBOX.md`](./docs/XBOX.md).
+Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`.  
+Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.md).
 
 ## Scripts root
 

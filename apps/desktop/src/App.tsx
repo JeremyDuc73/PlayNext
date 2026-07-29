@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { EpicLibrary } from "./components/EpicLibrary";
 import { SteamLibrary } from "./components/SteamLibrary";
 import { XboxLibrary } from "./components/XboxLibrary";
 import {
@@ -247,7 +248,8 @@ export default function App() {
               <div>
                 <h1>Salut, {user.displayName}</h1>
                 <p>
-                  Scanne Steam et Xbox, puis on pourra croiser avec tes amis.
+                  Scanne Steam, Xbox et Epic, puis on pourra croiser avec tes
+                  amis.
                 </p>
               </div>
               <div className="user-card compact">
@@ -283,6 +285,10 @@ export default function App() {
             <XboxLibrary
               enabled={Boolean(user)}
               microsoftLinkedSignal={microsoftLinkedSignal}
+              onBanner={(message) => setAuthBanner(message)}
+            />
+            <EpicLibrary
+              enabled={Boolean(user)}
               onBanner={(message) => setAuthBanner(message)}
             />
           </>

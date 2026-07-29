@@ -229,3 +229,95 @@ export async function syncXboxLibrary(
     hint: data.hint,
   };
 }
+
+export type EpicStatus = {
+  linked: boolean;
+  accountId: string | null;
+  displayName: string | null;
+};
+
+export async function fetchEpicStatus(): Promise<EpicStatus> {
+  const response = await apiFetch("/auth/epic/status");
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = (await response.json()) as {
+    ok: boolean;
+    linked: boolean;
+    accountId: string | null;
+    displayName: string | null;
+  };
+  return {
+    linked: data.linked,
+    accountId: data.accountId,
+    displayName: data.displayName,
+  };
+}
+
+export async function startEpicLink(): Promise<{ url: string; hint?: string }> {
+  const response = await apiFetch("/auth/epic/start", { method: "POST" });
+  if (!response.ok) throw new Error(`epic_start_${response.status}`);
+  const data = (await response.json()) as {
+    ok: boolean;
+    url: string;
+    hint?: string;
+  };
+  return { url: data.url, hint: data.hint };
+}
+
+export async function exchangeEpicCode(code: string): Promise<EpicStatus> {
+  const response = await apiFetch("/auth/epic/exchange", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(
+      body?.message ?? body?.error ?? `epic_exchange_${response.status}`,
+    );
+  }
+  const data = (await response.json()) as {
+    linked: boolean;
+    accountId: string | null;
+    displayName: string | null;
+  };
+  return {
+    linked: data.linked,
+    accountId: data.accountId,
+    displayName: data.displayName,
+  };
+}
+
+export async function disconnectEpic(): Promise<void> {
+  const response = await apiFetch("/auth/epic/disconnect", { method: "POST" });
+  if (!response.ok) throw new Error(`epic_disconnect_${response.status}`);
+}
+
+export async function syncEpicLibrary(
+  installed: Array<{ externalId: string; name?: string }>,
+): Promise<{ synced: number; installed: number; ownedCount: number }> {
+  const response = await apiFetch("/library/epic/sync", {
+    method: "POST",
+    body: JSON.stringify({ installed }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+      message?: string;
+    } | null;
+    throw new Error(
+      body?.message ?? body?.error ?? `sync_failed_${response.status}`,
+    );
+  }
+  const data = (await response.json()) as {
+    synced: number;
+    installed: number;
+    ownedCount?: number;
+  };
+  return {
+    synced: data.synced,
+    installed: data.installed,
+    ownedCount: data.ownedCount ?? 0,
+  };
+}

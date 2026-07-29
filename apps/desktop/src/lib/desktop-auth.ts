@@ -61,5 +61,9 @@ export async function openExternalUrl(url: string): Promise<void> {
     await openUrl(url);
     return;
   }
-  window.location.href = url;
+  // Prefer a new tab so PlayNext stays open (needed for Epic code paste).
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    window.location.href = url;
+  }
 }

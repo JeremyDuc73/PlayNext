@@ -1,6 +1,8 @@
+mod epic;
 mod steam;
 mod xbox;
 
+use epic::EpicScanResult;
 use serde::Serialize;
 use steam::SteamScanResult;
 use xbox::XboxScanResult;
@@ -38,6 +40,11 @@ fn scan_xbox() -> XboxScanResult {
     xbox::scan_xbox_installed()
 }
 
+#[tauri::command]
+fn scan_epic() -> EpicScanResult {
+    epic::scan_epic_installed()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -66,7 +73,8 @@ pub fn run() {
             get_app_info,
             ping_native,
             scan_steam,
-            scan_xbox
+            scan_xbox,
+            scan_epic
         ])
         .run(tauri::generate_context!())
         .expect("error while running PlayNext");

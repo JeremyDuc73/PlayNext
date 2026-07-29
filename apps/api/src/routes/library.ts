@@ -12,6 +12,8 @@ import {
   mergeXboxLibrary,
 } from "../microsoft/xbox.js";
 import { fetchSteamOwnedGames, mergeSteamLibrary } from "../steam/owned.js";
+import { getValidEpicAccessToken } from "../epic/tokens.js";
+import { fetchEpicLibrary, mergeEpicLibrary } from "../epic/library.js";
 
 type LibraryRoutesOptions = {
   db: Db;
@@ -43,6 +45,15 @@ const xboxInstalledSchema = z.object({
 
 const xboxSyncBodySchema = z.object({
   installed: z.array(xboxInstalledSchema).max(5000).default([]),
+});
+
+const epicInstalledSchema = z.object({
+  externalId: z.string().min(1).max(256),
+  name: z.string().min(1).max(256).optional(),
+});
+
+const epicSyncBodySchema = z.object({
+  installed: z.array(epicInstalledSchema).max(5000).default([]),
 });
 
 export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
@@ -206,6 +217,127 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       source: "xbox",
       hint:
         "Les titres Game Pass jamais lancés peuvent manquer (même limite que Playnite).",
+    };
+  });
+
+  app.post("/library/epic/sync", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = epicSyncBodySchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({
+        ok: false,
+        error: "invalid_body",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const raw = request.body as Record<string, unknown>;
+    if (
+      "path" in raw ||
+      "installDir" in raw ||
+      "installPath" in raw ||
+      "InstallLocation" in raw
+    ) {
+      return reply.code(400).send({
+        ok: false,
+        error: "paths_forbidden",
+        message: "Local paths must not be synchronized.",
+      });
+    }
+
+    let access;
+    try {
+      access = await getValidEpicAccessToken(db, config, userId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "epic_session";
+      if (message === "epic_not_linked") {
+        return reply.code(400).send({
+          ok: false,
+          error: "epic_not_linked",
+          message: "Connecte d’abord ton compte Epic.",
+        });
+      }
+      request.log.warn({ err: error }, "Epic session failed");
+      return reply.code(502).send({
+        ok: false,
+        error: "epic_auth_failed",
+        message: "Session Epic expirée. Reconnecte ton compte.",
+      });
+    }
+
+    let owned;
+    try {
+      owned = await fetchEpicLibrary(access.accessToken, access.tokenType);
+    } catch (error) {
+      request.log.warn({ err: error }, "Epic library fetch failed");
+      return reply.code(502).send({
+        ok: false,
+        error: "epic_library_failed",
+        message: "Impossible de récupérer la bibliothèque Epic.",
+      });
+    }
+
+    const games = mergeEpicLibrary(owned, parsed.data.installed);
+
+    const client = await db.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(
+        `
+          DELETE FROM user_games
+          WHERE user_id = $1 AND launcher = 'epic'
+        `,
+        [userId],
+      );
+
+      for (const game of games) {
+        await client.query(
+          `
+            INSERT INTO user_games (
+              user_id, launcher, external_id, name,
+              installed, owned, launchable, hidden, synced_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
+          `,
+          [
+            userId,
+            game.launcher,
+            game.externalId,
+            game.name,
+            game.installed,
+            game.owned,
+            game.launchable,
+          ],
+        );
+      }
+
+      await client.query(
+        `
+          INSERT INTO library_sync_runs (user_id, source, game_count)
+          VALUES ($1, 'epic', $2)
+        `,
+        [userId, games.length],
+      );
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      request.log.error({ err: error }, "epic library sync failed");
+      return reply.code(500).send({ ok: false, error: "sync_failed" });
+    } finally {
+      client.release();
+    }
+
+    const installedCount = games.filter((g) => g.installed).length;
+    return {
+      ok: true,
+      synced: games.length,
+      installed: installedCount,
+      ownedCount: owned.length,
+      source: "epic",
     };
   });
 

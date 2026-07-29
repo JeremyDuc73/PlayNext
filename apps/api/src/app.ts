@@ -5,6 +5,7 @@ import Fastify from "fastify";
 import type { Env } from "./config.js";
 import type { Db } from "./db.js";
 import { authDiscordRoutes } from "./routes/auth-discord.js";
+import { authEpicRoutes } from "./routes/auth-epic.js";
 import { authMicrosoftRoutes } from "./routes/auth-microsoft.js";
 import { healthRoutes } from "./routes/health.js";
 import { libraryRoutes } from "./routes/library.js";
@@ -37,6 +38,7 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(healthRoutes, { db });
   await app.register(authDiscordRoutes, { config, db });
   await app.register(authMicrosoftRoutes, { config, db });
+  await app.register(authEpicRoutes, { config, db });
   await app.register(libraryRoutes, { db, config });
 
   app.get("/", async () => ({
@@ -48,10 +50,14 @@ export async function buildApp(config: Env, db: Db) {
       discordLogin: "/auth/discord",
       microsoftStatus: "/auth/microsoft/status",
       microsoftStart: "POST /auth/microsoft/start",
+      epicStatus: "/auth/epic/status",
+      epicStart: "POST /auth/epic/start",
+      epicExchange: "POST /auth/epic/exchange",
       me: "/auth/me",
       logout: "POST /auth/logout",
       librarySync: "POST /library/sync",
       libraryXboxSync: "POST /library/xbox/sync",
+      libraryEpicSync: "POST /library/epic/sync",
       libraryMe: "GET /library/me",
     },
   }));

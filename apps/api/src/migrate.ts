@@ -90,5 +90,16 @@ export async function migrate(db: Db): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS epic_links (
+      user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      refresh_token_enc TEXT NOT NULL,
+      access_token_enc TEXT,
+      access_expires_at TIMESTAMPTZ,
+      account_id TEXT NOT NULL,
+      display_name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
 }

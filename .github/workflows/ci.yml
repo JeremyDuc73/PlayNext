@@ -35,4 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # .env is gitignored; compose still references it for the api service
+      - run: cp .env.example .env
       - run: docker compose config --quiet

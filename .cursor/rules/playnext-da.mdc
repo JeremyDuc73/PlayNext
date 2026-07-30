@@ -1,0 +1,112 @@
+---
+description: Direction artistique PlayNext — « BULLETIN ». À appliquer à tout composant d'UI.
+globs: ["apps/desktop/src/**/*.tsx", "apps/desktop/src/**/*.ts", "apps/desktop/src/**/*.css", "**/tailwind.config.js"]
+alwaysApply: true
+---
+
+# PlayNext — DA « BULLETIN »
+
+App desktop Windows (Tauri + React) qui aide un groupe d'amis à décider quoi jouer.
+Rituel produit : shortlist → bulletins secrets → veto → résultat. Signature : « Ce soir, on décide. »
+
+## Principe
+
+Un bulletin de vote imprimé, pas un launcher de jeu. Encre, filets, blocs inversés, tampons,
+chiffres tabulaires. Les jaquettes de jeux sont les seuls objets colorés de l'écran.
+
+## Règles dures (non négociables)
+
+- **Rayon 0 partout.** Aucun `border-radius`, jamais, ni sur les boutons ni sur les avatars.
+- **Aucun dégradé** (`linear-gradient` / `radial-gradient` interdits, y compris les voiles sur images).
+- **Aucune ombre floue.** `box-shadow` autorisé uniquement en décalage plein : `3px 3px 0 0 #6a7075`.
+- **Aucun glow, aucun néon, aucun `filter: blur`, aucun `backdrop-filter`.**
+- **Pas de carte.** On sépare avec des filets (`border`), pas avec des surfaces flottantes.
+- **Pas de pastille / pill / badge arrondi**, pas d'emoji, pas d'icône décorative, pas d'illustration SVG.
+- **Action primaire = bloc inversé** (fond papier, texte encre), jamais un bouton coloré.
+- Le vermillon `#e2402c` sert au **veto**, au **focus clavier**, et aux **accents structurels**
+  listés ci-dessous (filet sous titres, trait BrandMark, bordure table active).
+  Jamais en remplissage de bouton primaire, jamais en fond de section.
+- Titre de jeu **sous** la jaquette, jamais superposé à l'art.
+
+## Stack : Tailwind
+
+Tokens définis dans `playnext-theme.css` (`@theme`, Tailwind v4) ou `tailwind.config.js` (v3).
+Toujours passer par les noms de tokens, jamais par une valeur arbitraire ni une couleur Tailwind par défaut.
+
+```
+bg-ink  bg-ink-deep  bg-ink-raise      /* surfaces */
+border-rule  border-rule-strong        /* filets 1px */
+text-paper  text-paper-2  text-smoke  text-smoke-dim
+text-veto  border-veto  bg-veto        /* veto, focus, accents structurels */
+.pn-accent  .pn-edge-active            /* filet 2px / filet gauche actif */
+font-display  font-ui  font-data
+shadow-press                            /* seule ombre : 3px 3px 0 0 */
+w-rail  h-topbar  duration-90  animate-blink  animate-sync
+```
+
+**Classes interdites** (elles cassent la DA, aucune exception) :
+`rounded-*` · `shadow-sm|md|lg|xl|2xl` · `drop-shadow-*` · `blur-*` · `backdrop-*` ·
+`bg-gradient-to-*` / `from-*` / `via-*` / `to-*` · `ring-*` (utiliser `outline-*`) ·
+`scale-*` au survol · `bg-purple-*` / `bg-indigo-*` / `bg-cyan-*` et toute couleur Tailwind par défaut.
+En v3 ces utilitaires sont déjà désactivés via `corePlugins` — ne les réactivez pas.
+
+Classes composants prêtes à l'emploi dans `@layer components` : `.pn-display` `.pn-data` `.pn-btn`
+`.pn-btn-second` `.pn-btn-veto` `.pn-stamp` `.pn-cover` `.pn-cover-held` `.pn-cover-veto`
+`.pn-veto-stamp` `.pn-ledger-row` `.pn-gauge` `.pn-ballot`. Réutilisez-les avant d'écrire des utilitaires.
+
+Filets : 1px `--ink-rule-2` pour la structure, 1px `--ink-rule` dans les listes,
+2px `--paper` pour ouvrir une section, 4px `--paper` pour le verrou du résultat.
+
+## Typographie
+
+- **Archivo Black** (400) — titres, chiffres géants, tampons, libellés de bloc inversé.
+  Toujours `text-transform: uppercase`, `letter-spacing: -0.035em` à partir de 40px.
+- **Archivo** (400/600/700) — corps, nav, boutons. Nav et boutons : 700, `letter-spacing: .16em`, uppercase.
+- **IBM Plex Mono** (400/500) — toute donnée : compteurs, minuteurs, statuts, annotations.
+  `font-variant-numeric: tabular-nums` obligatoire. Nombres toujours à deux chiffres : `03 / 05`.
+- Interdits : Inter, Roboto, Arial, system-ui, Syne.
+
+## Vocabulaire de composants
+
+- **BrandMark** : carré papier plein avec un carré de fond poinçonné en bas à droite (ratio 20/9).
+- **Tranche marque** : colonne de 44px à gauche de chaque écran, fond `--ink-bg`, mark en haut,
+  texte vertical mono en bas (`writing-mode: vertical-rl; transform: rotate(180deg)`). Ne bouge jamais.
+- **Topbar** 68px : lockup PLAYNEXT · onglets uppercase, l'actif est un **bloc inversé** plein hauteur.
+- **Bulletin (VoteBar)** : une seule rangée bordée `--paper`, 4 cases séparées par des filets —
+  Chaud / Pourquoi pas / Pass / Veto (cette dernière détachée par un filet `--paper`, texte vermillon).
+  Survol = case inversée. Sélection = case inversée figée. Après dépôt : bloc « Bulletin déposé ✓ ».
+- **Jaquette** (`.pn-cover`) : `aspect-[3/4]`, `object-cover`, `overflow-hidden`, légende sous un filet.
+  Retenue = `.pn-cover-held` (outline 3px papier, offset −3px).
+  Veto = `.pn-cover-veto` (grayscale + brightness .42) + `.pn-veto-stamp`.
+- **Registre** (tables, présence, voix) : grille `numéro | initiales | nom | statut`, filet 1px par ligne.
+  Initiales dans un carré 22–24px : plein papier si actif, bordé `--ink-rule` sinon.
+- **Jauge de bulletins** : N segments de 6px, `gap: 3px`, papier = déposé, `--ink-rule` = en attente.
+  Jamais de barre continue ni de pourcentage.
+- **Bandeau** : bordure 1px, préfixe en bloc inversé (`TOUR 02`, `VETO`), auto-retrait 4s.
+- **Sync** : barre 2px à 12 crans (`animation: steps(12)`). Jamais de spinner, jamais de loader plein écran.
+- **État vide** : deux filets horizontaux + deux lignes de texte. Aucune illustration.
+
+## Motion
+
+Langage : coupes, balayages, tampons. Rien ne « respire », rien ne pulse, rien ne rebondit.
+
+| Situation | Timing |
+|---|---|
+| Appui bouton | inversion à 0ms, relâche 90ms, décalage −3px |
+| Survol | 90ms sur `background` / `color` / `transform` uniquement |
+| Balayage de confirmation | voile papier 16%, 90ms, `steps(6)` |
+| Repli en « bulletin déposé » | 140ms, largeur en une étape |
+| Tampon veto | `scale(1.12 → 1)`, 110ms, `cubic-bezier(.2,.9,.1,1)`, sans retour |
+| Changement de vue | coupe 60ms, puis entrée par rangées, 60ms d'écart |
+| Séquence résultat | 900ms : N/B 0–90 · glissement 90–420 · filet 4px 420–540 · titre 480–740 · voix 640–900 |
+| Entrée grille | par rangée, `clip-path` haut → bas, 60ms d'écart |
+
+Courbes : glissement `cubic-bezier(.16,1,.3,1)` · balayage linéaire · paliers `steps(6)` / `steps(12)`.
+Ne bougent jamais : tranche marque, lockup, topbar, filets de structure, chiffres (aucun compteur animé).
+`prefers-reduced-motion` : tout en coupe à 0ms, curseur clignotant figé, résultat affiché d'emblée.
+
+## Copie (FR)
+
+Sèche, administrative, deux à quatre mots. « Déposer mon bulletin », « Dépouillement »,
+« 03 / 05 déposés », « Hors tour », « Relancer un tour », « On joue ça ».
+Pas de marketing, pas de phrase d'ambiance, pas de point d'exclamation.

@@ -2,13 +2,12 @@ mod detect;
 mod parse;
 
 pub use detect::{scan_steam_libraries, SteamScanResult};
-pub use parse::{
-    parse_app_manifest, parse_library_folders, parse_most_recent_steam_id, SteamGameDraft,
-};
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::parse::{
+        parse_app_manifest, parse_library_folders, parse_most_recent_steam_id,
+    };
 
     #[test]
     fn parses_library_folders_vdf() {

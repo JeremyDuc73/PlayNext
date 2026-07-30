@@ -1,6 +1,9 @@
+import { isJunkGameName } from "../library/filter.js";
+
 export type EpicOwnedGame = {
   appName: string;
   title: string;
+  imageUrl: string | null;
 };
 
 type LibraryRecord = {
@@ -22,7 +25,27 @@ type CatalogItem = {
   categories?: Array<{ path?: string }>;
   mainGameItem?: unknown;
   customAttributes?: Record<string, { value?: string }>;
+  keyImages?: Array<{ type?: string; url?: string }>;
 };
+
+const TALL_IMAGE_TYPES = [
+  "DieselGameBoxTall",
+  "OfferImageTall",
+  "DieselGameBox",
+  "OfferImageWide",
+  "Thumbnail",
+  "Featured",
+];
+
+function pickCatalogImage(item: CatalogItem): string | null {
+  const images = item.keyImages ?? [];
+  for (const type of TALL_IMAGE_TYPES) {
+    const hit = images.find((img) => img.type === type && img.url);
+    if (hit?.url) return hit.url.replace(/^http:\/\//i, "https://");
+  }
+  const any = images.find((img) => img.url);
+  return any?.url ? any.url.replace(/^http:\/\//i, "https://") : null;
+}
 
 const LIBRARY_URL =
   "https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true&platform=Windows";
@@ -78,6 +101,7 @@ function isPlayableGame(item: CatalogItem): boolean {
 
   const title = item.title?.trim() ?? "";
   if (!title || looksLikeRawId(title)) return false;
+  if (isJunkGameName(title)) return false;
 
   return true;
 }
@@ -159,6 +183,42 @@ async function fetchCatalogBulk(
   return out;
 }
 
+/** Fallback when bulk catalog omits keyImages. */
+async function fetchCatalogImageGraphql(
+  namespace: string,
+  catalogItemId: string,
+): Promise<string | null> {
+  const query = `
+    query($namespace: String!, $id: String!, $locale: String) {
+      Catalog {
+        catalogItem(namespace: $namespace, id: $id, locale: $locale) {
+          keyImages { type url }
+        }
+      }
+    }`;
+  try {
+    const response = await fetch("https://graphql.epicgames.com/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        variables: { namespace, id: catalogItemId, locale: "fr" },
+      }),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      data?: {
+        Catalog?: { catalogItem?: { keyImages?: CatalogItem["keyImages"] } };
+      };
+    };
+    return pickCatalogImage({
+      keyImages: data.data?.Catalog?.catalogItem?.keyImages,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchEpicLibrary(
   accessToken: string,
   tokenType = "bearer",
@@ -200,18 +260,49 @@ export async function fetchEpicLibrary(
     );
   }
 
-  const games: EpicOwnedGame[] = [];
+  const pending: Array<{
+    appName: string;
+    title: string;
+    namespace: string;
+    catalogItemId: string;
+    imageUrl: string | null;
+  }> = [];
+
   for (const record of records) {
     const catalog = catalogByNs
       .get(record.namespace!)
       ?.get(record.catalogItemId!);
     if (!catalog || !isPlayableGame(catalog)) continue;
 
-    games.push({
+    pending.push({
       appName: record.appName!,
       title: catalog.title!.trim(),
+      namespace: record.namespace!,
+      catalogItemId: record.catalogItemId!,
+      imageUrl: pickCatalogImage(catalog),
     });
   }
+
+  // Enrich missing covers via GraphQL (bounded concurrency).
+  const missing = pending.filter((g) => !g.imageUrl);
+  const imageConcurrency = 6;
+  for (let i = 0; i < missing.length; i += imageConcurrency) {
+    const batch = missing.slice(i, i + imageConcurrency);
+    await Promise.all(
+      batch.map(async (game) => {
+        game.imageUrl = await fetchCatalogImageGraphql(
+          game.namespace,
+          game.catalogItemId,
+        );
+      }),
+    );
+  }
+
+  const games: EpicOwnedGame[] = pending.map((g) => ({
+    appName: g.appName,
+    title: g.title,
+    imageUrl: g.imageUrl,
+  }));
 
   const byId = new Map<string, EpicOwnedGame>();
   for (const game of games) {
@@ -230,6 +321,7 @@ export type EpicLibraryGame = {
   installed: boolean;
   owned: boolean;
   launchable: boolean;
+  imageUrl: string | null;
 };
 
 export function mergeEpicLibrary(
@@ -242,6 +334,7 @@ export function mergeEpicLibrary(
   const byId = new Map<string, EpicLibraryGame>();
 
   for (const game of owned) {
+    if (isJunkGameName(game.title)) continue;
     const key = game.appName.toLowerCase();
     const local = installedById.get(key);
     byId.set(key, {
@@ -251,6 +344,7 @@ export function mergeEpicLibrary(
       installed: Boolean(local),
       owned: true,
       launchable: Boolean(local),
+      imageUrl: game.imageUrl,
     });
   }
 
@@ -262,6 +356,7 @@ export function mergeEpicLibrary(
     if (!name || looksLikeRawId(name) || local.externalId.startsWith("UE_")) {
       continue;
     }
+    if (isJunkGameName(name)) continue;
     byId.set(key, {
       launcher: "epic",
       externalId: local.externalId,
@@ -269,6 +364,7 @@ export function mergeEpicLibrary(
       installed: true,
       owned: true,
       launchable: true,
+      imageUrl: null,
     });
   }
 

@@ -89,6 +89,8 @@ export type LibraryGame = {
   installed: boolean;
   owned: boolean;
   launchable: boolean;
+  coverUrl?: string | null;
+  year?: number | null;
 };
 
 export type SteamGamePayload = {

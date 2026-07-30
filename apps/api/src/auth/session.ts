@@ -32,7 +32,7 @@ export function discordAvatarUrl(
 ): string | null {
   if (!avatar) return null;
   const ext = avatar.startsWith("a_") ? "gif" : "png";
-  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${ext}?size=128`;
+  return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.${ext}?size=256`;
 }
 
 export function toPublicUser(row: SessionUserRow): PublicUser {

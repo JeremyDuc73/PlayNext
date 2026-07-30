@@ -25,10 +25,16 @@ On utilise le client OAuth public du launcher Epic (même approche que Playnite,
 Transmis : `appName`, nom, installé, possédé.  
 **Jamais** : chemins d’install Epic.
 
+## Covers
+
+Au sync, PlayNext lit `keyImages` du catalogue (`DieselGameBoxTall` / `OfferImageTall`) et les cache dans `game_meta`.  
+→ **Re-scan Epic** après MAJ pour remplir les affiches.
+
 ## Limites
 
 - Le code d’auth expire vite : colle-le tout de suite
 - On ne garde que les **jeux lançables** (filtre catalogue Epic, style Playnite) : pas DLC seuls, extras, plugins, Unreal Engine
+- Titres *playtest* / *demo* / *modkit* exclus automatiquement
 - Les titres viennent du **catalogue** Epic (plus d’IDs hex bruts)
 - Jeux gérés par EA/Ubisoft via Epic peuvent encore apparaître
 - Rescanne après MAJ pour rafraîchir la liste

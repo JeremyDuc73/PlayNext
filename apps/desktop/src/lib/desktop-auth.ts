@@ -21,20 +21,44 @@ export async function startDiscordLogin(): Promise<void> {
   window.location.href = url;
 }
 
-/** Parse Discord handoff or Microsoft link deep links. */
-export function parseAuthDeepLink(url: string): {
-  kind: "discord" | "microsoft";
-  handoff?: string;
-  error?: string;
-  ok?: boolean;
-} | null {
+export type DeepLinkPayload =
+  | {
+      kind: "discord";
+      handoff?: string;
+      error?: string;
+    }
+  | {
+      kind: "microsoft";
+      error?: string;
+      ok?: boolean;
+    }
+  | {
+      kind: "invite";
+      code: string;
+    };
+
+/** Parse Discord handoff, Microsoft link, or group invite deep links. */
+export function parseAuthDeepLink(url: string): DeepLinkPayload | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "playnext:") return null;
 
-    const hostPath = `${parsed.hostname}${parsed.pathname}`
-      .replace(/\/+$/, "")
-      .toLowerCase();
+    // Keep original casing for invite codes (base64url is case-sensitive).
+    const rawHostPath = `${parsed.hostname}${parsed.pathname}`.replace(
+      /\/+$/,
+      "",
+    );
+    const hostPath = rawHostPath.toLowerCase();
+
+    // playnext://invite/<code> or playnext://invite?code=
+    if (hostPath === "invite" || hostPath.startsWith("invite/")) {
+      const fromPath = rawHostPath.replace(/^invite\/?/i, "").replace(/\/+$/, "");
+      const code =
+        (fromPath ? fromPath : null) ?? parsed.searchParams.get("code");
+      if (!code) return null;
+      return { kind: "invite", code: decodeURIComponent(code) };
+    }
+
     if (
       hostPath === "auth/microsoft" ||
       hostPath.endsWith("/auth/microsoft")

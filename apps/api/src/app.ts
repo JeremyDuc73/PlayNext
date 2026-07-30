@@ -7,8 +7,11 @@ import type { Db } from "./db.js";
 import { authDiscordRoutes } from "./routes/auth-discord.js";
 import { authEpicRoutes } from "./routes/auth-epic.js";
 import { authMicrosoftRoutes } from "./routes/auth-microsoft.js";
+import { eveningsRoutes } from "./routes/evenings.js";
+import { groupsRoutes } from "./routes/groups.js";
 import { healthRoutes } from "./routes/health.js";
 import { libraryRoutes } from "./routes/library.js";
+import { metaRoutes } from "./routes/meta.js";
 
 export async function buildApp(config: Env, db: Db) {
   const app = Fastify({
@@ -40,6 +43,9 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(authMicrosoftRoutes, { config, db });
   await app.register(authEpicRoutes, { config, db });
   await app.register(libraryRoutes, { db, config });
+  await app.register(groupsRoutes, { db });
+  await app.register(eveningsRoutes, { db });
+  await app.register(metaRoutes, { db });
 
   app.get("/", async () => ({
     ok: true,
@@ -59,6 +65,12 @@ export async function buildApp(config: Env, db: Db) {
       libraryXboxSync: "POST /library/xbox/sync",
       libraryEpicSync: "POST /library/epic/sync",
       libraryMe: "GET /library/me",
+      groups: "GET /groups",
+      createGroup: "POST /groups",
+      joinInvite: "POST /invites/:code/join",
+      createEvening: "POST /groups/:groupId/evenings",
+      evening: "GET /evenings/:eveningId",
+      eveningVotes: "POST /evenings/:eveningId/votes",
     },
   }));
 

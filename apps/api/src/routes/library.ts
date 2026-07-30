@@ -14,6 +14,7 @@ import {
 import { fetchSteamOwnedGames, mergeSteamLibrary } from "../steam/owned.js";
 import { getValidEpicAccessToken } from "../epic/tokens.js";
 import { fetchEpicLibrary, mergeEpicLibrary } from "../epic/library.js";
+import { filterJunkGames, isJunkGameName } from "../library/filter.js";
 
 type LibraryRoutesOptions = {
   db: Db;
@@ -189,6 +190,22 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
             game.launchable,
           ],
         );
+        if (game.imageUrl) {
+          await client.query(
+            `
+              INSERT INTO game_meta (
+                launcher, external_id, name, cover_url, source, fetched_at
+              )
+              VALUES ($1, $2, $3, $4, 'xbox_titlehub', now())
+              ON CONFLICT (launcher, external_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                cover_url = EXCLUDED.cover_url,
+                source = EXCLUDED.source,
+                fetched_at = now()
+            `,
+            [game.launcher, game.externalId, game.name, game.imageUrl],
+          );
+        }
       }
 
       await client.query(
@@ -313,6 +330,22 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
             game.launchable,
           ],
         );
+        if (game.imageUrl) {
+          await client.query(
+            `
+              INSERT INTO game_meta (
+                launcher, external_id, name, cover_url, source, fetched_at
+              )
+              VALUES ($1, $2, $3, $4, 'epic_catalog', now())
+              ON CONFLICT (launcher, external_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                cover_url = COALESCE(EXCLUDED.cover_url, game_meta.cover_url),
+                source = EXCLUDED.source,
+                fetched_at = now()
+            `,
+            [game.launcher, game.externalId, game.name, game.imageUrl],
+          );
+        }
       }
 
       await client.query(
@@ -393,6 +426,8 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         });
       }
     }
+
+    games = filterJunkGames(games);
 
     const client = await db.pool.connect();
     try {
@@ -476,12 +511,18 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       owned: boolean;
       launchable: boolean;
       synced_at: Date;
+      cover_url: string | null;
+      year: number | null;
     }>(
       `
-        SELECT id, launcher, external_id, name, installed, owned, launchable, synced_at
-        FROM user_games
-        WHERE user_id = $1 AND hidden = false
-        ORDER BY name ASC
+        SELECT ug.id, ug.launcher, ug.external_id, ug.name, ug.installed,
+               ug.owned, ug.launchable, ug.synced_at,
+               gm.cover_url, gm.year
+        FROM user_games ug
+        LEFT JOIN game_meta gm
+          ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
+        WHERE ug.user_id = $1 AND ug.hidden = false
+        ORDER BY ug.name ASC
       `,
       [userId],
     );
@@ -497,9 +538,9 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       [userId],
     );
 
-    return {
-      ok: true,
-      games: games.rows.map((row) => ({
+    const mapped = games.rows
+      .filter((row) => !isJunkGameName(row.name))
+      .map((row) => ({
         id: row.id,
         launcher: row.launcher,
         externalId: row.external_id,
@@ -508,7 +549,13 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         owned: row.owned,
         launchable: row.launchable,
         syncedAt: row.synced_at,
-      })),
+        coverUrl: row.cover_url,
+        year: row.year,
+      }));
+
+    return {
+      ok: true,
+      games: mapped,
       lastSync: lastSync.rows[0]
         ? {
             at: lastSync.rows[0].created_at,

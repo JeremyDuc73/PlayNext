@@ -1,0 +1,187 @@
+/* PlayNext — DA « BULLETIN » · Tailwind v4
+   Importer ce fichier à la place de `@import "tailwindcss"` :
+     @import "tailwindcss";
+     @import "./playnext-theme.css";
+   (Pour Tailwind v3, voir tailwind.config.js — mêmes noms de tokens.) */
+
+@theme {
+  /* Encres */
+  --color-ink: #0e1013;          /* scène */
+  --color-ink-deep: #08090b;     /* fond app, colonnes */
+  --color-ink-raise: #16191d;    /* ligne active */
+  --color-rule: #22262a;         /* filet de liste */
+  --color-rule-strong: #2a2f34;  /* filet de structure */
+
+  /* Papier */
+  --color-paper: #f4f2ec;
+  --color-paper-2: #a4a8ab;
+  --color-smoke: #6a7075;
+  --color-smoke-dim: #3f454a;
+
+  /* Accent unique — veto + focus clavier, rien d'autre */
+  --color-veto: #e2402c;
+
+  /* Typo */
+  --font-display: "Archivo Black", sans-serif;
+  --font-ui: "Archivo", sans-serif;
+  --font-data: "IBM Plex Mono", monospace;
+
+  /* Géométrie */
+  --radius-none: 0px;
+  --spacing-rail: 44px;
+  --spacing-topbar: 68px;
+
+  /* Ombre autorisée : décalage plein, jamais de flou */
+  --shadow-press: 3px 3px 0 0 #6a7075;
+
+  /* Durées / courbes — duration-* Tailwind = nombre en ms (ex. duration-90) */
+  --ease-slide: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-stamp: cubic-bezier(0.2, 0.9, 0.1, 1);
+  --animate-blink: pn-blink 1.1s steps(1) infinite;
+  --animate-sync: pn-sync 2.4s steps(12) infinite;
+}
+
+@keyframes pn-blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+@keyframes pn-sync { from { transform: scaleX(.12) } to { transform: scaleX(1) } }
+
+@layer base {
+  /* Rayon 0 par défaut : aucune classe rounded-* ne doit être nécessaire */
+  *, *::before, *::after { border-radius: 0; }
+  body { @apply bg-ink text-paper font-ui text-sm leading-relaxed antialiased; }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href] { cursor: pointer; }
+  button:disabled { cursor: default; }
+  :focus-visible { @apply outline-2 outline-offset-[3px] outline-veto; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+}
+
+@layer components {
+  /* Titres */
+  .pn-display { @apply font-display font-normal uppercase tracking-[-0.035em] leading-[0.86]; }
+
+  /* Données : toujours tabulaire, toujours deux chiffres (03 / 05) */
+  .pn-data { @apply font-data text-[11px] leading-none tracking-[0.14em] tabular-nums text-smoke; }
+
+  /* Action primaire = bloc inversé */
+  .pn-btn {
+    @apply border-0 bg-paper text-ink-deep font-ui font-bold text-xs uppercase tracking-[0.16em]
+           px-7 py-[17px] cursor-pointer transition-[transform,box-shadow] duration-90;
+  }
+  .pn-btn:hover { @apply -translate-x-[3px] -translate-y-[3px] shadow-press; }
+  .pn-btn:active { @apply translate-x-0 translate-y-0 shadow-none; }
+  .pn-btn:disabled { @apply bg-rule-strong text-smoke cursor-default translate-x-0 translate-y-0 shadow-none; }
+
+  .pn-btn-second {
+    @apply border bg-transparent text-paper border-smoke font-ui font-bold text-xs uppercase
+           tracking-[0.16em] px-7 py-[17px] cursor-pointer transition-[background-color,border-color,color] duration-90;
+  }
+  .pn-btn-second:hover { @apply border-paper bg-ink-raise; }
+  .pn-btn-second:disabled { @apply text-smoke border-rule cursor-default; }
+
+  .pn-btn-ghost {
+    @apply border-0 border-b border-rule-strong bg-transparent text-paper-2 font-ui font-bold text-xs
+           uppercase tracking-[0.16em] py-[17px] px-0 cursor-pointer transition-[color,border-color] duration-90;
+  }
+  .pn-btn-ghost:hover { @apply text-paper border-paper; }
+
+  .pn-btn-veto {
+    @apply border bg-transparent text-veto border-veto font-ui font-bold text-xs uppercase
+           tracking-[0.16em] px-7 py-[17px] cursor-pointer transition-[background-color,color] duration-90;
+  }
+  .pn-btn-veto:hover { @apply bg-veto text-ink-deep; }
+
+  /* Bloc inversé : onglet actif, préfixe de bandeau, étiquette de section */
+  .pn-stamp { @apply bg-paper text-ink-deep font-display text-[10px] leading-none tracking-[0.06em] px-2.5 py-1.5; }
+
+  /* Jaquette — aspect-ratio en CSS brut (évite que l'img impose sa hauteur) */
+  .pn-cover {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    background: var(--color-ink-deep);
+    transition: transform 90ms, box-shadow 90ms;
+  }
+  .pn-cover.pn-cover-wide { aspect-ratio: 16 / 9; }
+  .pn-cover img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: saturate(0.85) contrast(1.03);
+  }
+  .pn-cover:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-press);
+  }
+  .pn-cover-held {
+    outline: 3px solid var(--color-paper);
+    outline-offset: -3px;
+  }
+  .pn-cover-veto img { filter: grayscale(1) brightness(0.42); }
+
+  /* Cellule grille : jamais de collage / débordement */
+  .pn-poster-cell {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Filet d'accent vermillon (maquettes : trait sous marque / titres) */
+  .pn-accent {
+    display: block;
+    width: 3.5rem;
+    height: 2px;
+    background: var(--color-veto);
+  }
+  .pn-edge-active {
+    box-shadow: inset 2px 0 0 0 var(--color-veto);
+  }
+
+  .pn-veto-stamp {
+    @apply absolute left-1/2 top-[52%] -translate-x-1/2 -translate-y-1/2 rotate-[-7deg]
+           border-2 border-veto text-veto font-display text-xl leading-none tracking-[0.08em] px-3.5 py-1.5;
+  }
+
+  .pn-initials {
+    @apply inline-flex w-6 h-6 shrink-0 items-center justify-center overflow-hidden
+           font-ui font-bold text-[9px] leading-none bg-paper text-ink-deep uppercase;
+  }
+  .pn-initials-idle {
+    @apply bg-transparent border border-rule-strong text-smoke;
+  }
+  .pn-initials-veto {
+    @apply bg-transparent border border-veto text-veto;
+  }
+
+  /* Registre (tables, présence, voix) */
+  .pn-ledger-row { @apply grid grid-cols-[20px_24px_1fr_auto] gap-[11px] items-center py-3 border-b border-rule; }
+
+  /* Jauge de bulletins — segments, jamais de barre continue */
+  .pn-gauge { @apply flex gap-[3px]; }
+  .pn-gauge > i { @apply flex-1 h-1.5 bg-rule; }
+  .pn-gauge > i[data-done] { @apply bg-paper; }
+
+  .pn-sync { @apply h-0.5 bg-rule overflow-hidden; }
+  .pn-sync > i {
+    @apply block h-0.5 bg-veto origin-left animate-sync;
+  }
+
+  .pn-caret { @apply inline-block w-[5px] h-2.5 bg-smoke animate-blink; }
+
+  /* Bulletin (VoteBar) */
+  .pn-ballot { @apply flex border border-paper; }
+  .pn-ballot > button {
+    @apply flex-1 py-[19px] border-0 border-r border-rule-strong bg-transparent text-paper-2
+           font-ui font-bold text-xs uppercase tracking-[0.16em] cursor-pointer
+           transition-[background-color,color] duration-90;
+  }
+  .pn-ballot > button:hover { @apply bg-paper text-ink-deep; }
+  .pn-ballot > button[aria-pressed="true"] { @apply bg-paper text-ink-deep; }
+  .pn-ballot > button[data-veto] { @apply flex-none w-[158px] border-r-0 border-l border-paper text-veto; }
+  .pn-ballot > button[data-veto]:hover,
+  .pn-ballot > button[data-veto][aria-pressed="true"] { @apply bg-veto text-ink-deep; }
+}

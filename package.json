@@ -16,7 +16,9 @@
     "lint": "npm run typecheck",
     "docker:up": "docker compose up -d postgres redis",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "seed:buddy": "npm run seed:buddy -w @playnext/api",
+    "test:api": "npm run test -w @playnext/api"
   },
   "engines": {
     "node": ">=20"

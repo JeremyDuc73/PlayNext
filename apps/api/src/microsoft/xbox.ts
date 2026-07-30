@@ -5,12 +5,16 @@ export type XboxSession = {
   expiresAt: Date;
 };
 
+import { isJunkGameName } from "../library/filter.js";
+
 export type XboxTitle = {
   titleId: string;
   pfn: string;
   name: string;
   type: string;
   devices: string[];
+  /** Box / display art from TitleHub (https). */
+  imageUrl: string | null;
 };
 
 type XuiClaim = {
@@ -32,6 +36,8 @@ type TitleHubTitle = {
   name?: string;
   type?: string;
   devices?: string[];
+  displayImage?: string;
+  images?: Array<{ url?: string; type?: string }>;
 };
 
 function cleanName(name: string): string {
@@ -117,6 +123,26 @@ function authHeaders(session: XboxSession): Record<string, string> {
   };
 }
 
+function httpsUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://")) return `https://${url.slice("http://".length)}`;
+  return url;
+}
+
+function pickImage(raw: TitleHubTitle): string | null {
+  const direct = httpsUrl(raw.displayImage);
+  if (direct) return direct;
+  const fromList = raw.images?.find(
+    (img) =>
+      img.url &&
+      (img.type === "BoxArt" ||
+        img.type === "Poster" ||
+        img.type === "Tile" ||
+        img.type === "BrandedKeyArt"),
+  );
+  return httpsUrl(fromList?.url ?? raw.images?.[0]?.url);
+}
+
 function mapTitle(raw: TitleHubTitle): XboxTitle | null {
   if (!raw.pfn || !raw.name) return null;
   return {
@@ -125,6 +151,7 @@ function mapTitle(raw: TitleHubTitle): XboxTitle | null {
     name: cleanName(raw.name),
     type: raw.type ?? "",
     devices: raw.devices ?? [],
+    imageUrl: pickImage(raw),
   };
 }
 
@@ -132,7 +159,7 @@ function mapTitle(raw: TitleHubTitle): XboxTitle | null {
 export async function fetchTitleHistory(
   session: XboxSession,
 ): Promise<XboxTitle[]> {
-  const url = `https://titlehub.xboxlive.com/users/xuid(${session.xuid})/titles/titlehistory/decoration/detail`;
+  const url = `https://titlehub.xboxlive.com/users/xuid(${session.xuid})/titles/titlehistory/decoration/image,detail`;
   const response = await fetch(url, { headers: authHeaders(session) });
   if (!response.ok) {
     const text = await response.text();
@@ -160,7 +187,7 @@ export async function fetchTitlesByPfns(
   for (let i = 0; i < pfns.length; i += chunkSize) {
     const chunk = pfns.slice(i, i + chunkSize);
     const response = await fetch(
-      "https://titlehub.xboxlive.com/titles/batch/decoration/detail",
+      "https://titlehub.xboxlive.com/titles/batch/decoration/image,detail",
       {
         method: "POST",
         headers: authHeaders(session),
@@ -193,6 +220,7 @@ export type XboxLibraryGame = {
   installed: boolean;
   owned: boolean;
   launchable: boolean;
+  imageUrl: string | null;
 };
 
 export function mergeXboxLibrary(
@@ -206,6 +234,7 @@ export function mergeXboxLibrary(
   const byPfn = new Map<string, XboxLibraryGame>();
 
   for (const title of history) {
+    if (isJunkGameName(title.name)) continue;
     const key = title.pfn.toLowerCase();
     const local = installedByPfn.get(key);
     byPfn.set(key, {
@@ -215,10 +244,12 @@ export function mergeXboxLibrary(
       installed: Boolean(local),
       owned: true,
       launchable: Boolean(local),
+      imageUrl: title.imageUrl,
     });
   }
 
   for (const title of installedOnlyTitles) {
+    if (isJunkGameName(title.name)) continue;
     const key = title.pfn.toLowerCase();
     if (byPfn.has(key)) continue;
     byPfn.set(key, {
@@ -228,8 +259,9 @@ export function mergeXboxLibrary(
       installed: true,
       owned: true,
       launchable: true,
+      imageUrl: title.imageUrl,
     });
   }
 
-  return [...byPfn.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...byPfn.values()].sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }

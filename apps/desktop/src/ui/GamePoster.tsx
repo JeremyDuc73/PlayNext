@@ -16,7 +16,7 @@ type Props = {
   index?: string;
   onClick?: () => void;
   footer?: ReactNode;
-  wide?: boolean;
+  priority?: boolean;
 };
 
 export function GamePoster({
@@ -32,7 +32,7 @@ export function GamePoster({
   index,
   onClick,
   footer,
-  wide,
+  priority = false,
 }: Props) {
   const sources = useMemo(
     () =>
@@ -44,14 +44,16 @@ export function GamePoster({
       }),
     [coverUrl, launcher, externalId, fallbackUrls],
   );
-  const { src, failed, onLoad, onError } = useCoverSrc(sources);
+  const { src, failed, imgReady, onLoad, onError } = useCoverSrc(
+    sources,
+    priority ? 10000 : null,
+  );
   const fallback = fallbackPosterStyle(name);
 
   const art = (
     <div
       className={clsx(
         "pn-cover",
-        wide && "pn-cover-wide",
         selected && "pn-cover-held",
         vetoed && "pn-cover-veto",
       )}
@@ -62,21 +64,32 @@ export function GamePoster({
           {index}
         </span>
       ) : null}
+      {selected ? (
+        <span className="pn-stamp absolute bottom-2 left-2 z-10">
+          Choisi
+        </span>
+      ) : null}
+      {!imgReady ? (
+        <span className="absolute inset-0 flex items-center justify-center pn-display text-4xl text-smoke-dim">
+          {fallback.initial}
+        </span>
+      ) : null}
       {src ? (
         <img
           src={src}
           alt=""
           draggable={false}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
+          className={
+            imgReady
+              ? "h-full w-full object-cover opacity-100 transition-opacity duration-90"
+              : "h-full w-full object-cover opacity-0"
+          }
           onLoad={onLoad}
           onError={onError}
         />
-      ) : (
-        <span className="absolute inset-0 flex items-center justify-center pn-display text-4xl text-smoke-dim">
-          {fallback.initial}
-        </span>
-      )}
+      ) : null}
       {vetoed ? <span className="pn-veto-stamp">VETO</span> : null}
     </div>
   );

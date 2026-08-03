@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSessionToken } from "../auth/request-session.js";
 import { findUserBySessionToken, toPublicUser } from "../auth/session.js";
 import type { Db } from "../db.js";
+import { normalizeGameTitle } from "../library/filter.js";
 import {
   fetchParticipantLibrary,
   fetchRecentWinnerKeys,
@@ -33,9 +34,9 @@ const createEveningSchema = z.object({
   title: z.string().trim().min(1).max(80).optional(),
   durationMinutes: z.number().int().min(15).max(600).optional().nullable(),
   vibe: vibeSchema.optional().nullable(),
-  requireOwned: z.boolean().optional().default(true),
+  requireOwned: z.boolean().optional().default(false),
   requireInstalled: z.boolean().optional().default(false),
-  shortlistSize: z.number().int().min(5).max(12).optional().default(8),
+  shortlistSize: z.number().int().min(1).max(5).optional().default(3),
   participantIds: z.array(z.string().uuid()).min(1).max(32).optional(),
 });
 
@@ -49,6 +50,15 @@ const votesSchema = z.object({
     )
     .min(1)
     .max(20),
+});
+
+const selectionSchema = z.object({
+  candidateIds: z.array(z.string().uuid()).min(1).max(5),
+});
+
+const currentVoteSchema = z.object({
+  candidateId: z.string().uuid(),
+  value: z.enum(["hot", "maybe", "pass", "veto"]),
 });
 
 const closeSchema = z.object({
@@ -67,6 +77,7 @@ type EveningRow = {
   require_installed: boolean;
   shortlist_size: number;
   round: number;
+  vote_cursor: number;
   closes_at: Date | null;
   revealed_at: Date | null;
   closed_at: Date | null;
@@ -116,35 +127,86 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     return Boolean(membership && isManager(membership.role));
   }
 
+  async function fetchViewerOwnedKeys(
+    evening: EveningRow,
+    userId: string,
+  ): Promise<{ exact: Set<string>; titles: Set<string> }> {
+    const result = await db.pool.query<{
+      launcher: string;
+      external_id: string;
+      name: string;
+    }>(
+      `
+        SELECT ug.launcher, ug.external_id, ug.name
+        FROM user_games ug
+        WHERE ug.user_id = $1
+          AND ug.owned = true
+          AND ug.hidden = false
+          AND NOT EXISTS (
+            SELECT 1
+            FROM group_hidden_games h
+            WHERE h.group_id = $2
+              AND h.user_id = ug.user_id
+              AND h.launcher = ug.launcher
+              AND h.external_id = ug.external_id
+          )
+      `,
+      [userId, evening.group_id],
+    );
+    return {
+      exact: new Set(
+        result.rows.map((row) => `${row.launcher}:${row.external_id}`),
+      ),
+      titles: new Set(
+        result.rows
+          .map((row) => normalizeGameTitle(row.name))
+          .filter(Boolean),
+      ),
+    };
+  }
+
+  function isOwnedByViewer(
+    candidate: { launcher: string; external_id: string; name: string },
+    owned: { exact: Set<string>; titles: Set<string> },
+  ): boolean {
+    return (
+      owned.exact.has(`${candidate.launcher}:${candidate.external_id}`) ||
+      owned.titles.has(normalizeGameTitle(candidate.name))
+    );
+  }
+
   async function insertCandidates(
     eveningId: string,
     round: number,
     shortlist: ReturnType<typeof buildShortlist>,
   ): Promise<void> {
-    for (let i = 0; i < shortlist.length; i++) {
-      const game = shortlist[i]!;
-      await db.pool.query(
-        `
-          INSERT INTO evening_candidates (
-            evening_id, round, launcher, external_id, name, sort_order,
-            owned_count, installed_count, participant_count, reasons
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-        `,
-        [
-          eveningId,
-          round,
-          game.launcher,
-          game.externalId,
-          game.name,
-          i,
-          game.ownedCount,
-          game.installedCount,
-          game.participantCount,
-          game.reasons,
-        ],
+    if (shortlist.length === 0) return;
+    const params: unknown[] = [eveningId, round];
+    const values = shortlist.map((game, index) => {
+      const start = params.length + 1;
+      params.push(
+        game.launcher,
+        game.externalId,
+        game.name,
+        index,
+        game.ownedCount,
+        game.installedCount,
+        game.participantCount,
+        game.reasons,
       );
-    }
+      return `($1,$2,$${start},$${start + 1},$${start + 2},$${start + 3},$${start + 4},$${start + 5},$${start + 6},$${start + 7})`;
+    });
+
+    await db.pool.query(
+      `
+        INSERT INTO evening_candidates (
+          evening_id, round, launcher, external_id, name, sort_order,
+          owned_count, installed_count, participant_count, reasons
+        )
+        VALUES ${values.join(",")}
+      `,
+      params,
+    );
   }
 
   async function serializeEvening(evening: EveningRow, viewerId: string) {
@@ -152,6 +214,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       user_id: string;
       present: boolean;
       veto_available: boolean;
+      selection_submitted: boolean;
       discord_id: string;
       username: string;
       global_name: string | null;
@@ -159,6 +222,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     }>(
       `
         SELECT p.user_id, p.present, p.veto_available,
+               p.selection_submitted,
                u.discord_id, u.username, u.global_name, u.avatar
         FROM evening_participants p
         JOIN users u ON u.id = p.user_id
@@ -203,6 +267,33 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       [evening.id, viewerId, evening.round],
     );
 
+    const mySelections = await db.pool.query<{ candidate_id: string }>(
+      `
+        SELECT candidate_id
+        FROM evening_selections
+        WHERE evening_id = $1 AND user_id = $2 AND round = $3
+      `,
+      [evening.id, viewerId, evening.round],
+    );
+    const viewerOwned = await fetchViewerOwnedKeys(evening, viewerId);
+
+    const currentCandidate =
+      evening.status === "voting"
+        ? candidates.rows[evening.vote_cursor] ?? null
+        : null;
+    const currentVoteProgress = currentCandidate
+      ? await db.pool.query<{ user_id: string }>(
+          `
+            SELECT DISTINCT user_id
+            FROM evening_votes
+            WHERE evening_id = $1
+              AND candidate_id = $2
+              AND round = $3
+          `,
+          [evening.id, currentCandidate.id, evening.round],
+        )
+      : { rows: [] };
+
     const voteProgress = await db.pool.query<{
       user_id: string;
       vote_count: string;
@@ -222,10 +313,21 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       .map((row) => row.user_id);
 
     const presentParticipants = participants.rows.filter((p) => p.present);
-    const allVoted =
+    const allSelected =
       presentParticipants.length > 0 &&
-      presentParticipants.every((p) => votedUserIds.includes(p.user_id));
-
+      presentParticipants.every((p) => p.selection_submitted);
+    const currentVotedUserIds = new Set(
+      currentVoteProgress.rows.map((row) => row.user_id),
+    );
+    const allVoted =
+      evening.status === "voting"
+        ? presentParticipants.length > 0 &&
+          presentParticipants.every((p) =>
+            currentVoteProgress.rows.some((v) => v.user_id === p.user_id),
+          )
+        : evening.status === "revealed" || evening.status === "closed"
+          ? true
+          : false;
     const revealed =
       evening.status === "revealed" ||
       evening.status === "closed";
@@ -309,6 +411,15 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       requireInstalled: evening.require_installed,
       shortlistSize: evening.shortlist_size,
       round: evening.round,
+      selectionComplete: allSelected,
+      selectionCount: mySelections.rows.length,
+      mySelectionIds: mySelections.rows.map((row) => row.candidate_id),
+      currentCandidateIndex:
+        evening.status === "voting" ? evening.vote_cursor : null,
+      currentCandidateId: currentCandidate?.id ?? null,
+      currentVotes:
+        evening.status === "voting" ? currentVoteProgress.rows.length : 0,
+      currentVotesTotal: presentParticipants.length,
       closesAt: evening.closes_at,
       revealedAt: evening.revealed_at,
       closedAt: evening.closed_at,
@@ -327,7 +438,13 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         }),
         present: row.present,
         vetoAvailable: row.veto_available,
-        hasVoted: votedUserIds.includes(row.user_id),
+        selectionSubmitted: row.selection_submitted,
+        hasVoted:
+          evening.status === "selection"
+            ? row.selection_submitted
+            : evening.status === "voting"
+              ? currentVotedUserIds.has(row.user_id)
+              : votedUserIds.includes(row.user_id),
       })),
       candidates: candidates.rows.map((row) => ({
         id: row.id,
@@ -345,6 +462,10 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         eliminatedReason: revealed
           ? (tallies?.[row.id]?.eliminatedReason ?? row.eliminated_reason)
           : row.eliminated_reason,
+        ownedByMe: isOwnedByViewer(row, viewerOwned),
+        selectedByMe: mySelections.rows.some(
+          (selection) => selection.candidate_id === row.id,
+        ),
         myVote: myVotes.rows.find((v) => v.candidate_id === row.id)?.value ?? null,
         tally: revealed ? (tallies?.[row.id] ?? null) : null,
       })),
@@ -355,6 +476,83 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
           }
         : null,
     };
+  }
+
+  async function startVoting(evening: EveningRow): Promise<EveningRow> {
+    const selected = await db.pool.query<{
+      id: string;
+      selection_count: string;
+      sort_order: number;
+      name: string;
+    }>(
+      `
+        SELECT c.id, COUNT(s.user_id)::text AS selection_count,
+               c.sort_order, c.name
+        FROM evening_candidates c
+        JOIN evening_selections s
+          ON s.candidate_id = c.id
+         AND s.evening_id = c.evening_id
+         AND s.round = c.round
+        WHERE c.evening_id = $1 AND c.round = $2
+        GROUP BY c.id, c.sort_order, c.name
+        ORDER BY COUNT(s.user_id) DESC, c.sort_order ASC, c.name ASC
+      `,
+      [evening.id, evening.round],
+    );
+    if (selected.rows.length === 0) {
+      throw new Error("selection_empty");
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const selectedIds = selected.rows.map((row) => row.id);
+      for (const [index, row] of selected.rows.entries()) {
+        await client.query(
+          `
+            UPDATE evening_candidates
+            SET sort_order = $3
+            WHERE id = $1 AND evening_id = $2 AND round = $4
+          `,
+          [row.id, evening.id, index, evening.round],
+        );
+      }
+      await client.query(
+        `
+          DELETE FROM evening_candidates
+          WHERE evening_id = $1
+            AND round = $2
+            AND NOT (id = ANY($3::uuid[]))
+        `,
+        [evening.id, evening.round, selectedIds],
+      );
+      await client.query(
+        `
+          UPDATE evenings
+          SET status = 'voting',
+              vote_cursor = 0,
+              updated_at = now()
+          WHERE id = $1
+        `,
+        [evening.id],
+      );
+      await client.query(
+        `
+          UPDATE evening_participants
+          SET selection_submitted = true
+          WHERE evening_id = $1
+        `,
+        [evening.id],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return (await loadEvening(evening.id))!;
   }
 
   async function revealEvening(evening: EveningRow): Promise<EveningRow> {
@@ -485,7 +683,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       const active = await db.pool.query<{ id: string }>(
         `
           SELECT id FROM evenings
-          WHERE group_id = $1 AND status IN ('voting', 'revealed')
+          WHERE group_id = $1 AND status IN ('selection', 'voting', 'revealed')
           LIMIT 1
         `,
         [request.params.groupId],
@@ -505,27 +703,23 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         participantIds,
       );
       const recent = await fetchRecentWinnerKeys(db, request.params.groupId);
+      const poolSize = Math.max(1, library.length);
       let shortlist = buildShortlist(library, {
-        requireOwned: parsed.data.requireOwned,
+        // La sélection se fait ensuite dans la bibliothèque personnelle.
+        requireOwned: false,
         requireInstalled: parsed.data.requireInstalled,
-        shortlistSize: parsed.data.shortlistSize,
+        shortlistSize: poolSize,
+        maxSize: poolSize,
         recentWinnerKeys: recent,
       });
 
       // Soft fallback: if requireInstalled yields nothing, retry without it.
       if (shortlist.length === 0 && parsed.data.requireInstalled) {
         shortlist = buildShortlist(library, {
-          requireOwned: parsed.data.requireOwned,
-          requireInstalled: false,
-          shortlistSize: parsed.data.shortlistSize,
-          recentWinnerKeys: recent,
-        });
-      }
-      if (shortlist.length === 0 && parsed.data.requireOwned) {
-        shortlist = buildShortlist(library, {
           requireOwned: false,
           requireInstalled: false,
-          shortlistSize: parsed.data.shortlistSize,
+          shortlistSize: poolSize,
+          maxSize: poolSize,
           recentWinnerKeys: recent,
         });
       }
@@ -534,7 +728,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
           ok: false,
           error: "no_candidates",
           message:
-            "Aucun jeu commun trouvé. Scannez vos bibliothèques ou assouplissez les contraintes.",
+            "Aucun jeu compatible dans les bibliothèques du groupe.",
         });
       }
 
@@ -547,7 +741,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
               group_id, created_by, status, title, duration_minutes, vibe,
               require_owned, require_installed, shortlist_size
             )
-            VALUES ($1,$2,'voting',$3,$4,$5,$6,$7,$8)
+            VALUES ($1,$2,'selection',$3,$4,$5,$6,$7,$8)
             RETURNING *
           `,
           [
@@ -681,6 +875,373 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       return {
         ok: true,
         evening: await serializeEvening(evening, userId),
+      };
+    },
+  );
+
+  app.post<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId/selections",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (evening.status !== "selection") {
+        return reply.code(400).send({ ok: false, error: "not_selection" });
+      }
+      if (!(await isParticipant(evening.id, userId))) {
+        return reply.code(403).send({ ok: false, error: "forbidden" });
+      }
+
+      const parsed = selectionSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ ok: false, error: "invalid_body" });
+      }
+      const candidateIds = [...new Set(parsed.data.candidateIds)];
+      if (candidateIds.length > evening.shortlist_size) {
+        return reply.code(400).send({
+          ok: false,
+          error: "selection_limit",
+          message: `Choisis au maximum ${evening.shortlist_size} jeux.`,
+        });
+      }
+
+      const candidates = await db.pool.query<{
+        id: string;
+        launcher: string;
+        external_id: string;
+        name: string;
+      }>(
+        `
+          SELECT id, launcher, external_id, name
+          FROM evening_candidates
+          WHERE evening_id = $1 AND round = $2 AND eliminated = false
+        `,
+        [evening.id, evening.round],
+      );
+      const allowed = new Set(candidates.rows.map((row) => row.id));
+      if (candidateIds.some((id) => !allowed.has(id))) {
+        return reply.code(400).send({
+          ok: false,
+          error: "invalid_candidate",
+        });
+      }
+      const viewerOwned = await fetchViewerOwnedKeys(evening, userId);
+      const selectedRows = candidates.rows.filter((row) =>
+        candidateIds.includes(row.id),
+      );
+      if (selectedRows.some((row) => !isOwnedByViewer(row, viewerOwned))) {
+        return reply.code(403).send({
+          ok: false,
+          error: "candidate_not_owned",
+          message: "Tu peux sélectionner uniquement tes jeux.",
+        });
+      }
+
+      const client = await db.pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `
+            DELETE FROM evening_selections
+            WHERE evening_id = $1 AND user_id = $2 AND round = $3
+          `,
+          [evening.id, userId, evening.round],
+        );
+        for (const candidateId of candidateIds) {
+          await client.query(
+            `
+              INSERT INTO evening_selections (
+                evening_id, candidate_id, user_id, round
+              )
+              VALUES ($1,$2,$3,$4)
+            `,
+            [evening.id, candidateId, userId, evening.round],
+          );
+        }
+        await client.query(
+          `
+            UPDATE evening_participants
+            SET selection_submitted = true
+            WHERE evening_id = $1 AND user_id = $2
+          `,
+          [evening.id, userId],
+        );
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      return {
+        ok: true,
+        evening: await serializeEvening(
+          (await loadEvening(evening.id))!,
+          userId,
+        ),
+      };
+    },
+  );
+
+  app.post<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId/start-voting",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (!(await canOrganize(evening, userId))) {
+        return reply.code(403).send({ ok: false, error: "forbidden" });
+      }
+      if (evening.status !== "selection") {
+        return reply.code(400).send({ ok: false, error: "not_selection" });
+      }
+
+      const participants = await db.pool.query<{
+        user_id: string;
+        selection_submitted: boolean;
+      }>(
+        `
+          SELECT user_id, selection_submitted
+          FROM evening_participants
+          WHERE evening_id = $1 AND present = true
+        `,
+        [evening.id],
+      );
+      if (
+        participants.rows.length === 0 ||
+        participants.rows.some((row) => !row.selection_submitted)
+      ) {
+        return reply.code(400).send({
+          ok: false,
+          error: "selection_incomplete",
+          message: "Attends la sélection de tous les joueurs.",
+        });
+      }
+
+      try {
+        const started = await startVoting(evening);
+        return {
+          ok: true,
+          evening: await serializeEvening(started, userId),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.message === "selection_empty") {
+          return reply.code(400).send({
+            ok: false,
+            error: "selection_empty",
+            message: "Aucun jeu sélectionné.",
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.post<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId/current-vote",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (evening.status !== "voting") {
+        return reply.code(400).send({ ok: false, error: "not_voting" });
+      }
+      if (!(await isParticipant(evening.id, userId))) {
+        return reply.code(403).send({ ok: false, error: "forbidden" });
+      }
+      const parsed = currentVoteSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ ok: false, error: "invalid_body" });
+      }
+
+      const current = await db.pool.query<{
+        id: string;
+        launcher: string;
+        external_id: string;
+      }>(
+        `
+          SELECT id, launcher, external_id
+          FROM evening_candidates
+          WHERE evening_id = $1 AND round = $2
+          ORDER BY sort_order ASC, name ASC
+          OFFSET $3 LIMIT 1
+        `,
+        [evening.id, evening.round, evening.vote_cursor],
+      );
+      const candidate = current.rows[0];
+      if (!candidate || candidate.id !== parsed.data.candidateId) {
+        return reply.code(409).send({
+          ok: false,
+          error: "vote_cursor_changed",
+          message: "Le jeu en cours a changé.",
+        });
+      }
+
+      const participant = await db.pool.query<{ veto_available: boolean }>(
+        `
+          SELECT veto_available
+          FROM evening_participants
+          WHERE evening_id = $1 AND user_id = $2
+        `,
+        [evening.id, userId],
+      );
+      let vetoAvailable = participant.rows[0]?.veto_available ?? false;
+      const existing = await db.pool.query<{
+        candidate_id: string;
+        value: VoteValue;
+      }>(
+        `
+          SELECT candidate_id, value
+          FROM evening_votes
+          WHERE evening_id = $1 AND user_id = $2 AND round = $3
+        `,
+        [evening.id, userId, evening.round],
+      );
+      const nextVotes = new Map(
+        existing.rows.map((row) => [row.candidate_id, row.value]),
+      );
+      nextVotes.set(candidate.id, parsed.data.value);
+      const vetoCount = [...nextVotes.values()].filter(
+        (value) => value === "veto",
+      ).length;
+      if (vetoCount > 1) {
+        return reply.code(400).send({
+          ok: false,
+          error: "veto_limit",
+          message: "Un seul veto par joueur et par soirée.",
+        });
+      }
+      const hadVetoBefore = [...existing.rows].some(
+        (row) => row.value === "veto",
+      );
+      if (
+        parsed.data.value === "veto" &&
+        !hadVetoBefore &&
+        !vetoAvailable
+      ) {
+        return reply.code(400).send({
+          ok: false,
+          error: "veto_unavailable",
+          message: "Ton veto a déjà été utilisé.",
+        });
+      }
+
+      const client = await db.pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `
+            INSERT INTO evening_votes (
+              evening_id, candidate_id, user_id, value, round
+            )
+            VALUES ($1,$2,$3,$4,$5)
+            ON CONFLICT (candidate_id, user_id) DO UPDATE SET
+              value = EXCLUDED.value,
+              round = EXCLUDED.round,
+              updated_at = now()
+          `,
+          [
+            evening.id,
+            candidate.id,
+            userId,
+            parsed.data.value,
+            evening.round,
+          ],
+        );
+        vetoAvailable =
+          ![...nextVotes.values()].includes("veto") &&
+          !(await client.query(
+            `
+              SELECT 1
+              FROM evening_votes
+              WHERE evening_id = $1 AND user_id = $2
+                AND value = 'veto' AND round < $3
+              LIMIT 1
+            `,
+            [evening.id, userId, evening.round],
+          )).rowCount;
+        await client.query(
+          `
+            UPDATE evening_participants
+            SET veto_available = $3
+            WHERE evening_id = $1 AND user_id = $2
+          `,
+          [evening.id, userId, vetoAvailable],
+        );
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      const present = await db.pool.query<{ user_id: string }>(
+        `
+          SELECT user_id
+          FROM evening_participants
+          WHERE evening_id = $1 AND present = true
+        `,
+        [evening.id],
+      );
+      const currentVotes = await db.pool.query<{ user_id: string }>(
+        `
+          SELECT DISTINCT user_id
+          FROM evening_votes
+          WHERE evening_id = $1 AND candidate_id = $2 AND round = $3
+        `,
+        [evening.id, candidate.id, evening.round],
+      );
+      let next = (await loadEvening(evening.id))!;
+      if (
+        present.rows.length > 0 &&
+        present.rows.every((row) =>
+          currentVotes.rows.some((vote) => vote.user_id === row.user_id),
+        )
+      ) {
+        const candidateCount = await db.pool.query<{ count: string }>(
+          `
+            SELECT COUNT(*)::text AS count
+            FROM evening_candidates
+            WHERE evening_id = $1 AND round = $2
+          `,
+          [evening.id, evening.round],
+        );
+        if (evening.vote_cursor + 1 >= Number(candidateCount.rows[0]?.count ?? 0)) {
+          next = await revealEvening(next);
+        } else {
+          const updated = await db.pool.query<EveningRow>(
+            `
+              UPDATE evenings
+              SET vote_cursor = vote_cursor + 1, updated_at = now()
+              WHERE id = $1
+              RETURNING *
+            `,
+            [evening.id],
+          );
+          next = updated.rows[0]!;
+        }
+      }
+
+      return {
+        ok: true,
+        evening: await serializeEvening(next, userId),
       };
     },
   );
@@ -975,6 +1536,112 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
   );
 
   app.post<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId/revote-tie",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (!(await canOrganize(evening, userId))) {
+        return reply.code(403).send({ ok: false, error: "forbidden" });
+      }
+      if (evening.status !== "revealed") {
+        return reply.code(400).send({ ok: false, error: "not_revealed" });
+      }
+
+      const snapshot = await serializeEvening(evening, userId);
+      const tiedIds = snapshot.resolution?.tiedIds ?? [];
+      if (tiedIds.length < 2) {
+        return reply.code(400).send({ ok: false, error: "no_tie" });
+      }
+
+      const tied = await db.pool.query<{
+        launcher: string;
+        external_id: string;
+        name: string;
+        owned_count: number;
+        installed_count: number;
+        participant_count: number;
+        reasons: string[];
+      }>(
+        `
+          SELECT launcher, external_id, name, owned_count,
+                 installed_count, participant_count, reasons
+          FROM evening_candidates
+          WHERE evening_id = $1 AND round = $2 AND id = ANY($3::uuid[])
+          ORDER BY sort_order ASC, name ASC
+        `,
+        [evening.id, evening.round, tiedIds],
+      );
+      const nextRound = evening.round + 1;
+      const client = await db.pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `
+            UPDATE evenings
+            SET status = 'voting',
+                round = $2,
+                vote_cursor = 0,
+                revealed_at = NULL,
+                winner_candidate_id = NULL,
+                updated_at = now()
+            WHERE id = $1
+          `,
+          [evening.id, nextRound],
+        );
+        for (const [index, candidate] of tied.rows.entries()) {
+          await client.query(
+            `
+              INSERT INTO evening_candidates (
+                evening_id, round, launcher, external_id, name, sort_order,
+                owned_count, installed_count, participant_count, reasons
+              )
+              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            `,
+            [
+              evening.id,
+              nextRound,
+              candidate.launcher,
+              candidate.external_id,
+              candidate.name,
+              index,
+              candidate.owned_count,
+              candidate.installed_count,
+              candidate.participant_count,
+              candidate.reasons,
+            ],
+          );
+        }
+        await client.query(
+          `
+            UPDATE evening_participants
+            SET selection_submitted = true
+            WHERE evening_id = $1
+          `,
+          [evening.id],
+        );
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      const updated = (await loadEvening(evening.id))!;
+      return {
+        ok: true,
+        evening: await serializeEvening(updated, userId),
+      };
+    },
+  );
+
+  app.post<{ Params: { eveningId: string } }>(
     "/evenings/:eveningId/new-round",
     async (request, reply) => {
       const userId = await requireUserId(request);
@@ -1042,19 +1709,23 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         );
       }
 
+      const poolSize = Math.max(1, pool.length);
       let shortlist = buildShortlist(pool, {
-        requireOwned: evening.require_owned,
+        requireOwned: false,
         requireInstalled: evening.require_installed,
-        shortlistSize: evening.shortlist_size,
+        shortlistSize: poolSize,
+        maxSize: poolSize,
         recentWinnerKeys: recent,
         excludeKeys,
       });
 
       if (shortlist.length < 3) {
+        const librarySize = Math.max(1, library.length);
         shortlist = buildShortlist(library, {
-          requireOwned: evening.require_owned,
+          requireOwned: false,
           requireInstalled: false,
-          shortlistSize: evening.shortlist_size,
+          shortlistSize: librarySize,
+          maxSize: librarySize,
           recentWinnerKeys: recent,
           excludeKeys,
         });
@@ -1072,14 +1743,23 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       await db.pool.query(
         `
           UPDATE evenings
-          SET status = 'voting',
+          SET status = 'selection',
               round = $2,
+              vote_cursor = 0,
               revealed_at = NULL,
               winner_candidate_id = NULL,
               updated_at = now()
           WHERE id = $1
         `,
         [evening.id, nextRound],
+      );
+      await db.pool.query(
+        `
+          UPDATE evening_participants
+          SET selection_submitted = false
+          WHERE evening_id = $1
+        `,
+        [evening.id],
       );
       await insertCandidates(evening.id, nextRound, shortlist);
 

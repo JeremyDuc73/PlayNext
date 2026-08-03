@@ -10,6 +10,7 @@ import { loadConfig } from "../config.js";
 import { createDb } from "../db.js";
 import { createSession } from "../auth/session.js";
 import { migrate } from "../migrate.js";
+import { fetchSteamGroupPlayable } from "../steam/store.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 loadEnv({ path: resolve(here, "../../../../.env") });
@@ -33,6 +34,156 @@ const SAMPLE_GAMES = [
     launcher: "steam",
     externalId: "1245620",
     name: "ELDEN RING",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "728880",
+    name: "Overcooked! 2",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "550",
+    name: "Left 4 Dead 2",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "105600",
+    name: "Terraria",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "413150",
+    name: "Stardew Valley",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "945360",
+    name: "Among Us",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "892970",
+    name: "Valheim",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "548430",
+    name: "Deep Rock Galactic",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "632360",
+    name: "Risk of Rain 2",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "620",
+    name: "Portal 2",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "4000",
+    name: "Garry's Mod",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "322330",
+    name: "Don't Starve Together",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "582010",
+    name: "Monster Hunter: World",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "230410",
+    name: "Warframe",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "1172470",
+    name: "Apex Legends",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "252950",
+    name: "Rocket League",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "289070",
+    name: "Sid Meier's Civilization VI",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "1086940",
+    name: "Baldur's Gate 3",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "553850",
+    name: "HELLDIVERS 2",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "1966720",
+    name: "Lethal Company",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "739630",
+    name: "Phasmophobia",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "477160",
+    name: "Human Fall Flat",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "285900",
+    name: "Gang Beasts",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "242760",
+    name: "The Forest",
+    installed: true,
+  },
+  {
+    launcher: "steam",
+    externalId: "1172620",
+    name: "Sea of Thieves",
+    installed: false,
+  },
+  {
+    launcher: "steam",
+    externalId: "286160",
+    name: "Tabletop Simulator",
     installed: true,
   },
   {
@@ -83,6 +234,31 @@ async function main() {
           updated_at = now()
       `,
       [buddy.id, game.launcher, game.externalId, game.name, game.installed],
+    );
+  }
+
+  const steamModes = await fetchSteamGroupPlayable(
+    SAMPLE_GAMES.filter((game) => game.launcher === "steam").map(
+      (game) => game.externalId,
+    ),
+  );
+  for (const game of SAMPLE_GAMES) {
+    if (game.launcher !== "steam") continue;
+    const groupPlayable = steamModes.get(game.externalId);
+    if (groupPlayable == null) continue;
+    await db.pool.query(
+      `
+        INSERT INTO game_meta (
+          launcher, external_id, name, group_playable,
+          group_playable_source, fetched_at
+        )
+        VALUES ('steam', $1, $2, $3, 'steam_store', now())
+        ON CONFLICT (launcher, external_id) DO UPDATE SET
+          group_playable = EXCLUDED.group_playable,
+          group_playable_source = EXCLUDED.group_playable_source,
+          fetched_at = now()
+      `,
+      [game.externalId, game.name, groupPlayable],
     );
   }
 

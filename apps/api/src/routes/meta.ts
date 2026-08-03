@@ -20,7 +20,7 @@ const itemSchema = z.object({
 });
 
 const resolveBodySchema = z.object({
-  items: z.array(itemSchema).min(1).max(80),
+  items: z.array(itemSchema).min(1).max(500),
 });
 
 /**
@@ -88,10 +88,17 @@ export const metaRoutes: FastifyPluginAsync<MetaRoutesOptions> = async (
     const results = items.map((item) => {
       const key = metaKey(item.launcher, item.externalId);
       const row = byKey.get(key);
+      const cachedCover =
+        item.launcher !== "steam" &&
+        row?.cover_url &&
+        (row.source === "igdb_manual" ||
+          !row.cover_url.includes("images.igdb.com"))
+          ? row.cover_url
+          : null;
       const coverUrl =
-        row?.cover_url ??
+        cachedCover ??
         (item.launcher === "steam"
-          ? steamLibraryPosterUrl(item.externalId, "_2x")
+          ? steamLibraryPosterUrl(item.externalId)
           : null);
 
       return {
@@ -107,7 +114,7 @@ export const metaRoutes: FastifyPluginAsync<MetaRoutesOptions> = async (
         year: null as number | null,
         genres: [] as string[],
         source:
-          row?.source ??
+          (row?.source === "igdb" ? null : row?.source) ??
           (item.launcher === "steam" ? "steam_cdn" : "none"),
       };
     });

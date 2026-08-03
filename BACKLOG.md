@@ -205,8 +205,8 @@ Doc : `docs/EVENINGS.md`
 - [x] Filtres obligatoires (possession / installation / participants)
 - [~] Classement (installé, possession, diversité récents ; envie/fréquence/historique enrichis plus tard)
 - [x] Diversité de sélection (pénalité gagnants récents)
-- [x] Liste courte 5–12
-- [x] Explications par jeu (possédé X/Y, installé X/Y ; durée/modes catalogue plus tard)
+- [x] Liste courte 1–5 (choix libre de l’organisateur)
+- [x] Explications par jeu (possédé X/Y, installé X/Y ; mode groupe catalogué si disponible)
 - [x] Compatibilité avant popularité ; veto non compensé
 - [x] Tests unitaires du moteur (`npm run test:api`)
 
@@ -214,7 +214,10 @@ Doc : `docs/EVENINGS.md`
 
 ### Votes & veto
 
-- [x] Votes : Chaud / Pourquoi pas / Pas ce soir / Veto
+- [x] Phase de sélection personnelle depuis la bibliothèque (1–5 jeux) avant le vote
+- [x] Vote séquentiel synchronisé, jeu par jeu
+- [x] Re-vote des égalités ou roulette au résultat
+- [x] Votes : Chaud / Pourquoi pas / Pass / Veto
 - [x] Votes masqués jusqu’à révélation
 - [x] 1 veto / joueur / soirée (retrait possible tant que le tour est ouvert)
 - [x] Progression « qui a voté » sans révéler le choix

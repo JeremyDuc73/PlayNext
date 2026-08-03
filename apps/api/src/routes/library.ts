@@ -517,7 +517,12 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       `
         SELECT ug.id, ug.launcher, ug.external_id, ug.name, ug.installed,
                ug.owned, ug.launchable, ug.synced_at,
-               gm.cover_url, gm.year
+               CASE
+                 WHEN gm.cover_url LIKE '%images.igdb.com%'
+                  AND gm.source <> 'igdb_manual' THEN NULL
+                 ELSE gm.cover_url
+               END AS cover_url,
+               gm.year
         FROM user_games ug
         LEFT JOIN game_meta gm
           ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id

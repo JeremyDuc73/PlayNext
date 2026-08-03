@@ -4,6 +4,7 @@ node_modules/
 # Builds
 dist/
 build/
+apps/web/.astro/
 apps/desktop/src-tauri/target/
 
 # Env & secrets
@@ -11,6 +12,7 @@ apps/desktop/src-tauri/target/
 .env.local
 .env.*.local
 !.env.example
+deploy/.env.production
 
 # Tooling (local Rust toolchain if installed in-repo)
 .tools/

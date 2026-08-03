@@ -1,0 +1,94 @@
+---
+import Base from "../layouts/Base.astro";
+
+const downloadUrl =
+  "https://github.com/JeremyDuc73/PlayNext/releases/latest/download/PlayNext_0.1.0_x64-setup.exe";
+---
+
+<Base>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">PlayNext · application Windows</p>
+      <span class="accent"></span>
+      <h1>On décide.</h1>
+      <p>
+        Les bibliothèques sont croisées, les choix restent secrets et le groupe
+        tranche enfin. Une soirée ne devrait pas commencer par trente minutes
+        de débat.
+      </p>
+      <div class="actions">
+        <a class="button" href={downloadUrl}>Télécharger pour Windows</a>
+        <a class="button secondary" href="/docs">Voir la documentation</a>
+      </div>
+      <p class="mono">Windows 10/11 · Discord · Tauri</p>
+    </div>
+    <div class="hero-mark" aria-label="Logo PlayNext">
+      <div class="hero-mark-inner">
+        <img src="/playnext.svg" alt="PlayNext" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading">
+      <h2>Le rituel</h2>
+      <p>
+        Pas un launcher universel. Un bulletin de décision pour les groupes
+        qui savent déjà qu’ils vont perdre du temps à choisir.
+      </p>
+    </div>
+    <div class="steps">
+      <article class="step">
+        <span class="step-number">01</span>
+        <h3>Synchroniser</h3>
+        <p>PlayNext repère les jeux utiles sur les PC du groupe.</p>
+      </article>
+      <article class="step">
+        <span class="step-number">02</span>
+        <h3>Sélectionner</h3>
+        <p>Chaque joueur choisit ses candidats. Les choix restent privés.</p>
+      </article>
+      <article class="step">
+        <span class="step-number">03</span>
+        <h3>Trancher</h3>
+        <p>Vote jeu par jeu, veto limité, résultat expliqué.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading">
+      <h2>Fait pour le groupe</h2>
+      <p>Les informations qui comptent sont visibles avant le vote.</p>
+    </div>
+    <div class="manifesto">
+      <div>
+        <strong>Qui possède ?</strong>
+        <p>Les bibliothèques croisées évitent de proposer un jeu inaccessible.</p>
+      </div>
+      <div>
+        <strong>Qui a installé ?</strong>
+        <p>Les contraintes de la soirée restent compréhensibles et ajustables.</p>
+      </div>
+      <div>
+        <strong>Qui a voté ?</strong>
+        <p>La progression est visible. Le choix de chacun ne l’est pas.</p>
+      </div>
+      <div>
+        <strong>Pourquoi ce jeu ?</strong>
+        <p>Le résultat garde une trace des raisons, pas seulement un gagnant.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="download-box">
+      <div>
+        <p class="eyebrow">Version de test</p>
+        <h3>Installer PlayNext</h3>
+        <p>Installateur Windows NSIS · installation par utilisateur.</p>
+      </div>
+      <a class="button" href={downloadUrl}>Télécharger le setup</a>
+    </div>
+  </section>
+</Base>

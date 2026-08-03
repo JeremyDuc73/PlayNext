@@ -21,15 +21,8 @@ export function fallbackPosterStyle(name: string): {
   };
 }
 
-function steamAsset(
-  appId: string,
-  file: "library_600x900" | "library_hero" | "header" | "capsule_616x353",
-  scale: "" | "_2x" = "",
-): string {
-  const name =
-    file === "header" || file === "capsule_616x353"
-      ? `${file}.jpg`
-      : `${file}${scale}.jpg`;
+function steamPosterAsset(appId: string): string {
+  const name = "library_600x900.jpg";
   return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/${name}`;
 }
 
@@ -44,18 +37,16 @@ export function coverCandidates(input: {
     if (url && !list.includes(url)) list.push(url);
   };
 
-  push(input.coverUrl);
-  for (const url of input.fallbackUrls ?? []) push(url);
-
   if (input.launcher === "steam" && input.externalId) {
     const id = input.externalId.replace(/[^\d]/g, "");
     if (id) {
-      push(steamAsset(id, "library_600x900", "_2x"));
-      push(steamAsset(id, "library_600x900"));
-      push(steamAsset(id, "library_hero", "_2x"));
-      push(steamAsset(id, "header"));
-      push(steamAsset(id, "capsule_616x353"));
+      push(steamPosterAsset(id));
     }
+  } else {
+    push(input.coverUrl);
+    // Les launchers non-Steam ne possèdent pas de ladder fiable :
+    // une seule URL stable évite les changements d’art aléatoires.
+    push(input.fallbackUrls?.[0]);
   }
 
   return list;

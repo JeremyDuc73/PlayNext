@@ -11,6 +11,7 @@ import { eveningsRoutes } from "./routes/evenings.js";
 import { groupsRoutes } from "./routes/groups.js";
 import { healthRoutes } from "./routes/health.js";
 import { libraryRoutes } from "./routes/library.js";
+import { manualLibraryRoutes } from "./routes/manual-library.js";
 import { metaRoutes } from "./routes/meta.js";
 
 export async function buildApp(config: Env, db: Db) {
@@ -43,6 +44,7 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(authMicrosoftRoutes, { config, db });
   await app.register(authEpicRoutes, { config, db });
   await app.register(libraryRoutes, { db, config });
+  await app.register(manualLibraryRoutes, { db, config });
   await app.register(groupsRoutes, { db });
   await app.register(eveningsRoutes, { db });
   await app.register(metaRoutes, { db });

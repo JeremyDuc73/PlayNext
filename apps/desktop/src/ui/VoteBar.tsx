@@ -5,6 +5,7 @@ const OPTIONS: VoteValue[] = ["hot", "maybe", "pass", "veto"];
 type Props = {
   value: VoteValue | null | undefined;
   vetoDisabled?: boolean;
+  hideVeto?: boolean;
   disabled?: boolean;
   onChange: (value: VoteValue) => void;
 };
@@ -12,12 +13,13 @@ type Props = {
 export function VoteBar({
   value,
   vetoDisabled,
+  hideVeto,
   disabled,
   onChange,
 }: Props) {
   return (
     <div className="pn-ballot" role="group" aria-label="Bulletin">
-      {OPTIONS.map((option) => {
+      {OPTIONS.filter((option) => !(hideVeto && option === "veto")).map((option) => {
         const isVeto = option === "veto";
         const blocked = isVeto && vetoDisabled && value !== "veto";
         return (

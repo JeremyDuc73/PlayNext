@@ -1,0 +1,96 @@
+# Première mise en ligne
+
+## URLs publiques
+
+- Site : `https://playnext.jeremyduc.dev`
+- API : `https://api.playnext.jeremyduc.dev`
+- Discord OAuth callback :
+  `https://api.playnext.jeremyduc.dev/auth/discord/callback`
+- Microsoft/Xbox callback :
+  `https://api.playnext.jeremyduc.dev/auth/microsoft/callback`
+
+IGDB/Twitch utilise `client_credentials` : aucune URL de callback n’est
+nécessaire.
+
+Créer deux entrées DNS A vers le VPS :
+
+```text
+playnext.jeremyduc.dev      → IP_DU_VPS
+api.playnext.jeremyduc.dev  → IP_DU_VPS
+```
+
+## Discord Developer Portal
+
+Dans OAuth2 → Redirects, ajouter exactement :
+
+```text
+https://api.playnext.jeremyduc.dev/auth/discord/callback
+```
+
+Les valeurs de production sont dans `deploy/.env.production.example`.
+Ne jamais copier `.env` dans Git.
+
+## Caddy sur l’hôte
+
+Dans ton cas, Caddy n’apparaît pas dans `docker ps` : il est probablement
+installé comme service Ubuntu. Le fichier `deploy/Caddyfile.example` utilise
+donc les chemins et ports de l’hôte :
+
+- site : `/var/www/playnext/apps/web/dist` ;
+- API : `127.0.0.1:3101` (Cinezone utilise déjà le port `3001`).
+
+Le site Astro est statique :
+
+```bash
+npm run build -w @playnext/web
+```
+
+Le build reste directement dans le clone `/var/www/playnext`.
+Caddy fournit automatiquement HTTPS pour les deux domaines.
+
+## API Docker de production
+
+Sur le VPS :
+
+1. Copier `deploy/.env.production.example` vers `deploy/.env.production`.
+2. Renseigner `DATABASE_URL`, `SESSION_SECRET`, Discord et les services voulus.
+3. Renseigner `POSTGRES_PASSWORD`.
+4. Lancer le compose de production :
+
+```bash
+cd /var/www/playnext
+docker compose \
+  --env-file deploy/.env.production \
+  -f deploy/docker-compose.production.yml \
+  up -d --build
+```
+
+L’API écoute seulement sur `127.0.0.1:3101`; elle n’est pas exposée directement
+sur internet. Vérifier :
+
+```bash
+curl https://api.playnext.jeremyduc.dev/health
+```
+
+## Installer Windows depuis GitHub
+
+Le workflow Windows publie un artifact à chaque build et une Release lorsqu’un
+tag `v*` est poussé :
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+La page `/download` pointe vers le setup de la dernière Release.
+
+## Signature Windows
+
+Ajouter dans GitHub Actions → Secrets :
+
+- `WINDOWS_CERTIFICATE_BASE64` : fichier `.pfx` encodé en Base64 ;
+- `WINDOWS_CERTIFICATE_PASSWORD` : mot de passe du `.pfx`.
+
+Sans certificat reconnu, l’installeur est fonctionnel et personnalisé mais
+SmartScreen peut afficher « éditeur inconnu ». Il ne faut pas désactiver
+Defender pour contourner cela.

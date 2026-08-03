@@ -694,7 +694,7 @@ export function GroupsPanel({
                   density="compact"
                   animateKey={`${filter}:${visibleLibrary.length}`}
                 >
-                  {visibleLibrary.map((game) => {
+                  {visibleLibrary.map((game, index) => {
                     const mine = game.owners.find(
                       (o) => o.userId === currentUserId,
                     );
@@ -705,6 +705,7 @@ export function GroupsPanel({
                           launcher={game.launcher}
                           externalId={game.externalId}
                           coverUrl={game.coverUrl}
+                          priority={index < 24}
                           subtitle={`${pad2(game.ownedCount)}/${pad2(game.memberCount)} · ${game.launcher}`}
                           footer={
                             mine ? (

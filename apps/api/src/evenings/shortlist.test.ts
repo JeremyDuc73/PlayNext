@@ -45,6 +45,18 @@ describe("buildShortlist", () => {
     assert.equal(list[0]!.externalId, "1");
   });
 
+  it("excludes games not playable as a group", () => {
+    const list = buildShortlist(
+      [
+        game({ name: "Elden Ring", externalId: "1245620", groupPlayable: false }),
+        game({ name: "Overcooked 2", externalId: "728880", groupPlayable: true }),
+      ],
+      { requireOwned: true, requireInstalled: false, shortlistSize: 8 },
+    );
+
+    assert.deepEqual(list.map((candidate) => candidate.name), ["Overcooked 2"]);
+  });
+
   it("penalizes recent winners but can still include them", () => {
     const list = buildShortlist(
       [
@@ -71,7 +83,7 @@ describe("buildShortlist", () => {
     assert.equal(list[0]!.name, "Fresh");
   });
 
-  it("clamps shortlist between 5 and 12", () => {
+  it("clamps shortlist between 1 and 5", () => {
     const games = Array.from({ length: 20 }, (_, i) =>
       game({
         name: `G${i}`,
@@ -80,12 +92,19 @@ describe("buildShortlist", () => {
         installedCount: i % 2,
       }),
     );
-    const list = buildShortlist(games, {
+    const large = buildShortlist(games, {
       requireOwned: true,
       requireInstalled: false,
-      shortlistSize: 3,
+      shortlistSize: 20,
     });
-    assert.equal(list.length, 5);
+    assert.equal(large.length, 5);
+
+    const small = buildShortlist(games, {
+      requireOwned: true,
+      requireInstalled: false,
+      shortlistSize: 0,
+    });
+    assert.equal(small.length, 1);
   });
 });
 

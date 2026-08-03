@@ -157,7 +157,7 @@ export async function migrate(db: Db): Promise<void> {
       group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
       created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status TEXT NOT NULL CHECK (
-        status IN ('voting', 'revealed', 'closed', 'cancelled')
+        status IN ('selection', 'voting', 'revealed', 'closed', 'cancelled')
       ),
       title TEXT,
       duration_minutes INTEGER
@@ -165,11 +165,12 @@ export async function migrate(db: Db): Promise<void> {
       vibe TEXT CHECK (
         vibe IS NULL OR vibe IN ('chill', 'competitive', 'campaign', 'party', 'any')
       ),
-      require_owned BOOLEAN NOT NULL DEFAULT true,
+      require_owned BOOLEAN NOT NULL DEFAULT false,
       require_installed BOOLEAN NOT NULL DEFAULT false,
-      shortlist_size INTEGER NOT NULL DEFAULT 8
-        CHECK (shortlist_size BETWEEN 5 AND 12),
+      shortlist_size INTEGER NOT NULL DEFAULT 3
+        CHECK (shortlist_size BETWEEN 1 AND 5),
       round INTEGER NOT NULL DEFAULT 1,
+      vote_cursor INTEGER NOT NULL DEFAULT 0,
       closes_at TIMESTAMPTZ,
       revealed_at TIMESTAMPTZ,
       closed_at TIMESTAMPTZ,
@@ -181,14 +182,47 @@ export async function migrate(db: Db): Promise<void> {
     CREATE INDEX IF NOT EXISTS evenings_group_id_idx ON evenings(group_id);
     CREATE INDEX IF NOT EXISTS evenings_status_idx ON evenings(status);
 
+    ALTER TABLE evenings
+      DROP CONSTRAINT IF EXISTS evenings_shortlist_size_check;
+    ALTER TABLE evenings
+      DROP CONSTRAINT IF EXISTS evenings_status_check;
+    UPDATE evenings
+    SET shortlist_size = LEAST(5, GREATEST(1, shortlist_size));
+    ALTER TABLE evenings
+      ALTER COLUMN shortlist_size SET DEFAULT 3;
+    ALTER TABLE evenings
+      ALTER COLUMN require_owned SET DEFAULT false;
+    ALTER TABLE evenings
+      ADD CONSTRAINT evenings_shortlist_size_check
+      CHECK (shortlist_size BETWEEN 1 AND 5);
+    ALTER TABLE evenings
+      ADD CONSTRAINT evenings_status_check
+      CHECK (status IN ('selection', 'voting', 'revealed', 'closed', 'cancelled'));
+    ALTER TABLE evenings
+      ADD COLUMN IF NOT EXISTS vote_cursor INTEGER NOT NULL DEFAULT 0;
+
     CREATE TABLE IF NOT EXISTS evening_participants (
       evening_id UUID NOT NULL REFERENCES evenings(id) ON DELETE CASCADE,
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       present BOOLEAN NOT NULL DEFAULT true,
       veto_available BOOLEAN NOT NULL DEFAULT true,
+      selection_submitted BOOLEAN NOT NULL DEFAULT false,
       joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (evening_id, user_id)
     );
+
+    ALTER TABLE evening_participants
+      ADD COLUMN IF NOT EXISTS selection_submitted BOOLEAN NOT NULL DEFAULT false;
+
+    UPDATE evenings
+    SET status = 'selection'
+    WHERE status = 'voting'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM evening_participants p
+        WHERE p.evening_id = evenings.id
+          AND p.selection_submitted = true
+      );
 
     CREATE INDEX IF NOT EXISTS evening_participants_user_id_idx
       ON evening_participants(user_id);
@@ -212,6 +246,18 @@ export async function migrate(db: Db): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS evening_candidates_evening_idx
       ON evening_candidates(evening_id, round);
+
+    CREATE TABLE IF NOT EXISTS evening_selections (
+      evening_id UUID NOT NULL REFERENCES evenings(id) ON DELETE CASCADE,
+      candidate_id UUID NOT NULL REFERENCES evening_candidates(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      round INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (candidate_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS evening_selections_evening_user_idx
+      ON evening_selections(evening_id, user_id, round);
 
     DO $$ BEGIN
       ALTER TABLE evenings
@@ -247,9 +293,34 @@ export async function migrate(db: Db): Promise<void> {
       year INTEGER,
       genres TEXT[] NOT NULL DEFAULT '{}',
       source TEXT NOT NULL DEFAULT 'unknown',
+      group_playable BOOLEAN,
+      group_playable_source TEXT,
       fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (launcher, external_id)
     );
+
+    ALTER TABLE game_meta
+      ADD COLUMN IF NOT EXISTS group_playable BOOLEAN;
+    ALTER TABLE game_meta
+      ADD COLUMN IF NOT EXISTS group_playable_source TEXT;
+
+    -- Nettoyage de l’ancien pipeline IGDB abandonné.
+    UPDATE game_meta
+    SET cover_url = NULL,
+        cover_image_id = NULL,
+        igdb_id = NULL,
+        year = NULL,
+        genres = '{}',
+        source = CASE
+          WHEN launcher = 'steam' THEN 'steam_cdn'
+          ELSE 'none'
+        END,
+        fetched_at = now()
+    WHERE source = 'igdb'
+       OR (
+         cover_url LIKE '%images.igdb.com%'
+         AND source <> 'igdb_manual'
+       );
 
     CREATE INDEX IF NOT EXISTS game_meta_igdb_id_idx ON game_meta(igdb_id);
   `);

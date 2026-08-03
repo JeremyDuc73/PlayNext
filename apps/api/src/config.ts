@@ -27,6 +27,8 @@ const envSchema = z.object({
     .string()
     .url()
     .default("http://localhost:3001/auth/microsoft/callback"),
+  TWITCH_CLIENT_ID: z.string().optional().default(""),
+  TWITCH_CLIENT_SECRET: z.string().optional().default(""),
 });
 
 export function isSteamWebApiConfigured(config: Env): boolean {
@@ -51,6 +53,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Env {
     MICROSOFT_CLIENT_ID: trimEnv(env.MICROSOFT_CLIENT_ID),
     MICROSOFT_CLIENT_SECRET: trimEnv(env.MICROSOFT_CLIENT_SECRET),
     MICROSOFT_REDIRECT_URI: trimEnv(env.MICROSOFT_REDIRECT_URI),
+    TWITCH_CLIENT_ID: trimEnv(env.TWITCH_CLIENT_ID),
+    TWITCH_CLIENT_SECRET: trimEnv(env.TWITCH_CLIENT_SECRET),
   };
   const parsed = envSchema.safeParse(normalized);
   if (!parsed.success) {
@@ -64,4 +68,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Env {
 
 export function isDiscordConfigured(config: Env): boolean {
   return Boolean(config.DISCORD_CLIENT_ID && config.DISCORD_CLIENT_SECRET);
+}
+
+export function isIgdbConfigured(config: Env): boolean {
+  return Boolean(config.TWITCH_CLIENT_ID && config.TWITCH_CLIENT_SECRET);
 }

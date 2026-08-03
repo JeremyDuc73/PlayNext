@@ -1064,6 +1064,10 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
             JOIN unnest($1::text[], $2::text[]) AS x(launcher, external_id)
               ON gm.launcher = x.launcher AND gm.external_id = x.external_id
             WHERE gm.cover_url IS NOT NULL
+              AND (
+                gm.source = 'igdb_manual'
+                OR gm.cover_url NOT LIKE '%images.igdb.com%'
+              )
           `,
           [launchers, externalIds],
         );

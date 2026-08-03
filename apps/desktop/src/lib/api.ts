@@ -148,6 +148,48 @@ export async function fetchMyLibrary(): Promise<LibraryGame[]> {
   return data.games;
 }
 
+export type ManualCatalogGame = {
+  igdbId: number;
+  name: string;
+  coverImageId: string | null;
+  coverUrl: string | null;
+  year: number | null;
+};
+
+export async function searchManualGames(
+  query: string,
+): Promise<ManualCatalogGame[]> {
+  const response = await apiFetch("/library/manual/search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(data?.message ?? data?.error ?? `HTTP ${response.status}`);
+  }
+  const data = (await response.json()) as {
+    results: ManualCatalogGame[];
+  };
+  return data.results;
+}
+
+export async function addManualGame(igdbId: number): Promise<void> {
+  const response = await apiFetch("/library/manual", {
+    method: "POST",
+    body: JSON.stringify({ igdbId }),
+  });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(data?.message ?? data?.error ?? `HTTP ${response.status}`);
+  }
+}
+
 export type MicrosoftStatus = {
   configured: boolean;
   linked: boolean;

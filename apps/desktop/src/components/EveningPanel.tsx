@@ -6,10 +6,11 @@ import {
   fetchEvening,
   listEvenings,
   newEveningRound,
-  revealEvening,
+  revoteTie,
   rouletteEvening,
-  submitVotes,
-  vibeLabel,
+  startVoting,
+  submitCurrentVote,
+  submitSelection,
   type Evening,
   type EveningSummary,
   type EveningVibe,
@@ -20,11 +21,11 @@ import { pad2 } from "../lib/format";
 import { metaMapKey, resolveGameMeta, type GameMeta } from "../lib/meta";
 import { gsap, prefersReducedMotion, staggerIn, useGSAP } from "../lib/motion";
 import { Button } from "../ui/Button";
+import { Checkbox } from "../ui/Checkbox";
 import { EmptyHint } from "../ui/EmptyHint";
 import { coverCandidates, fallbackPosterStyle } from "../lib/covers";
 import { useCoverSrc } from "../lib/useCoverSrc";
 import { GamePoster } from "../ui/GamePoster";
-import { PresenceRow } from "../ui/PresenceRow";
 import { VoteBar } from "../ui/VoteBar";
 
 type Props = {
@@ -56,21 +57,42 @@ export function EveningPanel({
   const [evening, setEvening] = useState<Evening | null>(null);
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState(90);
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(90);
   const [vibe, setVibe] = useState<EveningVibe>("any");
-  const [requireOwned, setRequireOwned] = useState(true);
   const [requireInstalled, setRequireInstalled] = useState(false);
-  const [shortlistSize, setShortlistSize] = useState(8);
+  const [shortlistSize, setShortlistSize] = useState(3);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
     () => members.map((m) => m.id),
   );
-  const [draftVotes, setDraftVotes] = useState<Record<string, VoteValue>>({});
-  const [activeCandidateId, setActiveCandidateId] = useState<string | null>(
-    null,
-  );
+  const [selectionIds, setSelectionIds] = useState<string[]>([]);
   const [meta, setMeta] = useState<Map<string, GameMeta>>(new Map());
   const [setupOpen, setSetupOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const eveningRef = useRef<Evening | null>(null);
+  const selectionDirtyRef = useRef(false);
+  const metaLoadedForRef = useRef<string | null>(null);
+
+  function applyEvening(next: Evening): void {
+    const previous = eveningRef.current;
+    const sameRound =
+      previous?.id === next.id && previous.round === next.round;
+
+    if (!sameRound) {
+      selectionDirtyRef.current = false;
+    }
+
+    eveningRef.current = next;
+    const participant = next.participants.find(
+      (item) => item.id === currentUserId,
+    );
+    if (!sameRound || !selectionDirtyRef.current) {
+      setSelectionIds(next.mySelectionIds);
+    }
+    if (!sameRound || (!selectionDirtyRef.current && participant?.selectionSubmitted)) {
+      selectionDirtyRef.current = false;
+    }
+    setEvening(next);
+  }
 
   async function refreshHistory() {
     const list = await listEvenings(groupId);
@@ -80,24 +102,25 @@ export function EveningPanel({
 
   async function loadEvening(id: string) {
     const next = await fetchEvening(id);
-    setEvening(next);
-    const drafts: Record<string, VoteValue> = {};
-    for (const candidate of next.candidates) {
-      if (candidate.myVote) drafts[candidate.id] = candidate.myVote;
+    const metaKey = `${next.id}:${next.round}`;
+    if (metaLoadedForRef.current !== metaKey) {
+      let resolved = new Map<string, GameMeta>();
+      try {
+        resolved = await resolveGameMeta(
+          next.candidates.map((c) => ({
+            launcher: c.launcher,
+            externalId: c.externalId,
+            name: c.name,
+          })),
+        );
+      } catch {
+        // La soirée reste utilisable avec l’initiale encre.
+      }
+      setMeta(resolved);
+      metaLoadedForRef.current = metaKey;
     }
-    setDraftVotes(drafts);
-    if (!activeCandidateId && next.candidates[0]) {
-      setActiveCandidateId(next.candidates[0].id);
-    }
-    setMeta(
-      await resolveGameMeta(
-        next.candidates.map((c) => ({
-          launcher: c.launcher,
-          externalId: c.externalId,
-          name: c.name,
-        })),
-      ),
-    );
+    // Le ratio et les URLs sont connus avant le premier rendu de la grille.
+    applyEvening(next);
     return next;
   }
 
@@ -112,10 +135,20 @@ export function EveningPanel({
         const list = await refreshHistory();
         if (cancelled) return;
         const open = list.find(
-          (e) => e.status === "voting" || e.status === "revealed",
+          (e) =>
+            e.status === "selection" ||
+            e.status === "voting" ||
+            e.status === "revealed",
         );
         if (open) await loadEvening(open.id);
-        else setEvening(null);
+        else {
+          eveningRef.current = null;
+          selectionDirtyRef.current = false;
+          metaLoadedForRef.current = null;
+          setSelectionIds([]);
+          setMeta(new Map());
+          setEvening(null);
+        }
       } catch {
         if (!cancelled) onBanner("Impossible de charger les soirées.");
       }
@@ -129,7 +162,9 @@ export function EveningPanel({
   useEffect(() => {
     if (
       !evening ||
-      (evening.status !== "voting" && evening.status !== "revealed")
+      (evening.status !== "selection" &&
+        evening.status !== "voting" &&
+        evening.status !== "revealed")
     ) {
       return;
     }
@@ -157,17 +192,67 @@ export function EveningPanel({
     );
   }
 
-  function setVote(candidateId: string, value: VoteValue) {
-    setDraftVotes((prev) => {
-      const next = { ...prev };
-      if (value === "veto") {
-        for (const [id, v] of Object.entries(next)) {
-          if (v === "veto" && id !== candidateId) next[id] = "pass";
-        }
-      }
-      next[candidateId] = value;
+  function toggleSelection(candidateId: string) {
+    if (!evening || evening.status !== "selection") return;
+    setSelectionIds((prev) => {
+      const next = prev.includes(candidateId)
+        ? prev.filter((id) => id !== candidateId)
+        : prev.length < evening.shortlistSize
+          ? [...prev, candidateId]
+          : prev;
+      selectionDirtyRef.current = true;
       return next;
     });
+  }
+
+  async function onSubmitSelection() {
+    if (!evening) return;
+    if (selectionIds.length < 1) {
+      onBanner("Choisis au moins un jeu.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = await submitSelection(evening.id, selectionIds);
+      selectionDirtyRef.current = false;
+      applyEvening(next);
+      onBanner("Sélection déposée.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Sélection échouée.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onStartVoting() {
+    if (!evening) return;
+    setBusy(true);
+    try {
+      const next = await startVoting(evening.id);
+      applyEvening(next);
+      onBanner("Vote lancé.");
+    } catch (error) {
+      onBanner(error instanceof Error ? error.message : "Lancement échoué.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCurrentVote(value: VoteValue) {
+    if (!evening || evening.status !== "voting") return;
+    const candidate = evening.candidates[evening.currentCandidateIndex ?? 0];
+    if (!candidate) return;
+    setBusy(true);
+    try {
+      const next = await submitCurrentVote(evening.id, candidate.id, value);
+      applyEvening(next);
+    } catch (error) {
+      onBanner(error instanceof Error ? error.message : "Vote échoué.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onCreate() {
@@ -181,19 +266,16 @@ export function EveningPanel({
         title: title.trim() || undefined,
         durationMinutes,
         vibe,
-        requireOwned,
         requireInstalled,
         shortlistSize,
         participantIds: selectedParticipants.includes(currentUserId)
           ? selectedParticipants
           : [...selectedParticipants, currentUserId],
       });
-      setEvening(created);
-      setDraftVotes({});
-      setActiveCandidateId(created.candidates[0]?.id ?? null);
+      applyEvening(created);
       setSetupOpen(false);
       await refreshHistory();
-      onBanner(`${pad2(created.candidates.length)} jeux en lice.`);
+      onBanner(`${pad2(created.candidates.length)} jeux à choisir.`);
     } catch (error) {
       onBanner(
         error instanceof Error ? error.message : "Création de soirée échouée.",
@@ -203,55 +285,21 @@ export function EveningPanel({
     }
   }
 
-  async function onSubmitVotes() {
-    if (!evening) return;
-    const votes = evening.candidates
-      .map((c) => {
-        const value = draftVotes[c.id];
-        return value ? { candidateId: c.id, value } : null;
-      })
-      .filter((v): v is { candidateId: string; value: VoteValue } => Boolean(v));
-
-    if (votes.length !== evening.candidates.length) {
-      onBanner("Vote sur chaque jeu avant de déposer.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const next = await submitVotes(evening.id, votes);
-      setEvening(next);
-      onBanner(next.status === "revealed" ? "Dépouillement." : "Bulletin déposé.");
-    } catch (error) {
-      onBanner(error instanceof Error ? error.message : "Vote échoué.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const iAmParticipant = Boolean(
     evening?.participants.some((p) => p.id === currentUserId),
+  );
+  const mySelectionSubmitted = Boolean(
+    evening?.participants.find((p) => p.id === currentUserId)
+      ?.selectionSubmitted,
   );
   const iOrganize = canOrganize || evening?.createdBy === currentUserId;
   const winner = evening?.candidates.find(
     (c) => c.id === (evening.winnerCandidateId ?? evening.resolution?.winnerId),
   );
-  const votedCount = evening
-    ? Object.keys(draftVotes).filter((id) =>
-        evening.candidates.some((c) => c.id === id),
-      ).length
-    : 0;
   const idle =
     !evening ||
     evening.status === "closed" ||
     evening.status === "cancelled";
-  const active =
-    evening?.candidates.find((c) => c.id === activeCandidateId) ??
-    evening?.candidates[0];
-  const myVetoUsed = evening
-    ? Object.values(draftVotes).includes("veto") || !evening.myVetoAvailable
-    : false;
-
   return (
     <div ref={rootRef} className="grid gap-6">
       {idle ? (
@@ -265,8 +313,6 @@ export function EveningPanel({
             setShortlistSize={setShortlistSize}
             vibe={vibe}
             setVibe={setVibe}
-            requireOwned={requireOwned}
-            setRequireOwned={setRequireOwned}
             requireInstalled={requireInstalled}
             setRequireInstalled={setRequireInstalled}
             members={members}
@@ -277,28 +323,59 @@ export function EveningPanel({
             onLaunch={() => void onCreate()}
           />
         ) : (
-          <div className="border border-rule-strong p-8">
-            <p className="pn-data mb-3">
-              {groupName} · Hors tour
-            </p>
-            <EmptyHint
-              title="Aucun tour ouvert"
-              body="Lance une soirée pour tirer la shortlist."
-            />
-            <div className="mt-6 flex flex-wrap gap-3">
+          <div className="grid gap-6">
+            <div className="flex flex-wrap items-end justify-between gap-5 border border-rule-strong p-6">
+              <div>
+                <p className="pn-data mb-2">{groupName}</p>
+                <h3 className="pn-display text-4xl">Soirées</h3>
+              </div>
               <Button variant="primary" onClick={() => setSetupOpen(true)}>
-                Lancer
+                Nouvelle soirée
               </Button>
-              {history.some((h) => h.status === "closed") ? (
-                <p className="pn-data self-center">
-                  Dernier ·{" "}
-                  {history.find((h) => h.status === "closed")?.title ||
-                    "Sans titre"}
-                </p>
-              ) : null}
             </div>
+            <EmptyHint
+              title="Aucune soirée en cours"
+              body="Lance une nouvelle soirée pour choisir."
+            />
+            <EveningHistory history={history} />
           </div>
         )
+      ) : evening.status === "selection" ? (
+        <SelectionView
+          evening={evening}
+          meta={meta}
+          selectionIds={selectionIds}
+          selectionSubmitted={mySelectionSubmitted}
+          iAmParticipant={iAmParticipant}
+          iOrganize={iOrganize}
+          busy={busy}
+          onToggle={toggleSelection}
+          onSubmit={() => void onSubmitSelection()}
+          onStart={() => void onStartVoting()}
+          onCancel={() =>
+            void cancelEvening(evening.id)
+              .then((next) => applyEvening(next))
+              .then(() => refreshHistory())
+              .then(() => onBanner("Annulée."))
+              .catch((e: Error) => onBanner(e.message))
+          }
+        />
+      ) : evening.status === "voting" ? (
+        <SequentialVoteView
+          evening={evening}
+          meta={meta}
+          iAmParticipant={iAmParticipant}
+          iOrganize={iOrganize}
+          busy={busy}
+          onVote={(value) => void onCurrentVote(value)}
+          onCancel={() =>
+            void cancelEvening(evening.id)
+              .then((next) => applyEvening(next))
+              .then(() => refreshHistory())
+              .then(() => onBanner("Annulée."))
+              .catch((e: Error) => onBanner(e.message))
+          }
+        />
       ) : evening.status === "revealed" && winner ? (
         <ResultView
           evening={evening}
@@ -308,67 +385,356 @@ export function EveningPanel({
           busy={busy}
           onConfirm={() =>
             void closeEvening(evening.id)
-              .then(setEvening)
+              .then((next) => applyEvening(next))
               .then(() => refreshHistory())
               .then(() => onBanner("On joue ça."))
               .catch((e: Error) => onBanner(e.message))
           }
           onRoulette={() =>
             void rouletteEvening(evening.id)
-              .then(setEvening)
+              .then((next) => applyEvening(next))
+              .catch((e: Error) => onBanner(e.message))
+          }
+          onRevoteTie={() =>
+            void revoteTie(evening.id)
+              .then((next) => applyEvening(next))
               .catch((e: Error) => onBanner(e.message))
           }
           onNewRound={() =>
             void newEveningRound(evening.id)
-              .then(setEvening)
-              .catch((e: Error) => onBanner(e.message))
-          }
-        />
-      ) : (
-        <LiveView
-          evening={evening}
-          groupName={groupName}
-          meta={meta}
-          draftVotes={draftVotes}
-          votedCount={votedCount}
-          active={active}
-          iAmParticipant={iAmParticipant}
-          iOrganize={iOrganize}
-          myVetoUsed={myVetoUsed}
-          busy={busy}
-          onSelectCandidate={setActiveCandidateId}
-          onVote={setVote}
-          onSubmit={() => void onSubmitVotes()}
-          onReveal={() =>
-            void revealEvening(evening.id)
-              .then(setEvening)
-              .then(() => onBanner("Révélé."))
+              .then((next) => applyEvening(next))
               .catch((e: Error) => onBanner(e.message))
           }
           onCancel={() =>
             void cancelEvening(evening.id)
-              .then(setEvening)
+              .then((next) => applyEvening(next))
               .then(() => refreshHistory())
               .then(() => onBanner("Annulée."))
               .catch((e: Error) => onBanner(e.message))
           }
         />
-      )}
+      ) : null}
     </div>
+  );
+}
+
+function SelectionView(props: {
+  evening: Evening;
+  meta: Map<string, GameMeta>;
+  selectionIds: string[];
+  selectionSubmitted: boolean;
+  iAmParticipant: boolean;
+  iOrganize: boolean;
+  busy: boolean;
+  onToggle: (candidateId: string) => void;
+  onSubmit: () => void;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  const selectedCount = props.selectionIds.length;
+  const [scope, setScope] = useState<"all" | "common" | "not-common">("all");
+  const [query, setQuery] = useState("");
+  const visibleCandidates = props.evening.candidates.filter((candidate) => {
+    if (!candidate.ownedByMe) return false;
+    if (
+      query.trim() &&
+      !candidate.name.toLowerCase().includes(query.trim().toLowerCase())
+    ) {
+      return false;
+    }
+    if (scope === "common") {
+      return candidate.ownedCount === candidate.participantCount;
+    }
+    if (scope === "not-common") {
+      return candidate.ownedCount < candidate.participantCount;
+    }
+    return true;
+  });
+  const selectedCandidates = props.selectionIds
+    .map((id) => props.evening.candidates.find((candidate) => candidate.id === id))
+    .filter(
+      (candidate): candidate is Evening["candidates"][number] =>
+        candidate != null,
+    );
+
+  return (
+    <section className="fixed inset-0 z-40 overflow-y-auto bg-ink p-6 md:p-10">
+      <div className="mx-auto grid min-h-full max-w-7xl content-start gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
+          <div>
+            <p className="pn-data mb-2">Phase 01 · Sélection</p>
+            <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">
+              Choisis tes jeux
+            </h2>
+            <p className="pn-data mt-2">
+              {pad2(selectedCount)} / {pad2(props.evening.shortlistSize)} max
+            </p>
+          </div>
+          {props.iOrganize ? (
+            <button
+              type="button"
+              className="pn-data hover:text-paper"
+              disabled={props.busy}
+              onClick={props.onCancel}
+            >
+              Annuler
+            </button>
+          ) : null}
+        </header>
+
+        <section className="border-2 border-paper bg-ink-deep p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule pb-3">
+            <p className="pn-data text-paper">Ta sélection</p>
+            <p className="pn-data">
+              {pad2(selectedCandidates.length)} /{" "}
+              {pad2(props.evening.shortlistSize)}
+            </p>
+          </div>
+          {selectedCandidates.length > 0 ? (
+            <ol className="m-0 grid list-none gap-0 p-0 sm:grid-cols-2">
+              {selectedCandidates.map((candidate, index) => {
+                const missing =
+                  candidate.participantCount - candidate.ownedCount;
+                return (
+                  <li key={candidate.id} className="border-b border-rule">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-2 py-3 text-left hover:bg-ink-raise"
+                      onClick={() => props.onToggle(candidate.id)}
+                    >
+                      <span className="pn-stamp shrink-0">
+                        {pad2(index + 1)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-ui text-xs font-bold uppercase tracking-[0.08em] text-paper">
+                        {candidate.name}
+                      </span>
+                      <span className="pn-data shrink-0">
+                        Retirer
+                      </span>
+                      {missing > 0 ? (
+                        <span className="pn-data shrink-0">
+                          -{pad2(missing)}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p className="pn-data pt-4">Aucun jeu choisi</p>
+          )}
+        </section>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-rule pb-4">
+          <p className="pn-data">
+            {props.evening.participants.filter((p) => p.selectionSubmitted).length}{" "}
+            / {props.evening.participants.length} sélections déposées
+          </p>
+          <p className="pn-data">
+            Chaque joueur choisit 1 à {props.evening.shortlistSize}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            className="min-w-[220px] flex-1 border border-rule-strong bg-ink-deep px-3 py-3 font-data text-xs tracking-[0.1em] uppercase outline-none focus:border-veto"
+            placeholder="Rechercher…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <div className="flex flex-wrap border border-rule-strong">
+          {(
+            [
+              ["all", "Ma bibliothèque"],
+              ["common", "En commun"],
+              ["not-common", "Pas en commun"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={scope === value}
+              className={
+                scope === value
+                  ? "border-r border-paper bg-paper px-4 py-3 font-ui text-xs font-bold uppercase tracking-[0.12em] text-ink-deep"
+                  : "border-r border-rule-strong px-4 py-3 font-ui text-xs font-bold uppercase tracking-[0.12em] text-smoke last:border-r-0"
+              }
+              onClick={() => setScope(value)}
+            >
+              {label}
+            </button>
+          ))}
+          </div>
+        </div>
+
+        {visibleCandidates.length === 0 ? (
+          <p className="border border-rule-strong p-5 pn-data">
+            Aucun jeu dans ce filtre.
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {visibleCandidates.map((candidate, index) => {
+            const meta = props.meta.get(
+              metaMapKey(candidate.launcher, candidate.externalId),
+            );
+            const missing = candidate.participantCount - candidate.ownedCount;
+            return (
+              <div key={candidate.id} data-ticket>
+                <GamePoster
+                  name={candidate.name}
+                  launcher={candidate.launcher}
+                  externalId={candidate.externalId}
+                  coverUrl={meta?.coverUrl}
+                  index={pad2(index + 1)}
+                  selected={props.selectionIds.includes(candidate.id)}
+                  subtitle={
+                    missing > 0
+                      ? `Manque ${pad2(missing)} joueur${missing > 1 ? "s" : ""}`
+                      : "En commun"
+                  }
+                  onClick={
+                    props.iAmParticipant ? () => props.onToggle(candidate.id) : undefined
+                  }
+                  priority={index < 24}
+                />
+              </div>
+            );
+            })}
+          </div>
+        )}
+
+        <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-paper bg-ink py-4">
+          <p className="pn-data">
+            {props.selectionSubmitted
+              ? "Sélection déposée · modifiable avant le lancement"
+              : "Sélection personnelle · invisible aux autres"}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {props.iAmParticipant ? (
+              <Button
+                variant="primary"
+                disabled={props.busy || selectedCount < 1}
+                onClick={props.onSubmit}
+              >
+                {props.selectionSubmitted
+                  ? "Mettre à jour"
+                  : "Valider ma sélection"}
+              </Button>
+            ) : null}
+            {props.iOrganize && props.evening.selectionComplete ? (
+              <Button
+                variant="ghost"
+                disabled={props.busy}
+                onClick={props.onStart}
+              >
+                Lancer les votes
+              </Button>
+            ) : null}
+          </div>
+        </footer>
+      </div>
+    </section>
+  );
+}
+
+function SequentialVoteView(props: {
+  evening: Evening;
+  meta: Map<string, GameMeta>;
+  iAmParticipant: boolean;
+  iOrganize: boolean;
+  busy: boolean;
+  onVote: (value: VoteValue) => void;
+  onCancel: () => void;
+}) {
+  const index = props.evening.currentCandidateIndex ?? 0;
+  const candidate = props.evening.candidates[index];
+  if (!candidate) return null;
+  const meta = props.meta.get(
+    metaMapKey(candidate.launcher, candidate.externalId),
+  );
+
+  return (
+    <section className="fixed inset-0 z-40 overflow-y-auto bg-ink p-6 md:p-10">
+      <div className="mx-auto grid min-h-full max-w-6xl content-start gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
+          <div>
+            <p className="pn-data mb-2">Phase 02 · Vote simultané</p>
+            <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">
+              Jeu {pad2(index + 1)} / {pad2(props.evening.candidates.length)}
+            </h2>
+          </div>
+          <div className="flex items-center gap-5">
+            <p className="pn-data">
+              {pad2(props.evening.currentVotes)} /{" "}
+              {pad2(props.evening.currentVotesTotal)} votes
+            </p>
+            {props.iOrganize ? (
+              <button
+                type="button"
+                className="pn-data hover:text-paper"
+                disabled={props.busy}
+                onClick={props.onCancel}
+              >
+                Annuler
+              </button>
+            ) : null}
+          </div>
+        </header>
+
+        <div className="grid items-center gap-8 lg:grid-cols-[minmax(260px,360px)_minmax(0,1fr)] lg:justify-center">
+          <div className="mx-auto w-full max-w-[360px]">
+            <GamePoster
+              name={candidate.name}
+              launcher={candidate.launcher}
+              externalId={candidate.externalId}
+              coverUrl={meta?.coverUrl}
+              priority
+            />
+          </div>
+          <div className="grid gap-5 border-t border-rule-strong pt-5 lg:border-t-0 lg:border-l lg:pl-8">
+            <p className="pn-data">
+              Discussion vocale · tout le monde vote le même jeu
+            </p>
+            {props.iAmParticipant ? (
+              <>
+                <VoteBar
+                  value={candidate.myVote}
+                  disabled={props.busy}
+                  hideVeto={
+                    !props.evening.myVetoAvailable &&
+                    candidate.myVote !== "veto"
+                  }
+                  onChange={props.onVote}
+                />
+                <p className="pn-data">
+                  {candidate.myVote
+                    ? "Vote enregistré · attente des autres"
+                    : "Choisis ton avis"}
+                </p>
+              </>
+            ) : (
+              <p className="pn-data border border-rule-strong px-4 py-4">
+                Spectateur · {pad2(props.evening.currentVotes)} /{" "}
+                {pad2(props.evening.currentVotesTotal)} votes
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function SetupForm(props: {
   title: string;
   setTitle: (v: string) => void;
-  durationMinutes: number;
-  setDurationMinutes: (v: number) => void;
+  durationMinutes: number | null;
+  setDurationMinutes: (v: number | null) => void;
   shortlistSize: number;
   setShortlistSize: (v: number) => void;
   vibe: EveningVibe;
   setVibe: (v: EveningVibe) => void;
-  requireOwned: boolean;
-  setRequireOwned: (v: boolean) => void;
   requireInstalled: boolean;
   setRequireInstalled: (v: boolean) => void;
   members: GroupMember[];
@@ -378,6 +744,14 @@ function SetupForm(props: {
   onAbort: () => void;
   onLaunch: () => void;
 }) {
+  const durationValue = props.durationMinutes ?? 0;
+  const durationHours = Math.floor(durationValue / 60);
+  const durationRemainder = durationValue % 60;
+  const setDuration = (hours: number, minutes: number) => {
+    const total = Math.min(600, Math.max(15, hours * 60 + minutes));
+    props.setDurationMinutes(total);
+  };
+
   return (
     <div className="grid max-w-3xl gap-5 border border-rule-strong p-6">
       <div>
@@ -393,22 +767,53 @@ function SetupForm(props: {
           maxLength={80}
           onChange={(e) => props.setTitle(e.target.value)}
         />
-        <select
-          className="border border-rule-strong bg-ink-deep px-3 py-3 font-data text-xs tracking-[0.1em] uppercase"
-          value={props.durationMinutes}
-          onChange={(e) => props.setDurationMinutes(Number(e.target.value))}
-        >
-          <option value={60}>60 min</option>
-          <option value={90}>90 min</option>
-          <option value={120}>120 min</option>
-          <option value={180}>180 min</option>
-        </select>
+        <div className="flex flex-wrap items-center gap-2 border border-rule-strong bg-ink-deep px-3 py-2.5 font-data text-xs tracking-[0.1em] uppercase">
+          <span>Durée</span>
+          <input
+            className="w-10 border border-rule-strong bg-ink px-2 py-1 text-right font-data text-xs outline-none focus:border-veto"
+            type="number"
+            min={0}
+            max={10}
+            value={props.durationMinutes === null ? "" : durationHours}
+            disabled={props.durationMinutes === null}
+            aria-label="Heures"
+            onChange={(e) =>
+              setDuration(Number(e.target.value) || 0, durationRemainder)
+            }
+          />
+          <span>h</span>
+          <select
+            className="border border-rule-strong bg-ink px-2 py-1 font-data text-xs outline-none focus:border-veto"
+            value={props.durationMinutes === null ? 0 : durationRemainder}
+            disabled={props.durationMinutes === null}
+            aria-label="Minutes"
+            onChange={(e) =>
+              setDuration(durationHours, Number(e.target.value))
+            }
+          >
+            {Array.from({ length: 12 }, (_, index) => index * 5).map(
+              (minutes) => (
+                <option key={minutes} value={minutes}>
+                  {String(minutes).padStart(2, "0")}
+                </option>
+              ),
+            )}
+          </select>
+          <span>min</span>
+        </div>
+        <Checkbox
+          checked={props.durationMinutes === null}
+          label="Sans limite"
+          onChange={(checked) =>
+            props.setDurationMinutes(checked ? null : 90)
+          }
+        />
         <select
           className="border border-rule-strong bg-ink-deep px-3 py-3 font-data text-xs tracking-[0.1em] uppercase"
           value={props.shortlistSize}
           onChange={(e) => props.setShortlistSize(Number(e.target.value))}
         >
-          {[5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+          {[1, 2, 3, 4, 5].map((n) => (
             <option key={n} value={n}>
               {pad2(n)} jeux
             </option>
@@ -431,23 +836,12 @@ function SetupForm(props: {
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap gap-6 font-data text-[11px] tracking-[0.12em] text-smoke uppercase">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={props.requireOwned}
-            onChange={(e) => props.setRequireOwned(e.target.checked)}
-          />
-          Possédé par tous
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={props.requireInstalled}
-            onChange={(e) => props.setRequireInstalled(e.target.checked)}
-          />
-          Installé
-        </label>
+      <div className="flex flex-wrap gap-6">
+        <Checkbox
+          checked={props.requireInstalled}
+          label="Installé"
+          onChange={props.setRequireInstalled}
+        />
       </div>
       <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
         {props.members.map((member) => {
@@ -482,180 +876,47 @@ function SetupForm(props: {
   );
 }
 
-function LiveView(props: {
-  evening: Evening;
-  groupName: string;
-  meta: Map<string, GameMeta>;
-  draftVotes: Record<string, VoteValue>;
-  votedCount: number;
-  active?: Evening["candidates"][number];
-  iAmParticipant: boolean;
-  iOrganize: boolean;
-  myVetoUsed: boolean;
-  busy: boolean;
-  onSelectCandidate: (id: string) => void;
-  onVote: (id: string, v: VoteValue) => void;
-  onSubmit: () => void;
-  onReveal: () => void;
-  onCancel: () => void;
-}) {
-  const { evening } = props;
-  const ready = evening.participants.filter((p) => p.hasVoted).length;
+function EveningHistory({ history }: { history: EveningSummary[] }) {
+  if (history.length === 0) return null;
+
+  const statusLabel = (status: EveningSummary["status"]): string => {
+    switch (status) {
+      case "closed":
+        return "Terminée";
+      case "cancelled":
+        return "Annulée";
+      case "revealed":
+        return "Résultat";
+      case "voting":
+        return "Vote en cours";
+      case "selection":
+        return "Sélection";
+    }
+  };
 
   return (
-    <div className="grid gap-0 border border-rule-strong lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="min-w-0 border-b border-rule-strong lg:border-b-0 lg:border-r">
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-rule-strong p-5">
-          <div>
-            <p className="pn-data mb-2">
-              {props.groupName} — Tour {pad2(evening.round)} en cours
-            </p>
-            <h3 className="pn-display text-[clamp(2.4rem,5vw,4.5rem)]">
-              {evening.title || "On décide"}
-            </h3>
-            <p className="mt-2 pn-data">
-              {vibeLabel(evening.vibe)}
-              {evening.durationMinutes
-                ? ` · ${evening.durationMinutes} min`
-                : ""}
-              {evening.status === "voting" ? " · Bulletins scellés" : ""}
-            </p>
-          </div>
-          <div className="border border-rule-strong px-4 py-3 text-right">
-            <p className="pn-data mb-1">Fin des bulletins</p>
-            <p className="pn-display text-3xl">
-              {pad2(ready)}/{pad2(evening.participants.length)}
-            </p>
-          </div>
-        </div>
-
-        <div className="border-b border-rule-strong px-5 py-4">
-          <div className="mb-2 flex flex-wrap justify-between gap-2">
-            <p className="pn-data">
-              {pad2(ready)} / {pad2(evening.participants.length)} déposés
-            </p>
-            <p className="pn-data">
-              Dépouillement automatique à{" "}
-              {pad2(evening.participants.length)} /{" "}
-              {pad2(evening.participants.length)}
-            </p>
-          </div>
-          <div className="pn-gauge">
-            {evening.participants.map((p) => (
-              <i key={p.id} data-done={p.hasVoted ? "" : undefined} />
-            ))}
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="mb-4 flex items-baseline justify-between gap-3">
-            <p className="pn-data">
-              En lice — {pad2(evening.candidates.length)} jeux
-            </p>
-            {props.iOrganize ? (
-              <div className="flex gap-3">
-                {evening.status === "voting" ? (
-                  <button
-                    type="button"
-                    className="pn-data hover:text-paper"
-                    disabled={props.busy}
-                    onClick={props.onReveal}
-                  >
-                    Révéler
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="pn-data hover:text-paper"
-                  disabled={props.busy}
-                  onClick={props.onCancel}
-                >
-                  Annuler
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {evening.candidates.map((candidate, index) => {
-              const m = props.meta.get(
-                metaMapKey(candidate.launcher, candidate.externalId),
-              );
-              const vote = props.draftVotes[candidate.id];
-              const vetoed = vote === "veto" || candidate.eliminated;
-              return (
-                <div key={candidate.id} data-ticket>
-                  <GamePoster
-                    name={candidate.name}
-                    launcher={candidate.launcher}
-                    externalId={candidate.externalId}
-                    coverUrl={m?.coverUrl}
-                    index={pad2(index + 1)}
-                    selected={props.active?.id === candidate.id}
-                    vetoed={vetoed}
-                    subtitle={`${pad2(candidate.ownedCount)}/${pad2(candidate.participantCount)}`}
-                    onClick={() => props.onSelectCandidate(candidate.id)}
-                    wide
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {evening.status === "voting" && props.iAmParticipant && props.active ? (
-          <div className="sticky bottom-0 border-t border-paper bg-ink p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="pn-data">
-                Bulletin — {props.active.name}
-              </p>
-              <p className="pn-data">
-                {props.myVetoUsed ? "0 veto restant" : "1 veto restant"} ·{" "}
-                {pad2(props.votedCount)}/{pad2(evening.candidates.length)}
-              </p>
-            </div>
-            <VoteBar
-              value={props.draftVotes[props.active.id]}
-              disabled={props.busy}
-              vetoDisabled={
-                props.myVetoUsed &&
-                props.draftVotes[props.active.id] !== "veto"
-              }
-              onChange={(v) => props.onVote(props.active!.id, v)}
-            />
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button
-                variant="primary"
-                disabled={
-                  props.busy ||
-                  props.votedCount < evening.candidates.length
-                }
-                onClick={props.onSubmit}
-              >
-                Déposer mon bulletin
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {evening.status === "voting" && !props.iAmParticipant ? (
-          <p className="border-t border-rule-strong p-5 pn-data">Spectateur</p>
-        ) : null}
+    <section className="border border-rule-strong p-6">
+      <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-rule pb-3">
+        <p className="pn-data text-paper">Historique des soirées</p>
+        <p className="pn-data">{pad2(history.length)} entrées</p>
       </div>
-
-      <aside className="bg-ink-deep p-5">
-        <p className="pn-data mb-4">Dépouillement</p>
-        <PresenceRow
-          people={evening.participants.map((p) => ({
-            id: p.id,
-            displayName: p.displayName,
-            avatarUrl: p.avatarUrl,
-            ready: p.hasVoted,
-            veto: !p.vetoAvailable && p.hasVoted,
-          }))}
-        />
-      </aside>
-    </div>
+      <ul className="m-0 list-none p-0">
+        {history.map((item) => (
+          <li
+            key={item.id}
+            className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-rule py-3 last:border-b-0"
+          >
+            <span className="truncate font-ui text-xs font-bold uppercase tracking-[0.1em] text-paper">
+              {item.title || "Sans titre"}
+            </span>
+            <span className="pn-data">{statusLabel(item.status)}</span>
+            <time className="pn-data" dateTime={item.createdAt}>
+              {new Date(item.createdAt).toLocaleDateString("fr-FR")}
+            </time>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -707,7 +968,9 @@ function ResultView(props: {
   busy: boolean;
   onConfirm: () => void;
   onRoulette: () => void;
+  onRevoteTie: () => void;
   onNewRound: () => void;
+  onCancel: () => void;
 }) {
   const coverRef = useRef<HTMLDivElement>(null);
   const m = props.meta.get(
@@ -729,36 +992,32 @@ function ResultView(props: {
 
   return (
     <div className="grid min-h-[70vh] border border-rule-strong lg:grid-cols-[0.9fr_1.1fr]">
-      <div ref={coverRef} className="relative min-h-[320px] bg-ink-deep">
-        <span className="pn-stamp absolute left-4 top-4 z-10">Ce soir</span>
-        <p
-          className="absolute bottom-4 left-4 z-10 pn-data"
-          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-        >
-          Résultat — Tour {pad2(props.evening.round)}
-        </p>
-        <ResultCover
-          name={props.winner.name}
-          coverUrl={m?.coverUrl}
-          launcher={props.winner.launcher}
-          externalId={props.winner.externalId}
-        />
+      <div ref={coverRef} className="flex min-h-[320px] flex-col bg-ink-deep p-5">
+        <span className="pn-stamp mb-5 self-start">Ce soir</span>
+        <div className="relative mx-auto w-full max-w-[420px] aspect-[3/4] bg-ink">
+          <ResultCover
+            name={props.winner.name}
+            coverUrl={m?.coverUrl}
+            launcher={props.winner.launcher}
+            externalId={props.winner.externalId}
+          />
+        </div>
+        <div className="mt-3 border-t border-rule pt-3">
+          <p className="pn-data">Résultat</p>
+          <p className="pn-display mt-2 text-3xl">{props.winner.name}</p>
+        </div>
       </div>
       <div className="flex flex-col p-6 md:p-10">
         <p className="pn-data mb-6">
-          Tour {pad2(props.evening.round)} ·{" "}
-          {pad2(props.evening.participants.length)} /{" "}
-          {pad2(props.evening.participants.length)} bulletins
+          Bulletins déposés · {pad2(props.evening.participants.length)} /{" "}
+          {pad2(props.evening.participants.length)}
         </p>
-        <h3 className="pn-display text-[clamp(2.8rem,6vw,5.5rem)]">
-          {props.winner.name}
-        </h3>
         <ul className="mt-8 m-0 list-none border-t border-rule p-0">
           {(
             [
               ["Chaud", props.winner.tally?.hot ?? 0],
               ["Pourquoi pas", props.winner.tally?.maybe ?? 0],
-              ["Passer", props.winner.tally?.pass ?? 0],
+              ["Pass", props.winner.tally?.pass ?? 0],
               ["Veto", props.winner.tally?.veto ?? 0],
             ] as const
           ).map(([label, n]) => (
@@ -787,12 +1046,35 @@ function ResultView(props: {
               type="button"
               className="pn-data hover:text-paper"
               disabled={props.busy}
-              onClick={props.onRoulette}
+              onClick={props.onCancel}
             >
-              Tirage
+              Annuler
             </button>
+            {(props.evening.resolution?.tiedIds?.length ?? 0) > 1 ? (
+              <>
+                <Button
+                  variant="ghost"
+                  disabled={props.busy}
+                  onClick={props.onRevoteTie}
+                >
+                  Revoter l’égalité
+                </Button>
+                <button
+                  type="button"
+                  className="pn-data hover:text-paper"
+                  disabled={props.busy}
+                  onClick={props.onRoulette}
+                >
+                  Tirage
+                </button>
+              </>
+            ) : null}
           </div>
-        ) : null}
+        ) : (
+          <p className="mt-auto border-t border-rule-strong pt-5 pn-data">
+            En attente de l’organisateur
+          </p>
+        )}
       </div>
     </div>
   );

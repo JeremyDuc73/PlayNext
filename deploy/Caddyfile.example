@@ -1,0 +1,9 @@
+playnext.jeremyduc.dev {
+    root * /var/www/playnext/apps/web/dist
+    encode zstd gzip
+    file_server
+}
+
+api.playnext.jeremyduc.dev {
+    reverse_proxy 127.0.0.1:3101
+}

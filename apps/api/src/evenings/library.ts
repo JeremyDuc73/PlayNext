@@ -1,5 +1,6 @@
 import type { Db } from "../db.js";
 import {
+  groupPlayableOverride,
   isJunkGameName,
   launcherRank,
   normalizeGameTitle,
@@ -20,6 +21,7 @@ export async function fetchParticipantLibrary(
     external_id: string;
     name: string;
     installed: boolean;
+      group_playable: boolean | null;
   }>(
     `
       SELECT
@@ -27,8 +29,12 @@ export async function fetchParticipantLibrary(
         ug.launcher,
         ug.external_id,
         ug.name,
-        ug.installed
+          ug.installed,
+          gm.group_playable
       FROM user_games ug
+        LEFT JOIN game_meta gm
+          ON gm.launcher = ug.launcher
+         AND gm.external_id = ug.external_id
       WHERE ug.user_id = ANY($1::uuid[])
         AND ug.owned = true
         AND ug.hidden = false
@@ -50,7 +56,17 @@ export async function fetchParticipantLibrary(
     externalId: string;
     name: string;
     owners: Map<string, boolean>; // userId -> installed
+    groupPlayable: boolean | null;
   };
+
+  function mergeGroupPlayable(
+    current: boolean | null,
+    next: boolean | null,
+  ): boolean | null {
+    if (current === true || next === true) return true;
+    if (current === false || next === false) return false;
+    return null;
+  }
 
   const byTitle = new Map<string, Acc>();
 
@@ -58,6 +74,8 @@ export async function fetchParticipantLibrary(
     if (isJunkGameName(row.name)) continue;
     const titleKey = normalizeGameTitle(row.name);
     if (!titleKey) continue;
+    const rowGroupPlayable =
+      groupPlayableOverride(row.name) ?? row.group_playable ?? null;
 
     const existing = byTitle.get(titleKey);
     if (!existing) {
@@ -66,12 +84,17 @@ export async function fetchParticipantLibrary(
         externalId: row.external_id,
         name: row.name,
         owners: new Map([[row.user_id, row.installed]]),
+        groupPlayable: rowGroupPlayable,
       });
       continue;
     }
 
     const prevInstalled = existing.owners.get(row.user_id) ?? false;
     existing.owners.set(row.user_id, prevInstalled || row.installed);
+    existing.groupPlayable = mergeGroupPlayable(
+      existing.groupPlayable,
+      rowGroupPlayable,
+    );
 
     if (launcherRank(row.launcher) < launcherRank(existing.launcher)) {
       existing.launcher = row.launcher;
@@ -88,6 +111,7 @@ export async function fetchParticipantLibrary(
       ownedCount: acc.owners.size,
       installedCount: [...acc.owners.values()].filter(Boolean).length,
       participantCount,
+      groupPlayable: groupPlayableOverride(acc.name) ?? acc.groupPlayable,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }

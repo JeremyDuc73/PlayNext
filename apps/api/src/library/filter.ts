@@ -93,3 +93,16 @@ export function dedupePreferLaunchers<
 export function filterJunkGames<T extends { name: string }>(games: T[]): T[] {
   return games.filter((g) => !isJunkGameName(g.name));
 }
+
+/**
+ * Exceptions produit : certains jeux ont du coop en ligne mais ne sont pas
+ * adaptés à une décision de groupe « on joue tous ensemble ».
+ * Ils restent visibles dans la bibliothèque.
+ */
+const GROUP_INCOMPATIBLE_TITLES = new Set(["elden ring"]);
+
+export function groupPlayableOverride(name: string): boolean | null {
+  return GROUP_INCOMPATIBLE_TITLES.has(normalizeGameTitle(name))
+    ? false
+    : null;
+}

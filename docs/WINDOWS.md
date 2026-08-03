@@ -91,7 +91,25 @@ Artefact :
 
 `apps\desktop\src-tauri\target\release\bundle\nsis\PlayNext_*_x64-setup.exe`
 
-Installation par utilisateur. Non signé → SmartScreen possible.
+Installation par utilisateur avec branding PlayNext : icône, en-tête,
+panneau latéral, dossier menu Démarrer et message de fin d’installation.
+
+## Protection Windows et signature
+
+PlayNext ne désactive pas Defender ou SmartScreen. Une application sûre peut
+quand même afficher un avertissement si elle est inconnue ou non signée.
+
+Pour supprimer l’avertissement « éditeur inconnu », il faut signer le binaire
+et l’installeur avec un certificat de signature de code reconnu.
+
+Le workflow GitHub accepte :
+
+- `WINDOWS_CERTIFICATE_BASE64` — certificat `.pfx` encodé en Base64 ;
+- `WINDOWS_CERTIFICATE_PASSWORD` — mot de passe du certificat.
+
+Sans ces secrets, le build reste téléchargeable mais SmartScreen peut demander
+une confirmation. Il n’existe pas de réglage applicatif légitime pour
+contourner cette protection.
 
 ## Option B — GitHub Actions
 
@@ -109,4 +127,5 @@ L’aperçu web `npm run dev:ui` (WSL) reste OK pour l’UI, pas pour le smoke d
 
 ## CI
 
-`.github/workflows/windows-build.yml` → artifact NSIS non signé.
+`.github/workflows/windows-build.yml` → artifact NSIS, signé automatiquement
+si les secrets du certificat sont configurés.

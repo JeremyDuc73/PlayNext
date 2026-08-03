@@ -4,6 +4,8 @@ export type ShortlistOptions = {
   requireOwned: boolean;
   requireInstalled: boolean;
   shortlistSize: number;
+  /** Pool de choix avant sélection individuelle. */
+  maxSize?: number;
   /** launcher:externalId keys recently chosen — pushed down for diversity */
   recentWinnerKeys?: Set<string>;
   excludeKeys?: Set<string>;
@@ -54,13 +56,15 @@ export function buildShortlist(
   games: LibraryGameAgg[],
   options: ShortlistOptions,
 ): ShortlistCandidate[] {
-  const size = Math.min(12, Math.max(5, options.shortlistSize));
+  const upperBound = Math.min(5000, Math.max(1, options.maxSize ?? 5));
+  const size = Math.min(upperBound, Math.max(1, options.shortlistSize));
   const recent = options.recentWinnerKeys ?? new Set<string>();
   const exclude = options.excludeKeys ?? new Set<string>();
 
   const filtered = games.filter((game) => {
     if (exclude.has(gameKey(game))) return false;
     if (game.ownedCount < 1) return false;
+    if (game.groupPlayable === false) return false;
     if (options.requireOwned && game.ownedCount < game.participantCount) {
       return false;
     }

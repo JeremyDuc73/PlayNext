@@ -1,0 +1,51 @@
+---
+import Base from "../layouts/Base.astro";
+
+const downloadUrl =
+  "https://github.com/JeremyDuc73/PlayNext/releases/latest/download/PlayNext_0.1.0_x64-setup.exe";
+---
+
+<Base title="Télécharger PlayNext — Windows">
+  <section class="section">
+    <div class="prose">
+      <p class="eyebrow">Distribution · Windows</p>
+      <span class="accent"></span>
+      <h1>Télécharger.</h1>
+      <p>
+        PlayNext est une application Windows desktop-first. Le site présente
+        l’application ; les groupes et les votes se vivent dans l’app.
+      </p>
+      <div class="actions">
+        <a class="button" href={downloadUrl}>Télécharger le setup</a>
+        <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext/releases">Voir les versions</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading">
+      <h2>Installation</h2>
+      <p>Une installation par utilisateur, sans privilèges administrateur inutiles.</p>
+    </div>
+    <ol class="prose">
+      <li>Télécharge le setup Windows.</li>
+      <li>Ouvre l’installeur et suis les étapes PlayNext.</li>
+      <li>Lance PlayNext depuis le menu Démarrer.</li>
+      <li>Connecte-toi avec Discord.</li>
+    </ol>
+    <p class="mono">
+      Prérequis · Windows 10/11 · WebView2 · connexion internet pour Discord
+    </p>
+  </section>
+
+  <section class="section">
+    <div class="download-box">
+      <div>
+        <p class="eyebrow">Dépôt public</p>
+        <h3>Code et versions</h3>
+        <p>Les notes de version et les artefacts sont publiés sur GitHub.</p>
+      </div>
+      <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext">Ouvrir GitHub</a>
+    </div>
+  </section>
+</Base>

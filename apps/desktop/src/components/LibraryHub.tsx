@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   disconnectEpic,
   disconnectMicrosoft,
+  addManualGame,
   exchangeEpicCode,
   fetchEpicStatus,
   fetchMicrosoftStatus,
@@ -11,6 +12,8 @@ import {
   syncEpicLibrary,
   syncSteamLibrary,
   syncXboxLibrary,
+  searchManualGames,
+  type ManualCatalogGame,
   type LibraryGame,
 } from "../lib/api";
 import {
@@ -36,7 +39,7 @@ type Props = {
   onBanner: (message: string) => void;
 };
 
-type LauncherFilter = "all" | "steam" | "xbox" | "epic";
+type LauncherFilter = "all" | "steam" | "xbox" | "epic" | "manual";
 
 export function LibraryHub({
   enabled,
@@ -53,6 +56,10 @@ export function LibraryHub({
     "comfortable",
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualQuery, setManualQuery] = useState("");
+  const [manualResults, setManualResults] = useState<ManualCatalogGame[]>([]);
+  const [manualBusy, setManualBusy] = useState(false);
 
   const [msConfigured, setMsConfigured] = useState(false);
   const [msLinked, setMsLinked] = useState(false);
@@ -62,6 +69,36 @@ export function LibraryHub({
 
   async function refreshGames() {
     setGames(await fetchMyLibrary());
+  }
+
+  async function onSearchManual() {
+    if (manualQuery.trim().length < 2) {
+      onBanner("Saisis au moins 2 caractères.");
+      return;
+    }
+    setManualBusy(true);
+    try {
+      setManualResults(await searchManualGames(manualQuery.trim()));
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Recherche IGDB échouée.",
+      );
+    } finally {
+      setManualBusy(false);
+    }
+  }
+
+  async function onAddManual(game: ManualCatalogGame) {
+    setManualBusy(true);
+    try {
+      await addManualGame(game.igdbId);
+      await refreshGames();
+      onBanner(`${game.name} ajouté à la bibliothèque.`);
+    } catch (error) {
+      onBanner(error instanceof Error ? error.message : "Ajout impossible.");
+    } finally {
+      setManualBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -127,11 +164,13 @@ export function LibraryHub({
       steam: 0,
       xbox: 0,
       epic: 0,
+      manual: 0,
     };
     for (const g of cleaned) {
       if (g.launcher === "steam") c.steam += 1;
       if (g.launcher === "xbox") c.xbox += 1;
       if (g.launcher === "epic") c.epic += 1;
+      if (g.launcher === "manual") c.manual += 1;
     }
     return c;
   }, [cleaned]);
@@ -276,7 +315,8 @@ export function LibraryHub({
         </div>
         <p className="pn-data">
           {pad2(counts.all)} titres · Steam {pad2(counts.steam)} · Xbox{" "}
-          {pad2(counts.xbox)} · Epic {pad2(counts.epic)}
+          {pad2(counts.xbox)} · Epic {pad2(counts.epic)} · Manuel{" "}
+          {pad2(counts.manual)}
         </p>
       </header>
 
@@ -287,6 +327,7 @@ export function LibraryHub({
             ["steam", "Steam"],
             ["xbox", "Xbox"],
             ["epic", "Epic"],
+            ["manual", "Manuel"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -315,6 +356,16 @@ export function LibraryHub({
           Installés
         </button>
         <div className="ml-auto flex flex-wrap gap-2">
+          <Button
+            variant="second"
+            disabled={Boolean(busy) || manualBusy}
+            onClick={() => {
+              setManualOpen((open) => !open);
+              setManualResults([]);
+            }}
+          >
+            Ajouter un jeu
+          </Button>
           <Button
             variant="primary"
             disabled={Boolean(busy) || !isDesktop}
@@ -358,6 +409,87 @@ export function LibraryHub({
           )}
         </div>
       </div>
+
+      {manualOpen ? (
+        <section className="mb-5 border border-rule-strong p-4">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3 border-b border-rule pb-3">
+            <div>
+              <p className="pn-data mb-1">Ajout manuel</p>
+              <h3 className="pn-display text-2xl">Chercher dans IGDB</h3>
+            </div>
+            <button
+              type="button"
+              className="pn-data hover:text-paper"
+              onClick={() => setManualOpen(false)}
+            >
+              Fermer
+            </button>
+          </div>
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onSearchManual();
+            }}
+          >
+            <input
+              className="min-w-[240px] flex-1 border border-rule-strong bg-ink-deep px-3 py-3 font-data text-xs tracking-[0.1em] uppercase outline-none focus:border-veto"
+              value={manualQuery}
+              onChange={(event) => setManualQuery(event.target.value)}
+              placeholder="Titre du jeu"
+              aria-label="Titre du jeu à chercher"
+            />
+            <Button variant="primary" type="submit" disabled={manualBusy}>
+              {manualBusy ? "Recherche…" : "Rechercher"}
+            </Button>
+          </form>
+          {manualResults.length > 0 ? (
+            <ul className="mt-4 grid list-none gap-2 p-0 md:grid-cols-2">
+              {manualResults.map((game) => {
+                const alreadyAdded = games.some(
+                  (item) =>
+                    item.launcher === "manual" &&
+                    item.externalId === String(game.igdbId),
+                );
+                return (
+                  <li
+                    key={game.igdbId}
+                    className="flex items-center gap-3 border-b border-rule py-2"
+                  >
+                    {game.coverUrl ? (
+                      <img
+                        src={game.coverUrl}
+                        alt=""
+                        className="h-16 w-12 object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="flex h-16 w-12 items-center justify-center bg-ink-raise pn-display text-xl text-smoke-dim">
+                        {game.name.charAt(0)}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-ui text-xs font-bold uppercase tracking-[0.08em]">
+                        {game.name}
+                      </span>
+                      {game.year ? (
+                        <span className="pn-data">{game.year}</span>
+                      ) : null}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      disabled={manualBusy || alreadyAdded}
+                      onClick={() => void onAddManual(game)}
+                    >
+                      {alreadyAdded ? "Ajouté" : "Ajouter"}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="mb-5 flex flex-wrap gap-3">
         <input
@@ -456,13 +588,14 @@ export function LibraryHub({
           density={density}
           animateKey={`${launcher}:${installedOnly}:${visible.length}:${query}`}
         >
-          {visible.map((game) => (
+          {visible.map((game, index) => (
             <div key={game.id} role="listitem">
               <GamePoster
                 name={game.name}
                 launcher={game.launcher}
                 externalId={game.externalId}
                 coverUrl={game.coverUrl}
+                priority={index < 24}
                 subtitle={`${game.launcher}${
                   game.installed ? " · installé" : ""
                 }`}

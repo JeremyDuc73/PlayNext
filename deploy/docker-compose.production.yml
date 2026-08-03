@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: playnext
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: playnext
+    volumes:
+      - playnext_pg:/var/lib/postgresql/data
+    networks:
+      - playnext_internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - playnext_redis:/data
+    networks:
+      - playnext_internal
+
+  playnext-api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.production
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_URL: postgres://playnext:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/playnext
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "127.0.0.1:3101:3001"
+    networks:
+      - playnext_internal
+
+volumes:
+  playnext_pg:
+  playnext_redis:
+
+networks:
+  playnext_internal:

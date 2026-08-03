@@ -1,7 +1,12 @@
 import { apiFetch } from "./api";
 
 export type VoteValue = "hot" | "maybe" | "pass" | "veto";
-export type EveningStatus = "voting" | "revealed" | "closed" | "cancelled";
+export type EveningStatus =
+  | "selection"
+  | "voting"
+  | "revealed"
+  | "closed"
+  | "cancelled";
 export type EveningVibe =
   | "chill"
   | "competitive"
@@ -21,6 +26,8 @@ export type EveningCandidate = {
   reasons: string[];
   eliminated: boolean;
   eliminatedReason: string | null;
+  ownedByMe: boolean;
+  selectedByMe: boolean;
   myVote: VoteValue | null;
   tally: {
     hot: number;
@@ -40,6 +47,7 @@ export type EveningParticipant = {
   avatarUrl: string | null;
   present: boolean;
   vetoAvailable: boolean;
+  selectionSubmitted: boolean;
   hasVoted: boolean;
 };
 
@@ -55,6 +63,13 @@ export type Evening = {
   requireInstalled: boolean;
   shortlistSize: number;
   round: number;
+  selectionComplete: boolean;
+  selectionCount: number;
+  mySelectionIds: string[];
+  currentCandidateIndex: number | null;
+  currentCandidateId: string | null;
+  currentVotes: number;
+  currentVotesTotal: number;
   allVoted: boolean;
   myVetoAvailable: boolean;
   winnerCandidateId: string | null;
@@ -140,6 +155,42 @@ export async function submitVotes(
   return data.evening;
 }
 
+export async function submitSelection(
+  eveningId: string,
+  candidateIds: string[],
+): Promise<Evening> {
+  const response = await apiFetch(`/evenings/${eveningId}/selections`, {
+    method: "POST",
+    body: JSON.stringify({ candidateIds }),
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evening: Evening };
+  return data.evening;
+}
+
+export async function startVoting(eveningId: string): Promise<Evening> {
+  const response = await apiFetch(`/evenings/${eveningId}/start-voting`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evening: Evening };
+  return data.evening;
+}
+
+export async function submitCurrentVote(
+  eveningId: string,
+  candidateId: string,
+  value: VoteValue,
+): Promise<Evening> {
+  const response = await apiFetch(`/evenings/${eveningId}/current-vote`, {
+    method: "POST",
+    body: JSON.stringify({ candidateId, value }),
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evening: Evening };
+  return data.evening;
+}
+
 export async function revealEvening(eveningId: string): Promise<Evening> {
   const response = await apiFetch(`/evenings/${eveningId}/reveal`, {
     method: "POST",
@@ -164,6 +215,15 @@ export async function closeEvening(
 
 export async function rouletteEvening(eveningId: string): Promise<Evening> {
   const response = await apiFetch(`/evenings/${eveningId}/roulette`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evening: Evening };
+  return data.evening;
+}
+
+export async function revoteTie(eveningId: string): Promise<Evening> {
+  const response = await apiFetch(`/evenings/${eveningId}/revote-tie`, {
     method: "POST",
   });
   if (!response.ok) throw new Error(await readError(response));
@@ -196,7 +256,7 @@ export function voteLabel(value: VoteValue): string {
     case "maybe":
       return "Pourquoi pas";
     case "pass":
-      return "Passer";
+      return "Pass";
     case "veto":
       return "Veto";
   }

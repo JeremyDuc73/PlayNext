@@ -19,7 +19,7 @@ export async function resolveGameMeta(
 
   const response = await apiFetch("/meta/resolve", {
     method: "POST",
-    body: JSON.stringify({ items: items.slice(0, 80) }),
+    body: JSON.stringify({ items: items.slice(0, 500) }),
   });
   if (!response.ok) return new Map();
 

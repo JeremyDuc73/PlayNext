@@ -1,4 +1,9 @@
-export type EveningStatus = "voting" | "revealed" | "closed" | "cancelled";
+export type EveningStatus =
+  | "selection"
+  | "voting"
+  | "revealed"
+  | "closed"
+  | "cancelled";
 
 export type EveningVibe =
   | "chill"
@@ -16,6 +21,8 @@ export type LibraryGameAgg = {
   ownedCount: number;
   installedCount: number;
   participantCount: number;
+  /** null = catalogue inconnu, false = pas adapté au jeu de groupe. */
+  groupPlayable?: boolean | null;
 };
 
 export type ShortlistCandidate = LibraryGameAgg & {

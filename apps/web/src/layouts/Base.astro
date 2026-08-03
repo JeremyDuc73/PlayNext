@@ -1,0 +1,53 @@
+---
+import "../styles/global.css";
+
+const { title = "PlayNext — Ce soir, on décide", description = "PlayNext aide un groupe d’amis à choisir quoi jouer ce soir." } = Astro.props;
+const pathname = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#08090b" />
+    <link rel="icon" type="image/svg+xml" href="/playnext.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="site-shell">
+      <aside class="rail" aria-hidden="true">
+        <span>CE SOIR, ON DECIDE</span>
+      </aside>
+      <div class="page">
+        <header class="topbar">
+          <a class="brand" href="/">
+            <img src="/playnext.svg" alt="" />
+            <span>PlayNext</span>
+          </a>
+          <nav class="nav" aria-label="Navigation principale">
+            <a href="/" aria-current={pathname === "/" ? "page" : undefined}>Accueil</a>
+            <a href="/download" aria-current={pathname === "/download" ? "page" : undefined}>Télécharger</a>
+            <a href="/docs" aria-current={pathname === "/docs" ? "page" : undefined}>Documentation</a>
+          </nav>
+          <span class="top-status">Windows · V1</span>
+        </header>
+
+        <main>
+          <slot />
+        </main>
+
+        <footer class="footer">
+          <span>PlayNext · Ce soir, on décide.</span>
+          <nav aria-label="Navigation secondaire">
+            <a href="/download">Télécharger</a>
+            <a href="/docs">Documentation</a>
+            <a href="/legal">Mentions</a>
+            <a href="https://github.com/JeremyDuc73/PlayNext">GitHub</a>
+          </nav>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>

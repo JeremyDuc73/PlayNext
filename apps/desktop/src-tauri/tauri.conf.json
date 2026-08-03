@@ -33,6 +33,12 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "publisher": "PlayNext",
+    "copyright": "Copyright © 2026 PlayNext",
+    "category": "Game",
+    "shortDescription": "Ce soir, on décide.",
+    "longDescription": "PlayNext croise les bibliothèques du groupe et organise une décision collective.",
+    "homepage": "https://github.com/JeremyDuc73/PlayNext",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -42,7 +48,15 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "startMenuFolder": "PlayNext",
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "windows/installer-header.bmp",
+        "sidebarImage": "windows/installer-sidebar.bmp",
+        "uninstallerHeaderImage": "windows/installer-header.bmp",
+        "installerHooks": "windows/installer-hooks.nsh"
       }
     }
   }

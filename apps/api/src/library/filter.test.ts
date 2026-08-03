@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   dedupePreferLaunchers,
+  groupPlayableOverride,
   isJunkGameName,
   normalizeGameTitle,
 } from "./filter.js";
@@ -18,6 +19,13 @@ describe("isJunkGameName", () => {
     assert.equal(isJunkGameName("Democracy 4"), false);
     assert.equal(isJunkGameName("Hades"), false);
     assert.equal(isJunkGameName("Modern Warfare"), false);
+  });
+});
+
+describe("groupPlayableOverride", () => {
+  it("keeps Elden Ring out of group evenings", () => {
+    assert.equal(groupPlayableOverride("Elden Ring"), false);
+    assert.equal(groupPlayableOverride("Overcooked 2"), null);
   });
 });
 

@@ -72,6 +72,28 @@ sur internet. Vérifier :
 curl https://api.playnext.jeremyduc.dev/health
 ```
 
+## Déploiement automatique GitHub
+
+`.github/workflows/deploy-production.yml` déploie sur `main` :
+
+1. build du site Astro ;
+2. copie de `apps/web/dist/` ;
+3. mise à jour du dépôt VPS ;
+4. rebuild du conteneur API ;
+5. smoke test `/health`.
+
+Créer dans GitHub Actions → Secrets :
+
+- `VPS_HOST` — nom ou IP du VPS ;
+- `VPS_USER` — ici probablement `ubuntu` ;
+- `VPS_SSH_KEY` — clé privée complète, jamais la clé publique ;
+- `VPS_APP_PATH` — `/var/www/playnext` ;
+- `VPS_WEB_PATH` — `/var/www/playnext/apps/web/dist`.
+
+Le workflow utilise l’environnement GitHub `production`. Tu peux lui ajouter
+une approbation manuelle dans GitHub avant de passer à un déploiement
+automatique sans validation.
+
 ## Installer Windows depuis GitHub
 
 Le workflow Windows publie un artifact à chaque build et une Release lorsqu’un

@@ -6,6 +6,9 @@ dist/
 build/
 apps/web/.astro/
 apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/icons/64x64.png
+apps/desktop/src-tauri/icons/android/
+apps/desktop/src-tauri/icons/ios/
 
 # Env & secrets
 .env

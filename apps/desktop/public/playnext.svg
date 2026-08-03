@@ -3,5 +3,5 @@
   <rect x="32" y="32" width="448" height="448" fill="#0e1013"/>
   <rect x="288" y="288" width="192" height="192" fill="#e2402c"/>
   <path fill="#f4f2ec" d="M96 104h52v304H96zm0 0h168v52H96zm0 132h168v52H96zm116-132h52v184h-52z"/>
-  <path fill="#f4f2ec" d="M304 104h48v304h-48zm112 0h48v304h-48zM344 136h48v48h-48zm-8 48h48v48h-48zm-8 48h48v48h-48zm-8 48h48v48h-48z"/>
+  <path fill="#f4f2ec" d="M304 104h48v304h-48zm112 0h48v304h-48zM340 104h48l76 304h-48z"/>
 </svg>

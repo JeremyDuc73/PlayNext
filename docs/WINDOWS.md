@@ -89,7 +89,7 @@ popd
 
 Artefact :
 
-`apps\desktop\src-tauri\target\release\bundle\nsis\PlayNext_*_x64-setup.exe`
+`apps\desktop\src-tauri\target\release\bundle\nsis\PlayNext-Setup.exe`
 
 Installation par utilisateur avec branding PlayNext : icône, en-tête,
 panneau latéral, dossier menu Démarrer et message de fin d’installation.

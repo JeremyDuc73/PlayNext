@@ -1,39 +1,27 @@
-# Epic Games — configuration
+# Epic Games
 
-PlayNext importe Epic avec un client OAuth PlayNext enregistré :
+PlayNext reprend le flux du launcher Epic, comme Playnite :
 
-1. Connexion Epic dans le navigateur ;
-2. retour automatique vers PlayNext ;
-3. échange serveur du code OAuth ;
-4. Bibliothèque possédée via `library-service…/library/api/public/items`
-5. Installés locaux via `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item`
+1. PlayNext ouvre une fenêtre Tauri dédiée ;
+2. l’utilisateur se connecte sur Epic ;
+3. la fenêtre intercepte `localhost/launcher/authorized?code=...` ;
+4. elle se ferme sans afficher de JSON ;
+5. l’API échange le code avec le client public du launcher ;
+6. **Scanner Epic** synchronise la bibliothèque.
 
-## Configuration Epic
+## Configuration
 
-Créer une application/client Epic et enregistrer exactement les callbacks :
+Aucun client Epic personnalisé, callback HTTPS ou secret Epic n’est nécessaire.
+Le client public du launcher est utilisé uniquement côté API pour l’échange du
+code. Le code d’autorisation n’est jamais affiché ni demandé à l’utilisateur.
+
+## Installation locale
+
+Les jeux installés sont lus depuis :
 
 ```text
-http://localhost:3001/auth/epic/callback
-https://api.playnext.jeremyduc.dev/auth/epic/callback
+%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item
 ```
-
-Renseigner ensuite :
-
-```env
-EPIC_CLIENT_ID=...
-EPIC_CLIENT_SECRET=...
-EPIC_REDIRECT_URI=http://localhost:3001/auth/epic/callback
-```
-
-En production, utiliser le callback HTTPS dans `.env.production`.
-
-## Flow utilisateur
-
-1. Connexion PlayNext ;
-2. **Lier Epic** ;
-3. connexion Epic ;
-4. retour automatique dans PlayNext ;
-5. **Scanner Epic**.
 
 ## Privacy
 

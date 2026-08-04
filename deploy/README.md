@@ -8,11 +8,10 @@
   `https://api.playnext.jeremyduc.dev/auth/discord/callback`
 - Microsoft/Xbox callback :
   `https://api.playnext.jeremyduc.dev/auth/microsoft/callback`
-- Epic callback :
-  `https://api.playnext.jeremyduc.dev/auth/epic/callback`
 
-IGDB/Twitch utilise `client_credentials` : aucune URL de callback n’est
-nécessaire. Epic utilise un client OAuth dédié avec callback enregistré.
+Epic n’a aucune URL de callback publique : l’application Windows intercepte
+le retour local du launcher dans une fenêtre Tauri. Aucun client Epic dédié ni
+secret Epic n’est nécessaire.
 
 Créer deux entrées DNS A vers le VPS :
 

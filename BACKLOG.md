@@ -119,7 +119,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [x] Steam (manifestes, AppID, installé ; sync API sans chemins) — validé (~143 possédés)
 - [x] Steam Web API possession (profil) — via `STEAM_WEB_API_KEY` + steamId local
 - [x] Xbox / Microsoft Store — OAuth public+PKCE + title history + AppX installés (validé Windows)
-- [x] Epic Games Store — OAuth + library/catalogue + manifests `.item` (voir `docs/EPIC.md`)
+- [x] Epic Games Store — client public launcher, login WebView Tauri, library/catalogue + manifests `.item` (voir `docs/EPIC.md`)
 - [ ] Riot natif : League of Legends et VALORANT **séparés** — plus tard
 - [ ] Battle.net — plus tard
 - [ ] Ubisoft Connect — plus tard

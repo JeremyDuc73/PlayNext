@@ -29,12 +29,6 @@ const envSchema = z.object({
     .default("http://localhost:3001/auth/microsoft/callback"),
   TWITCH_CLIENT_ID: z.string().optional().default(""),
   TWITCH_CLIENT_SECRET: z.string().optional().default(""),
-  EPIC_CLIENT_ID: z.string().optional().default(""),
-  EPIC_CLIENT_SECRET: z.string().optional().default(""),
-  EPIC_REDIRECT_URI: z
-    .string()
-    .url()
-    .default("http://localhost:3001/auth/epic/callback"),
 });
 
 export function isSteamWebApiConfigured(config: Env): boolean {
@@ -61,9 +55,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Env {
     MICROSOFT_REDIRECT_URI: trimEnv(env.MICROSOFT_REDIRECT_URI),
     TWITCH_CLIENT_ID: trimEnv(env.TWITCH_CLIENT_ID),
     TWITCH_CLIENT_SECRET: trimEnv(env.TWITCH_CLIENT_SECRET),
-    EPIC_CLIENT_ID: trimEnv(env.EPIC_CLIENT_ID),
-    EPIC_CLIENT_SECRET: trimEnv(env.EPIC_CLIENT_SECRET),
-    EPIC_REDIRECT_URI: trimEnv(env.EPIC_REDIRECT_URI),
   };
   const parsed = envSchema.safeParse(normalized);
   if (!parsed.success) {
@@ -83,10 +74,3 @@ export function isIgdbConfigured(config: Env): boolean {
   return Boolean(config.TWITCH_CLIENT_ID && config.TWITCH_CLIENT_SECRET);
 }
 
-export function isEpicOAuthConfigured(config: Env): boolean {
-  return Boolean(
-    config.EPIC_CLIENT_ID &&
-      config.EPIC_CLIENT_SECRET &&
-      config.EPIC_REDIRECT_URI,
-  );
-}

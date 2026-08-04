@@ -3,10 +3,10 @@ import {
   disconnectEpic,
   disconnectMicrosoft,
   addManualGame,
+  exchangeEpicCode,
   fetchEpicStatus,
   fetchMicrosoftStatus,
   fetchMyLibrary,
-  startEpicLink,
   startMicrosoftLink,
   syncEpicLibrary,
   syncSteamLibrary,
@@ -19,7 +19,7 @@ import {
   openExternalUrl,
   runningInDesktopShell,
 } from "../lib/desktop-auth";
-import { scanEpicLocal } from "../lib/epic";
+import { scanEpicLocal, startEpicLoginNative } from "../lib/epic";
 import {
   dedupePreferLaunchers,
   isJunkGameName,
@@ -35,7 +35,6 @@ import { PosterGrid } from "../ui/PosterGrid";
 type Props = {
   enabled: boolean;
   microsoftLinkedSignal?: number;
-  epicLinkedSignal?: number;
   onBanner: (message: string) => void;
 };
 
@@ -44,7 +43,6 @@ type LauncherFilter = "all" | "steam" | "xbox" | "epic" | "manual";
 export function LibraryHub({
   enabled,
   microsoftLinkedSignal = 0,
-  epicLinkedSignal = 0,
   onBanner,
 }: Props) {
   const isDesktop = runningInDesktopShell();
@@ -139,7 +137,7 @@ export function LibraryHub({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, microsoftLinkedSignal, epicLinkedSignal]);
+  }, [enabled, microsoftLinkedSignal]);
 
   const cleaned = useMemo(
     () => games.filter((g) => !isJunkGameName(g.name)),
@@ -245,15 +243,18 @@ export function LibraryHub({
   }
 
   async function onConnectEpic() {
+    if (!isDesktop) {
+      onBanner("La liaison Epic automatique nécessite l’application Windows.");
+      return;
+    }
     setBusy("epic-link");
     try {
-      const { url } = await startEpicLink(
-        isDesktop ? "desktop" : "web",
-      );
-      await openExternalUrl(url);
-      onBanner("Connexion Epic ouverte.");
+      const code = await startEpicLoginNative();
+      await exchangeEpicCode(code);
+      setEpicLinked(true);
+      onBanner("Compte Epic lié.");
     } catch {
-      onBanner("Login Epic impossible.");
+      onBanner("Connexion Epic impossible.");
     } finally {
       setBusy(null);
     }
@@ -506,7 +507,7 @@ export function LibraryHub({
                 .catch(() => onBanner("Déconnexion MS échouée."))
             }
           >
-            MS off
+            Déconnecter Xbox
           </Button>
         ) : null}
         {epicLinked ? (
@@ -519,7 +520,7 @@ export function LibraryHub({
                 .catch(() => onBanner("Déconnexion Epic échouée."))
             }
           >
-            Epic off
+            Déconnecter Epic
           </Button>
         ) : null}
       </div>
@@ -530,7 +531,7 @@ export function LibraryHub({
           <>
             {" · "}
             <span className="inline-flex items-center gap-2">
-              Sync <span className="pn-sync w-20"><i /></span>
+              Synchro <span className="pn-sync w-20"><i /></span>
             </span>
           </>
         ) : null}

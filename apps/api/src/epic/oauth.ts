@@ -1,5 +1,6 @@
-import type { Env } from "../config.js";
-
+/** Epic public launcher client used by Playnite-like integrations. */
+const EPIC_BASIC_AUTH =
+  "MzRhMDJjZjhmNDQxNGUyOWIxNTkyMTg3NmRhMzZmOWQ6ZGFhZmJjY2M3Mzc3NDUwMzlkZmZlNTNkOTRmYzc2Y2Y=";
 const OAUTH_TOKEN_URL =
   "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token";
 
@@ -13,30 +14,13 @@ export type EpicTokenResponse = {
   displayName?: string;
 };
 
-/**
- * OAuth standard : Epic redirects to the callback registered for the PlayNext
- * client instead of displaying a JSON response.
- */
-export function buildEpicLoginUrl(config: Env, state: string): string {
-  const url = new URL("https://www.epicgames.com/id/authorize");
-  url.searchParams.set("client_id", config.EPIC_CLIENT_ID);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "basic_profile");
-  url.searchParams.set("redirect_uri", config.EPIC_REDIRECT_URI);
-  url.searchParams.set("state", state);
-  return url.toString();
-}
-
 async function tokenRequest(
-  config: Env,
   body: Record<string, string>,
 ): Promise<EpicTokenResponse> {
   const response = await fetch(OAUTH_TOKEN_URL, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(
-        `${config.EPIC_CLIENT_ID}:${config.EPIC_CLIENT_SECRET}`,
-      ).toString("base64")}`,
+      Authorization: `basic ${EPIC_BASIC_AUTH}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(body).toString(),
@@ -49,22 +33,21 @@ async function tokenRequest(
 }
 
 export async function exchangeEpicAuthCode(
-  config: Env,
   code: string,
 ): Promise<EpicTokenResponse> {
-  return tokenRequest(config, {
+  return tokenRequest({
     grant_type: "authorization_code",
     code: code.trim(),
-    redirect_uri: config.EPIC_REDIRECT_URI,
+    token_type: "eg1",
   });
 }
 
 export async function refreshEpicToken(
-  config: Env,
   refreshToken: string,
 ): Promise<EpicTokenResponse> {
-  return tokenRequest(config, {
+  return tokenRequest({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
+    token_type: "eg1",
   });
 }

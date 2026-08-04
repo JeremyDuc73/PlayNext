@@ -59,7 +59,6 @@ export async function buildApp(config: Env, db: Db) {
       microsoftStatus: "/auth/microsoft/status",
       microsoftStart: "POST /auth/microsoft/start",
       epicStatus: "/auth/epic/status",
-      epicStart: "POST /auth/epic/start",
       epicExchange: "POST /auth/epic/exchange",
       me: "/auth/me",
       logout: "POST /auth/logout",

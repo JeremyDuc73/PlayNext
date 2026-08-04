@@ -188,7 +188,6 @@ async fn start_microsoft_login(app: tauri::AppHandle, url: String) -> Result<(),
 }
 
 const EPIC_LOGIN_URL: &str = "https://www.epicgames.com/id/login?responseType=code";
-const EPIC_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EpicGamesLauncher";
 const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
 (() => {
   const codePattern =
@@ -248,7 +247,6 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
     .inner_size(620.0, 760.0)
     .min_inner_size(520.0, 620.0)
     .resizable(true)
-    .user_agent(EPIC_USER_AGENT)
     .initialization_script(EPIC_CODE_CAPTURE_SCRIPT)
     .on_navigation(move |url| {
         let code = url

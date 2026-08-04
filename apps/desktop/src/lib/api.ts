@@ -308,6 +308,9 @@ export async function exchangeEpicCode(code: string): Promise<EpicStatus> {
     body: JSON.stringify({ code }),
   });
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Session PlayNext expirée. Reconnecte Discord.");
+    }
     const body = (await response.json().catch(() => null)) as {
       message?: string;
       error?: string;

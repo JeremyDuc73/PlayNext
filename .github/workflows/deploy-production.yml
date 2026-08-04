@@ -81,5 +81,24 @@ jobs:
 
       - name: Smoke test production API
         run: |
-          curl --fail --silent --show-error \
-            https://api.playnext.jeremyduc.dev/health
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              https://api.playnext.jeremyduc.dev/health; then
+              exit 0
+            fi
+            echo "API not ready (attempt $attempt/30)"
+            sleep 2
+          done
+          echo "API did not become healthy"
+          exit 1
+
+      - name: Dump API logs on failure
+        if: ${{ failure() }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" "
+            cd '$VPS_APP_PATH'
+            docker compose \
+              --env-file deploy/.env.production \
+              -f deploy/docker-compose.production.yml \
+              logs --tail=100 playnext-api
+          "

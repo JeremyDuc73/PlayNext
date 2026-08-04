@@ -96,12 +96,12 @@ automatique sans validation.
 
 ## Installer Windows depuis GitHub
 
-Le workflow Windows publie un artifact à chaque build et une Release lorsqu’un
-tag `v*` est poussé :
+Le workflow Windows est déclenché manuellement et publie un artifact ainsi
+qu’une Release GitHub :
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+Dans GitHub Actions → **Windows build** → **Run workflow**, renseigner le tag
+`v0.1.1`.
 ```
 
 La page `/download` pointe vers le setup de la dernière Release.

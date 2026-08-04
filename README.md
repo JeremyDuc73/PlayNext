@@ -5,6 +5,8 @@ Application Windows desktop-first pour aider un groupe d’amis à choisir un je
 Cahier des charges : `PlayNext_Cahier_des_charges_PC_V1.1.pdf`  
 Suivi produit / anti-oubli : [`BACKLOG.md`](./BACKLOG.md)
 
+Licence : [MIT](./LICENSE)
+
 ## Structure
 
 ```

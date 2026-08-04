@@ -10,14 +10,6 @@ on:
         description: "Tag de release GitHub"
         required: true
         default: "v0.1.0"
-  push:
-    branches: [main, master]
-    tags:
-      - "v*"
-    paths:
-      - "apps/desktop/**"
-      - "package-lock.json"
-      - ".github/workflows/windows-build.yml"
 
 jobs:
   build-windows:
@@ -42,6 +34,8 @@ jobs:
 
       - name: Build Tauri (NSIS)
         working-directory: apps/desktop
+        env:
+          VITE_API_URL: https://api.playnext.jeremyduc.dev
         run: npm run tauri:build
 
       - name: Normalize installer filename

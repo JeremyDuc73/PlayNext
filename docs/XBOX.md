@@ -31,7 +31,8 @@ MICROSOFT_REDIRECT_URI=http://localhost:3001/auth/microsoft/callback
 
 Tu peux ignorer / supprimer `MICROSOFT_CLIENT_SECRET`.
 
-Redémarrer l’API, puis **un seul** essai : Connecter Microsoft → valider tout de suite.
+Redémarrer l’API, puis lancer **Lier Xbox** dans l’application. La connexion
+se fait dans une fenêtre PlayNext dédiée et se ferme après le retour OAuth.
 
 ## Ce que fait PlayNext ensuite
 

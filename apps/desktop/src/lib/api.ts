@@ -231,9 +231,14 @@ export async function disconnectMicrosoft(): Promise<void> {
   const response = await apiFetch("/auth/microsoft/disconnect", {
     method: "POST",
   });
-  if (!response.ok) {
-    throw new Error(`microsoft_disconnect_${response.status}`);
-  }
+  if (response.ok) return;
+  const body = (await response.json().catch(() => null)) as {
+    message?: string;
+    error?: string;
+  } | null;
+  throw new Error(
+    body?.message ?? body?.error ?? `microsoft_disconnect_${response.status}`,
+  );
 }
 
 export async function syncXboxLibrary(

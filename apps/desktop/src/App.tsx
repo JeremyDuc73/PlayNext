@@ -245,8 +245,30 @@ export default function App() {
 
   async function onLoginClick() {
     setLoginPending(true);
-    setAuthBanner(isDesktop ? "Navigateur ouvert — valide Discord." : null);
-    await startDiscordLogin();
+    setAuthBanner(isDesktop ? "Fenêtre Discord ouverte." : null);
+    try {
+      const payload = await startDiscordLogin();
+      if (!payload || payload.kind !== "discord") return;
+      if (payload.error) {
+        setAuthBanner(`Connexion Discord échouée (${payload.error}).`);
+        return;
+      }
+      if (!payload.handoff) {
+        setAuthBanner("Retour Discord introuvable.");
+        return;
+      }
+      const nextUser = await exchangeHandoff(payload.handoff);
+      setUser(nextUser);
+      setAuthBanner("Connexion Discord réussie.");
+    } catch (error) {
+      setAuthBanner(
+        error instanceof Error
+          ? `Connexion Discord échouée (${error.message}).`
+          : "Connexion Discord échouée.",
+      );
+    } finally {
+      if (isDesktop) setLoginPending(false);
+    }
   }
 
   async function logout() {

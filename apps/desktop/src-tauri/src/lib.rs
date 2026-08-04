@@ -2,6 +2,11 @@ mod epic;
 mod steam;
 mod xbox;
 
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
 use epic::EpicScanResult;
 use serde::Serialize;
 use steam::SteamScanResult;
@@ -45,6 +50,143 @@ fn scan_epic() -> EpicScanResult {
     epic::scan_epic_installed()
 }
 
+#[tauri::command]
+async fn start_discord_login(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri::{Emitter, Manager};
+
+    let label = "discord-auth";
+    if let Some(window) = app.get_webview_window(label) {
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let target_url = url
+        .parse()
+        .map_err(|error| format!("URL Discord invalide: {error}"))?;
+    let blank_url = "about:blank"
+        .parse()
+        .map_err(|error| format!("URL de fenêtre Discord invalide: {error}"))?;
+    let handle = app.clone();
+    let completed = Arc::new(AtomicBool::new(false));
+    let navigation_completed = completed.clone();
+
+    let window = tauri::webview::WebviewWindowBuilder::new(
+        &app,
+        label,
+        tauri::WebviewUrl::External(blank_url),
+    )
+    .title("Connexion Discord")
+    .inner_size(520.0, 720.0)
+    .min_inner_size(460.0, 600.0)
+    .resizable(true)
+    .on_navigation(move |url| {
+        let is_callback = url.scheme() == "playnext"
+            && url.host_str() == Some("auth")
+            && url.path() == "/callback";
+        if !is_callback {
+            return true;
+        }
+
+        navigation_completed.store(true, Ordering::SeqCst);
+        let _ = handle.emit("discord-auth-result", url.to_string());
+        if let Some(window) = handle.get_webview_window(label) {
+            let _ = window.destroy();
+        }
+        false
+    })
+    .build()
+    .map_err(|error| format!("Fenêtre Discord impossible: {error}"))?;
+
+    let cancel_handle = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) && !completed.load(Ordering::SeqCst) {
+            let _ = cancel_handle.emit("discord-auth-cancelled", ());
+        }
+    });
+
+    window
+        .navigate(target_url)
+        .map_err(|error| format!("Navigation Discord impossible: {error}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn start_microsoft_login(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri::{Emitter, Manager};
+
+    let label = "microsoft-auth";
+    if let Some(window) = app.get_webview_window(label) {
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let target_url = url
+        .parse()
+        .map_err(|error| format!("URL Microsoft invalide: {error}"))?;
+    let blank_url = "about:blank"
+        .parse()
+        .map_err(|error| format!("URL de fenêtre Microsoft invalide: {error}"))?;
+    let handle = app.clone();
+    let completed = Arc::new(AtomicBool::new(false));
+    let navigation_completed = completed.clone();
+
+    let window = tauri::webview::WebviewWindowBuilder::new(
+        &app,
+        label,
+        tauri::WebviewUrl::External(blank_url),
+    )
+    .title("Connexion Microsoft")
+    .inner_size(560.0, 740.0)
+    .min_inner_size(460.0, 600.0)
+    .resizable(true)
+    .on_navigation(move |url| {
+        let is_callback = url.scheme() == "playnext"
+            && url.host_str() == Some("auth")
+            && url.path() == "/microsoft";
+        let xbox_result = url
+            .query_pairs()
+            .find(|(key, _)| key == "xbox")
+            .map(|(_, value)| value.into_owned());
+        let is_web_result = matches!(xbox_result.as_deref(), Some("ok") | Some("error"));
+        if !is_callback && !is_web_result {
+            return true;
+        }
+
+        navigation_completed.store(true, Ordering::SeqCst);
+        let result_url = if is_callback {
+            url.to_string()
+        } else if xbox_result.as_deref() == Some("ok") {
+            "playnext://auth/microsoft?ok=1".to_string()
+        } else {
+            let reason = url
+                .query_pairs()
+                .find(|(key, _)| key == "reason")
+                .map(|(_, value)| value.into_owned())
+                .unwrap_or_else(|| "xbox_link_failed".into());
+            format!("playnext://auth/microsoft?error={reason}")
+        };
+        let _ = handle.emit("microsoft-auth-result", result_url);
+        if let Some(window) = handle.get_webview_window(label) {
+            let _ = window.destroy();
+        }
+        false
+    })
+    .build()
+    .map_err(|error| format!("Fenêtre Microsoft impossible: {error}"))?;
+
+    let cancel_handle = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) && !completed.load(Ordering::SeqCst) {
+            let _ = cancel_handle.emit("microsoft-auth-cancelled", ());
+        }
+    });
+
+    window
+        .navigate(target_url)
+        .map_err(|error| format!("Navigation Microsoft impossible: {error}"))?;
+    Ok(())
+}
+
 const EPIC_LOGIN_URL: &str = "https://www.epicgames.com/id/login?responseType=code";
 const EPIC_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EpicGamesLauncher";
 const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
@@ -55,7 +197,10 @@ const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
 
   const captureCode = () => {
     if (redirected) return;
-    const content = document.documentElement?.textContent ?? "";
+    const content = [
+      document.documentElement?.textContent ?? "",
+      document.documentElement?.innerHTML ?? "",
+    ].join("\n");
     const match = content.match(codePattern);
     if (!match?.[1]) return;
     redirected = true;
@@ -85,6 +230,8 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     let handle = app.clone();
+    let completed = Arc::new(AtomicBool::new(false));
+    let navigation_completed = completed.clone();
     let url = EPIC_LOGIN_URL
         .parse()
         .map_err(|error| format!("Epic login URL invalide: {error}"))?;
@@ -121,6 +268,7 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
         }
 
         if let Some(code) = code {
+            navigation_completed.store(true, Ordering::SeqCst);
             let _ = handle.emit("epic-auth-code", code);
             if let Some(window) = handle.get_webview_window(label) {
                 let _ = window.destroy();
@@ -134,7 +282,7 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
 
     let cancel_handle = app.clone();
     window.on_window_event(move |event| {
-        if matches!(event, tauri::WindowEvent::Destroyed) {
+        if matches!(event, tauri::WindowEvent::Destroyed) && !completed.load(Ordering::SeqCst) {
             let _ = cancel_handle.emit("epic-auth-cancelled", ());
         }
     });
@@ -178,6 +326,8 @@ pub fn run() {
             scan_steam,
             scan_xbox,
             scan_epic,
+            start_discord_login,
+            start_microsoft_login,
             start_epic_login
         ])
         .run(tauri::generate_context!())

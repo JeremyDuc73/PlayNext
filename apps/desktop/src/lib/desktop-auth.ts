@@ -1,4 +1,5 @@
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getApiUrl } from "./api";
 
 export function runningInDesktopShell(): boolean {
@@ -9,16 +10,20 @@ export function runningInDesktopShell(): boolean {
   }
 }
 
-export async function startDiscordLogin(): Promise<void> {
+export async function startDiscordLogin(): Promise<DeepLinkPayload | null> {
   const url = `${getApiUrl()}/auth/discord${runningInDesktopShell() ? "?client=desktop" : ""}`;
 
   if (runningInDesktopShell()) {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-    return;
+    return startNativeAuthWindow(
+      url,
+      "start_discord_login",
+      "discord-auth-result",
+      "discord-auth-cancelled",
+    );
   }
 
   window.location.href = url;
+  return null;
 }
 
 export type DeepLinkPayload =
@@ -36,6 +41,68 @@ export type DeepLinkPayload =
       kind: "invite";
       code: string;
     };
+
+export function startMicrosoftLoginNative(
+  url: string,
+): Promise<DeepLinkPayload> {
+  return startNativeAuthWindow(
+    url,
+    "start_microsoft_login",
+    "microsoft-auth-result",
+    "microsoft-auth-cancelled",
+  );
+}
+
+async function startNativeAuthWindow(
+  url: string,
+  command: string,
+  resultEvent: string,
+  cancelledEvent: string,
+): Promise<DeepLinkPayload> {
+  let unlistenResult: (() => void) | undefined;
+  let unlistenCancelled: (() => void) | undefined;
+  let timeout: number | undefined;
+  let settled = false;
+  let finish:
+    | ((error: Error | null, payload?: DeepLinkPayload) => void)
+    | undefined;
+  const result = new Promise<DeepLinkPayload>((resolve, reject) => {
+    finish = (error, payload) => {
+      if (settled) return;
+      settled = true;
+      if (timeout != null) window.clearTimeout(timeout);
+      unlistenResult?.();
+      unlistenCancelled?.();
+      if (error) reject(error);
+      else if (payload) resolve(payload);
+      else reject(new Error(`${command}_callback_missing`));
+    };
+  });
+
+  try {
+    unlistenResult = await listen<string>(resultEvent, (event) => {
+      const payload = parseAuthDeepLink(event.payload);
+      finish?.(
+        payload ? null : new Error(`${command}_callback_invalid`),
+        payload ?? undefined,
+      );
+    });
+    unlistenCancelled = await listen(cancelledEvent, () =>
+      finish?.(new Error(`${command}_cancelled`)),
+    );
+    timeout = window.setTimeout(
+      () => finish?.(new Error(`${command}_timeout`)),
+      10 * 60 * 1000,
+    );
+    await invoke(command, { url });
+    return await result;
+  } catch (error) {
+    if (timeout != null) window.clearTimeout(timeout);
+    unlistenResult?.();
+    unlistenCancelled?.();
+    throw error;
+  }
+}
 
 /** Parse Discord handoff, Microsoft link, or group invite deep links. */
 export function parseAuthDeepLink(url: string): DeepLinkPayload | null {

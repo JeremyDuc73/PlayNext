@@ -18,6 +18,7 @@ import {
 import {
   openExternalUrl,
   runningInDesktopShell,
+  startMicrosoftLoginNative,
 } from "../lib/desktop-auth";
 import { scanEpicLocal, startEpicLoginNative } from "../lib/epic";
 import {
@@ -204,10 +205,24 @@ export function LibraryHub({
     setBusy("ms-link");
     try {
       const url = await startMicrosoftLink(isDesktop ? "desktop" : "web");
+      if (isDesktop) {
+        const payload = await startMicrosoftLoginNative(url);
+        if (payload.kind !== "microsoft") {
+          throw new Error("microsoft_callback_invalid");
+        }
+        if (payload.error) {
+          onBanner(`Lien Microsoft échoué (${payload.error}).`);
+        } else if (payload.ok) {
+          setMsLinked(true);
+          onBanner("Compte Microsoft / Xbox lié.");
+        }
+        return;
+      }
       onBanner("Navigateur ouvert — valide Microsoft.");
       await openExternalUrl(url);
-    } catch {
-      onBanner("Login Microsoft impossible (docs/XBOX.md).");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "";
+      onBanner(reason || "Connexion Microsoft impossible.");
     } finally {
       setBusy(null);
     }
@@ -253,8 +268,15 @@ export function LibraryHub({
       await exchangeEpicCode(code);
       setEpicLinked(true);
       onBanner("Compte Epic lié.");
-    } catch {
-      onBanner("Connexion Epic impossible.");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "";
+      if (reason === "epic_login_cancelled") {
+        onBanner("Connexion Epic annulée.");
+      } else if (reason === "epic_login_timeout") {
+        onBanner("Connexion Epic expirée.");
+      } else {
+        onBanner(reason || "Connexion Epic impossible.");
+      }
     } finally {
       setBusy(null);
     }
@@ -504,7 +526,13 @@ export function LibraryHub({
               void disconnectMicrosoft()
                 .then(() => setMsLinked(false))
                 .then(() => onBanner("Microsoft déconnecté."))
-                .catch(() => onBanner("Déconnexion MS échouée."))
+                .catch((error) =>
+                  onBanner(
+                    error instanceof Error
+                      ? error.message
+                      : "Déconnexion Xbox échouée.",
+                  ),
+                )
             }
           >
             Déconnecter Xbox

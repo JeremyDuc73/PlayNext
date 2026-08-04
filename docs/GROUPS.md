@@ -73,4 +73,4 @@ Tu es « Buddy Dev » avec quelques jeux sample pour croiser la biblio.
 - Liaison serveur + salon Discord
 - Image upload (URL optionnelle côté API seulement)
 - Préférences collectives soirée
-- Site web qui ouvre l’app ou propose le téléchargement
+- Ouverture automatique des invitations web dans l’application installée

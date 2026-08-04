@@ -28,10 +28,10 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
    Login Discord via navigateur système + deep link `playnext://`.  
    Build NSIS CI + install sur PC réel + API WSL + CORS `tauri.localhost` validés.
 
-3. **P1a — Scan Steam**  
+3. **P1a — Scan Steam** ✅
    Connecteur Rust + fixtures, puis vrai scan sur le PC Windows. Sync API sans chemins. UI bibliothèque perso.
 
-4. **P1b — Autres launchers prioritaires** ✅ (partiel)  
+4. **P1b — Autres launchers prioritaires** ✅ (partiel)
    Steam + Xbox + Epic OK. Autres launchers **en pause** ; on avance sur le cœur produit.
 
 5. **P2 — Groupes** ← **cœur app OK**  
@@ -43,7 +43,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 7. **P4 — Achats collectifs**  
    Une fois les soirées stables. Prévoir règle de quorum (pas seulement unanimité).
 
-8. **P5 — Finition prod**  
+8. **P5 — Finition prod** ← **en cours**
    Historique, Astro/téléchargement, signature, updater, Caddy, recette CDC.
 
 **Règles de séquence :**
@@ -66,7 +66,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [x] PostgreSQL
 - [x] Redis (+ BullMQ plus tard dans P2/P5 selon besoin)
 - [x] Docker Compose (API, Postgres, Redis)
-- [ ] Caddy (HTTPS / reverse proxy) — peut arriver en fin de P0 ou P5
+- [x] Caddy (HTTPS / reverse proxy) — site et API accessibles sur le VPS
 - [x] CI GitHub Actions (build / tests de base)
 - [x] Variables d’environnement, secrets hors dépôt
 - [x] Structure des commandes natives Tauri (allowlist dès le départ)
@@ -85,15 +85,15 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 ### Distribution minimale
 
-- [~] Installateur Windows (setup) utilisable en interne — cible NSIS + workflow CI ; à valider sur PC
+- [~] Installateur Windows (setup) — NSIS custom, workflow manuel ; validation sur PC/signature restante
 - [x] Deep link `playnext://` + handoff OAuth desktop (cookies browser ≠ WebView Tauri)
 - [x] Doc build Windows (`docs/WINDOWS.md`)
-- [~] Site vitrine Astro : dossier `apps/web` réservé (pas encore scaffoldé Astro)
-  - [ ] Accueil
-  - [ ] Téléchargement (version, prérequis, checksum, notes)
-  - [ ] Documentation
-  - [ ] Invitations / deep links (ouvre l’app ou téléchargement)
-  - [ ] Légal (mentions, confidentialité, CGU, contact)
+- [x] Site vitrine Astro scaffoldé
+  - [x] Accueil
+  - [x] Téléchargement (version, prérequis, signature)
+  - [x] Documentation
+  - [~] Invitations / deep links (ouverture app à finaliser)
+  - [x] Légal minimal
 
 
 
@@ -101,10 +101,10 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 - [x] Direction artistique — **« BULLETIN »** (Tailwind + GSAP) : encre, filets, blocs inversés, tampons
 - [x] Tokens CSS + composants `apps/desktop/src/ui/*`
-- [x] Covers launcher (Steam CDN, TitleHub, Epic) — IGDB abandonné
+- [x] Covers launcher (Steam CDN, TitleHub, Epic) ; IGDB manuel pour le catalogue
 - [~] Principes UX CDC : vide / chargement de base ; hors ligne / MAJ / confidentialité à approfondir
 - [~] Accessibilité de base (focus, contraste, clavier) — focus visible + contraste ; approfondir en P5
-- [ ] Site Astro vitrine + install — **différé** (on itère dans l’app desktop)
+- [x] Site Astro vitrine + install — build et première mise en ligne validés
 
 ---
 
@@ -125,7 +125,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [ ] Ubisoft Connect — plus tard
 - [ ] EA app — plus tard
 - [ ] GOG Galaxy — plus tard
-- [ ] Ajout manuel / dossier choisi par l’utilisateur — plus tard
+- [x] Ajout manuel depuis le catalogue IGDB ; dossier local choisi plus tard
 
 
 
@@ -178,7 +178,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
   - [ ] Nouvelle proposition d’achat
   - [ ] Accord collectif → invitation soirée
   - [ ] Rappels facultatifs
-- [~] Deep links : invite → app OK ; Discord / web → ouverture app si installée (site Astro plus tard)
+- [~] Deep links : invite → app OK ; Discord / web → ouverture app si installée
 
 Doc : `docs/GROUPS.md`
 
@@ -195,17 +195,17 @@ Doc : `docs/EVENINGS.md`
 - [x] Participants présents
 - [x] Durée
 - [x] Ambiance
-- [x] Contraintes possession / installation
+- [x] Sélection depuis les bibliothèques personnelles / installation optionnelle
 - [~] Préférences (récents via diversité gagnants ; oubliés / campagne / gratuit / exclusions fines plus tard)
 
 
 
 ### Recommandation (règles, pas IA obligatoire)
 
-- [x] Filtres obligatoires (possession / installation / participants)
+- [x] Filtres obligatoires (participants / compatibilité) + installation optionnelle
 - [~] Classement (installé, possession, diversité récents ; envie/fréquence/historique enrichis plus tard)
 - [x] Diversité de sélection (pénalité gagnants récents)
-- [x] Liste courte 1–5 (choix libre de l’organisateur)
+- [x] Pool personnel complet + maximum de sélection 1–5
 - [x] Explications par jeu (possédé X/Y, installé X/Y ; mode groupe catalogué si disponible)
 - [x] Compatibilité avant popularité ; veto non compensé
 - [x] Tests unitaires du moteur (`npm run test:api`)
@@ -259,7 +259,7 @@ Doc : `docs/EVENINGS.md`
 
 ### Historique & mémoire de groupe
 
-- [ ] Historique soirées
+- [~] Historique soirées — liste de base disponible, détail à enrichir
 - [ ] Notes / souvenirs / captures
 - [ ] Jeux les plus joués / délaissés
 - [ ] Stats légères
@@ -268,10 +268,10 @@ Doc : `docs/EVENINGS.md`
 
 ### UX écrans restants
 
-- [ ] Accueil (groupes, trouver un jeu, dernière soirée, sync, propositions)
-- [ ] Bibliothèque personnelle
-- [ ] Bibliothèque groupe
-- [ ] Création soirée / salle de vote / résultat
+- [~] Accueil (groupes, trouver un jeu, dernière soirée, sync, propositions)
+- [x] Bibliothèque personnelle
+- [x] Bibliothèque groupe
+- [x] Création soirée / salle de vote / résultat
 - [ ] Propositions d’achat
 - [ ] Paramètres (Discord, scan, auto-start, confidentialité, notifs, MAJ)
 - [ ] Mode compact + mode présentation grand écran
@@ -281,7 +281,7 @@ Doc : `docs/EVENINGS.md`
 
 ### Catalogue & admin
 
-- [-] Intégration IGDB — abandonné (trop lent / buggé pour la V1)
+- [~] IGDB manuel uniquement — recherche et ajout catalogue ; pas de sync automatique
 - [ ] Cache catalogue serveur
 - [ ] Outil interne correction associations / doublons
 - [ ] Correction communautaire / exceptions par groupe (métadonnées joueurs)
@@ -290,9 +290,9 @@ Doc : `docs/EVENINGS.md`
 
 ### APIs externes (caractère CDC)
 
-- [ ] Discord OAuth + bot (nécessaire)
-- [-] IGDB — abandonné
-- [ ] Steam Web API (recommandé)
+- [~] Discord OAuth + bot — OAuth fait, bot restant
+- [~] IGDB — utilisé pour les ajouts manuels uniquement
+- [x] Steam Web API (recommandé)
 - [ ] IsThereAnyDeal (optionnel recommandé)
 - [ ] Sentry ou équivalent (optionnel prod)
 - [ ] Stockage S3-compatible si besoin (évolution)
@@ -301,14 +301,14 @@ Doc : `docs/EVENINGS.md`
 
 ### Sécurité & confidentialité (checklist prod)
 
-- [ ] Allowlist commandes Tauri
-- [ ] Pas de script distant dans l’UI
+- [x] Allowlist commandes Tauri
+- [x] Pas de script distant dans l’UI
 - [ ] Updater signé + notes de version + report redémarrage
 - [ ] Secrets Windows sécurisés
 - [ ] Deep links validés (pas de commande arbitraire)
-- [ ] AuthZ par appartenance / rôle sur chaque op API
+- [x] AuthZ par appartenance / rôle sur les opérations principales
 - [ ] Rate limit, validation stricte, journalisation actions sensibles
-- [ ] HTTPS partout
+- [~] HTTPS partout — Caddy configuré, validation VPS en cours
 - [ ] Sauvegardes chiffrées + test restauration
 - [ ] Suppression / anonymisation compte
 - [ ] Temps de jeu : usage reco, affichage précis désactivable
@@ -317,20 +317,20 @@ Doc : `docs/EVENINGS.md`
 
 ### Exploitation
 
-- [ ] Signature code Windows (SmartScreen)
+- [~] Signature code Windows (SmartScreen) — pipeline prêt, candidature SignPath à faire
 - [ ] Canal stable unique
-- [ ] Déploiement Compose sur VPS OVH
-- [ ] Postgres/Redis non exposés
+- [~] Déploiement Compose sur VPS OVH — première mise en ligne validée, automatisation à tester
+- [x] Postgres/Redis non exposés dans le compose de production
 - [ ] Sauvegarde quotidienne, rotation logs
 - [ ] Surveillance minimale (santé API, disque, jobs, bot)
 - [ ] Rollback documenté
-- [ ] Domaine playnext.fr / téléchargement officiel
+- [x] Domaine `playnext.jeremyduc.dev` / API HTTPS en ligne ; Release Windows à publier
 
 
 
 ### Qualité & recette CDC
 
-- [ ] Tests unitaires : reco, votes, veto
+- [x] Tests unitaires : moteur de reco, votes, veto
 - [ ] Tests connecteurs (fixtures manifestes anonymisés)
 - [ ] Tests Discord / externes mockés
 - [ ] E2E : connexion, groupe, scan, soirée, vote, achat
@@ -407,5 +407,5 @@ Quand on reporte quelque chose hors phase prévue, ajouter une ligne :
 
 ## Prochaine action concrète
 
-**UI « BULLETIN »** — Tailwind v4 + GSAP. Covers launcher (Steam / TitleHub / Epic).  
-Tester soirée + rails. Site vitrine **plus tard**.
+**Mise en ligne** — finaliser Caddy/VPS, candidater SignPath, publier une
+première Release Windows et tester le parcours complet en production.

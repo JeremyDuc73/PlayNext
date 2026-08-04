@@ -113,8 +113,9 @@ contourner cette protection.
 
 ## Option B — GitHub Actions
 
-Push la branche, lance le workflow **Windows build** (ou attends le push sur `main`).  
-Télécharge l’artifact `playnext-windows-nsis`.
+Le workflow **Windows build** est manuel. Dans GitHub Actions → **Run
+workflow**, renseigne le tag de release (`v0.1.1` par exemple), puis télécharge
+`PlayNext-Setup.exe` depuis la Release publiée.
 
 ## Login Discord dans l’app
 
@@ -127,5 +128,6 @@ L’aperçu web `npm run dev:ui` (WSL) reste OK pour l’UI, pas pour le smoke d
 
 ## CI
 
-`.github/workflows/windows-build.yml` → artifact NSIS, signé automatiquement
-si les secrets du certificat sont configurés.
+`.github/workflows/windows-build.yml` → Release Windows manuelle.
+`.github/workflows/deploy-production.yml` → site/API sur le VPS à chaque push
+sur `main`.

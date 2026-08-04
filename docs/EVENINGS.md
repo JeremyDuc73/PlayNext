@@ -20,11 +20,12 @@ Chaque joueur choisit ensuite entre 1 et N jeux, avec N fixé par l’hôte entr
 
 | Option | Effet |
 |--------|--------|
-| Tout le monde possède | `ownedCount === participants` |
-| Tout le monde a installé | idem pour `installed` |
+| En commun | `ownedCount === participants` |
+| Pas en commun | `ownedCount < participants` + indication des absents |
+| Installation | filtre optionnel au lancement du pool |
 | Durée | minutes libres entre 15 et 600, ou sans limite |
 | Jouable en groupe | exclut les jeux marqués solo par le catalogue launcher |
-| Fallback | si 0 résultat → assouplit installé puis possédé |
+| Fallback | si 0 résultat → assouplit l’installation |
 
 Diversité : les gagnants récents du groupe sont pénalisés (pas exclus).
 La propriété « jouable en groupe » vient du Steam Store quand disponible ;

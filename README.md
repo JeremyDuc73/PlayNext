@@ -13,7 +13,7 @@ Licence : [MIT](./LICENSE)
 apps/
   desktop/   # Tauri 2 + React + TypeScript (produit principal)
   api/       # Fastify + PostgreSQL
-  web/       # Site Astro (réservé, pas encore scaffoldé)
+  web/       # Site Astro public (présentation, téléchargement, docs)
 docker-compose.yml
 ```
 
@@ -52,6 +52,12 @@ Dans un autre terminal (UI navigateur, sans shell Tauri) :
 npm run dev:ui
 ```
 
+Site public Astro :
+
+```bash
+npm run dev -w @playnext/web
+```
+
 App native (quand la toolchain Tauri est prête) :
 
 ```bash
@@ -72,6 +78,8 @@ npm run dev:desktop
 | `POST /auth/epic/exchange` | Lien compte Epic (authorizationCode) |
 | `POST /library/epic/sync` | Sync Epic (possédés + installés) |
 | `GET /library/me` | Bibliothèque sync |
+| `POST /library/manual/search` | Recherche manuelle IGDB |
+| `POST /library/manual` | Ajout d’un jeu catalogue à la bibliothèque |
 
 Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`.  
 Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.md).
@@ -85,11 +93,15 @@ Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.m
 | `npm run dev:desktop` | Tauri dev |
 | `npm run docker:up` | Postgres + Redis |
 | `npm run typecheck` | Types API + desktop |
+| `npm run build -w @playnext/web` | Build du site public |
 
 ## Phase en cours
 
-**P1 — Bibliothèque** : Steam validé ; Xbox (OAuth + title history) à valider sur Windows.
+**P5 — Mise en ligne** : API, site public et workflow Windows prêts ; VPS,
+signature et recette finale restent à valider.
 
 Déroulé complet : [`BACKLOG.md`](./BACKLOG.md) (section *Déroulé recommandé*).  
 Build Windows : [`docs/WINDOWS.md`](./docs/WINDOWS.md).  
 Xbox : [`docs/XBOX.md`](./docs/XBOX.md).
+Mise en ligne : [`deploy/README.md`](./deploy/README.md).
+Documentation : [`docs/README.md`](./docs/README.md).

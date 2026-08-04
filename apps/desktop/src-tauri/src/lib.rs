@@ -187,11 +187,13 @@ async fn start_microsoft_login(app: tauri::AppHandle, url: String) -> Result<(),
     Ok(())
 }
 
-const EPIC_LOGIN_URL: &str = "https://www.epicgames.com/id/login?responseType=code";
+const EPIC_LOGIN_URL: &str = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode";
 const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
 (() => {
-  const codePattern =
-    /localhost\/launcher\/authorized\?code=([A-Za-z0-9._~-]+)/i;
+  const codePatterns = [
+    /localhost\/launcher\/authorized\?code=([A-Za-z0-9._~-]+)/i,
+    /["']authorizationCode["']\s*:\s*["']([A-Za-z0-9._~-]+)["']/i,
+  ];
   let redirected = false;
 
   const captureCode = () => {
@@ -200,7 +202,10 @@ const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
       document.documentElement?.textContent ?? "",
       document.documentElement?.innerHTML ?? "",
     ].join("\n");
-    const match = content.match(codePattern);
+    const normalized = content.replaceAll("\\/", "/");
+    const match = codePatterns
+      .map((pattern) => normalized.match(pattern))
+      .find(Boolean);
     if (!match?.[1]) return;
     redirected = true;
     window.location.replace(

@@ -55,7 +55,7 @@ export async function saveEpicLinkFromCode(
   userId: string,
   code: string,
 ): Promise<void> {
-  const tokens = await exchangeEpicAuthCode(code);
+  const tokens = await exchangeEpicAuthCode(config, code);
   await persistTokens(db, config, userId, tokens);
 }
 
@@ -117,7 +117,7 @@ export async function getValidEpicAccessToken(
     row.refresh_token_enc,
     config.SESSION_SECRET,
   );
-  const tokens = await refreshEpicToken(refreshToken);
+  const tokens = await refreshEpicToken(config, refreshToken);
   await persistTokens(db, config, userId, tokens);
   return { accessToken: tokens.access_token, tokenType: tokens.token_type || "bearer" };
 }

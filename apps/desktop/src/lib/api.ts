@@ -297,8 +297,13 @@ export async function fetchEpicStatus(): Promise<EpicStatus> {
   };
 }
 
-export async function startEpicLink(): Promise<{ url: string; hint?: string }> {
-  const response = await apiFetch("/auth/epic/start", { method: "POST" });
+export async function startEpicLink(
+  client: "desktop" | "web" = "web",
+): Promise<{ url: string; hint?: string }> {
+  const response = await apiFetch("/auth/epic/start", {
+    method: "POST",
+    body: JSON.stringify({ client }),
+  });
   if (!response.ok) throw new Error(`epic_start_${response.status}`);
   const data = (await response.json()) as {
     ok: boolean;

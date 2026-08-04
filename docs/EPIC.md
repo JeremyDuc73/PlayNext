@@ -1,24 +1,39 @@
 # Epic Games — configuration
 
-PlayNext importe Epic **comme Playnite / Legendary** :
+PlayNext importe Epic avec un client OAuth PlayNext enregistré :
 
-1. Login compte Epic → `authorizationCode`
-2. Tokens OAuth (client public du **Epic Games Launcher**)
-3. Bibliothèque possédée via `library-service…/library/api/public/items`
-4. Installés locaux via `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item`
+1. Connexion Epic dans le navigateur ;
+2. retour automatique vers PlayNext ;
+3. échange serveur du code OAuth ;
+4. Bibliothèque possédée via `library-service…/library/api/public/items`
+5. Installés locaux via `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item`
 
-## Pas de clé `.env`
+## Configuration Epic
 
-Contrairement à Steam / Xbox, **aucune variable Epic** n’est requise.  
-On utilise le client OAuth public du launcher Epic (même approche que Playnite, Heroic, Legendary).
+Créer une application/client Epic et enregistrer exactement les callbacks :
+
+```text
+http://localhost:3001/auth/epic/callback
+https://api.playnext.jeremyduc.dev/auth/epic/callback
+```
+
+Renseigner ensuite :
+
+```env
+EPIC_CLIENT_ID=...
+EPIC_CLIENT_SECRET=...
+EPIC_REDIRECT_URI=http://localhost:3001/auth/epic/callback
+```
+
+En production, utiliser le callback HTTPS dans `.env.production`.
 
 ## Flow utilisateur
 
-1. Login Discord sur `http://localhost:1420`
-2. **Connecter Epic** → le champ de code apparaît (rien ne s’ouvre tout seul)
-3. Clique **Ouvrir la page Epic** (un seul onglet)
-4. Copie `authorizationCode` → colle → **Valider le code**
-5. **Scanner Epic**
+1. Connexion PlayNext ;
+2. **Lier Epic** ;
+3. connexion Epic ;
+4. retour automatique dans PlayNext ;
+5. **Scanner Epic**.
 
 ## Privacy
 
@@ -32,7 +47,7 @@ Au sync, PlayNext lit `keyImages` du catalogue (`DieselGameBoxTall` / `OfferImag
 
 ## Limites
 
-- Le code d’auth expire vite : colle-le tout de suite
+- Le code d’auth expire rapidement
 - On ne garde que les **jeux lançables** (filtre catalogue Epic, style Playnite) : pas DLC seuls, extras, plugins, Unreal Engine
 - Titres *playtest* / *demo* / *modkit* exclus automatiquement
 - Les titres viennent du **catalogue** Epic (plus d’IDs hex bruts)

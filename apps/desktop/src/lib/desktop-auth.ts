@@ -33,6 +33,11 @@ export type DeepLinkPayload =
       ok?: boolean;
     }
   | {
+      kind: "epic";
+      error?: string;
+      ok?: boolean;
+    }
+  | {
       kind: "invite";
       code: string;
     };
@@ -67,6 +72,13 @@ export function parseAuthDeepLink(url: string): DeepLinkPayload | null {
       const ok = parsed.searchParams.get("ok") === "1";
       if (!error && !ok) return null;
       return { kind: "microsoft", error, ok };
+    }
+
+    if (hostPath === "auth/epic" || hostPath.endsWith("/auth/epic")) {
+      const error = parsed.searchParams.get("error") ?? undefined;
+      const ok = parsed.searchParams.get("ok") === "1";
+      if (!error && !ok) return null;
+      return { kind: "epic", error, ok };
     }
 
     // playnext://auth/callback?handoff=...

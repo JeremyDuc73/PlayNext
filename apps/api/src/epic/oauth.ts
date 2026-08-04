@@ -1,10 +1,4 @@
-/**
- * Epic Games Launcher public OAuth client (same as Playnite / Legendary / Heroic).
- * Not a PlayNext-owned secret — required to talk to Epic consumer library APIs.
- */
-export const EPIC_LAUNCHER_CLIENT_ID = "34a02cf8f4414e29b15921876da36f9a";
-const EPIC_BASIC_AUTH =
-  "MzRhMDJjZjhmNDQxNGUyOWIxNTkyMTg3NmRhMzZmOWE6ZGFhZmJjY2M3Mzc3NDUwMzlkZmZlNTNkOTRmYzc2Y2Y=";
+import type { Env } from "../config.js";
 
 const OAUTH_TOKEN_URL =
   "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token";
@@ -20,23 +14,29 @@ export type EpicTokenResponse = {
 };
 
 /**
- * Single tab: Epic redirect endpoint (asks login if needed, then JSON with authorizationCode).
- * Same as Playnite alternative auth — avoid /id/login?redirectUrl=… (can open duplicate tabs).
+ * OAuth standard : Epic redirects to the callback registered for the PlayNext
+ * client instead of displaying a JSON response.
  */
-export function buildEpicLoginUrl(): string {
-  const url = new URL("https://www.epicgames.com/id/api/redirect");
-  url.searchParams.set("clientId", EPIC_LAUNCHER_CLIENT_ID);
-  url.searchParams.set("responseType", "code");
+export function buildEpicLoginUrl(config: Env, state: string): string {
+  const url = new URL("https://www.epicgames.com/id/authorize");
+  url.searchParams.set("client_id", config.EPIC_CLIENT_ID);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "basic_profile");
+  url.searchParams.set("redirect_uri", config.EPIC_REDIRECT_URI);
+  url.searchParams.set("state", state);
   return url.toString();
 }
 
 async function tokenRequest(
+  config: Env,
   body: Record<string, string>,
 ): Promise<EpicTokenResponse> {
   const response = await fetch(OAUTH_TOKEN_URL, {
     method: "POST",
     headers: {
-      Authorization: `basic ${EPIC_BASIC_AUTH}`,
+      Authorization: `Basic ${Buffer.from(
+        `${config.EPIC_CLIENT_ID}:${config.EPIC_CLIENT_SECRET}`,
+      ).toString("base64")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(body).toString(),
@@ -49,21 +49,22 @@ async function tokenRequest(
 }
 
 export async function exchangeEpicAuthCode(
+  config: Env,
   code: string,
 ): Promise<EpicTokenResponse> {
-  return tokenRequest({
+  return tokenRequest(config, {
     grant_type: "authorization_code",
     code: code.trim(),
-    token_type: "eg1",
+    redirect_uri: config.EPIC_REDIRECT_URI,
   });
 }
 
 export async function refreshEpicToken(
+  config: Env,
   refreshToken: string,
 ): Promise<EpicTokenResponse> {
-  return tokenRequest({
+  return tokenRequest(config, {
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    token_type: "eg1",
   });
 }

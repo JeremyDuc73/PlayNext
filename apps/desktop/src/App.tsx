@@ -70,6 +70,7 @@ export default function App() {
   const [authBanner, setAuthBanner] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
   const [microsoftLinkedSignal, setMicrosoftLinkedSignal] = useState(0);
+  const [epicLinkedSignal, setEpicLinkedSignal] = useState(0);
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(
     null,
   );
@@ -82,6 +83,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const auth = params.get("auth");
     const xbox = params.get("xbox");
+    const epic = params.get("epic");
     const invite = params.get("invite");
     if (auth === "ok") {
       setAuthBanner("Connexion Discord réussie.");
@@ -98,6 +100,16 @@ export default function App() {
       const reason = params.get("reason") ?? "unknown";
       setAuthBanner(microsoftErrorMessage(reason));
       setMicrosoftLinkedSignal((n) => n + 1);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (epic === "ok") {
+      setAuthBanner("Compte Epic lié.");
+      setEpicLinkedSignal((n) => n + 1);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (epic === "error") {
+      setAuthBanner(
+        `Connexion Epic échouée (${params.get("reason") ?? "unknown"}).`,
+      );
+      setEpicLinkedSignal((n) => n + 1);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (invite) {
       setPendingInviteCode(invite);
@@ -130,6 +142,18 @@ export default function App() {
             setAuthBanner("Compte Microsoft / Xbox lié.");
             setMicrosoftLinkedSignal((n) => n + 1);
           }
+        }
+        return;
+      }
+
+      if (parsed.kind === "epic") {
+        if (!cancelled) {
+          setEpicLinkedSignal((n) => n + 1);
+          setAuthBanner(
+            parsed.error
+              ? `Connexion Epic échouée (${parsed.error}).`
+              : "Compte Epic lié.",
+          );
         }
         return;
       }
@@ -347,6 +371,7 @@ export default function App() {
                   <LibraryHub
                     enabled
                     microsoftLinkedSignal={microsoftLinkedSignal}
+                    epicLinkedSignal={epicLinkedSignal}
                     onBanner={(message) => setAuthBanner(message)}
                   />
                 ) : (

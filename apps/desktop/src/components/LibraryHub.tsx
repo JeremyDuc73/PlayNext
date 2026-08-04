@@ -3,7 +3,6 @@ import {
   disconnectEpic,
   disconnectMicrosoft,
   addManualGame,
-  exchangeEpicCode,
   fetchEpicStatus,
   fetchMicrosoftStatus,
   fetchMyLibrary,
@@ -36,6 +35,7 @@ import { PosterGrid } from "../ui/PosterGrid";
 type Props = {
   enabled: boolean;
   microsoftLinkedSignal?: number;
+  epicLinkedSignal?: number;
   onBanner: (message: string) => void;
 };
 
@@ -44,6 +44,7 @@ type LauncherFilter = "all" | "steam" | "xbox" | "epic" | "manual";
 export function LibraryHub({
   enabled,
   microsoftLinkedSignal = 0,
+  epicLinkedSignal = 0,
   onBanner,
 }: Props) {
   const isDesktop = runningInDesktopShell();
@@ -64,8 +65,6 @@ export function LibraryHub({
   const [msConfigured, setMsConfigured] = useState(false);
   const [msLinked, setMsLinked] = useState(false);
   const [epicLinked, setEpicLinked] = useState(false);
-  const [epicLoginUrl, setEpicLoginUrl] = useState<string | null>(null);
-  const [epicCode, setEpicCode] = useState("");
 
   async function refreshGames() {
     setGames(await fetchMyLibrary());
@@ -122,7 +121,9 @@ export function LibraryHub({
         }),
       fetchEpicStatus()
         .then((s) => {
-          if (!cancelled) setEpicLinked(s.linked);
+          if (!cancelled) {
+            setEpicLinked(s.linked);
+          }
         })
         .catch(() => {
           if (!cancelled) setEpicLinked(false);
@@ -138,7 +139,7 @@ export function LibraryHub({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, microsoftLinkedSignal]);
+  }, [enabled, microsoftLinkedSignal, epicLinkedSignal]);
 
   const cleaned = useMemo(
     () => games.filter((g) => !isJunkGameName(g.name)),
@@ -246,27 +247,13 @@ export function LibraryHub({
   async function onConnectEpic() {
     setBusy("epic-link");
     try {
-      const { url } = await startEpicLink();
-      setEpicLoginUrl(url);
-      onBanner("Ouvre Epic, copie authorizationCode, colle-le.");
+      const { url } = await startEpicLink(
+        isDesktop ? "desktop" : "web",
+      );
+      await openExternalUrl(url);
+      onBanner("Connexion Epic ouverte.");
     } catch {
       onBanner("Login Epic impossible.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onExchangeEpic() {
-    if (!epicCode.trim()) return;
-    setBusy("epic-link");
-    try {
-      await exchangeEpicCode(epicCode.trim());
-      setEpicLinked(true);
-      setEpicLoginUrl(null);
-      setEpicCode("");
-      onBanner("Epic lié.");
-    } catch (error) {
-      onBanner(error instanceof Error ? error.message : "Code Epic invalide.");
     } finally {
       setBusy(null);
     }
@@ -536,32 +523,6 @@ export function LibraryHub({
           </Button>
         ) : null}
       </div>
-
-      {epicLoginUrl ? (
-        <div className="mb-5 flex flex-wrap items-center gap-2 border border-rule-strong p-3">
-          <a
-            href={epicLoginUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="pn-btn-second"
-          >
-            Page Epic
-          </a>
-          <input
-            className="min-w-[200px] flex-1 border border-rule-strong bg-ink-deep px-3 py-2 font-data text-[11px] uppercase outline-none focus:border-paper"
-            value={epicCode}
-            onChange={(e) => setEpicCode(e.target.value)}
-            placeholder="authorizationCode"
-          />
-          <Button
-            variant="primary"
-            disabled={Boolean(busy) || !epicCode.trim()}
-            onClick={() => void onExchangeEpic()}
-          >
-            Valider
-          </Button>
-        </div>
-      ) : null}
 
       <p className="pn-data mb-4">
         {pad2(visible.length)} jeu{visible.length > 1 ? "x" : ""}

@@ -150,9 +150,13 @@ export default function App() {
             setAuthBanner("Connexion Discord réussie.");
             setLoginPending(false);
           }
-        } catch {
+        } catch (error) {
           if (!cancelled) {
-            setAuthBanner("Échange de session desktop échoué.");
+            setAuthBanner(
+              error instanceof Error
+                ? `Échange de session desktop échoué (${error.message}).`
+                : "Échange de session desktop échoué.",
+            );
             setLoginPending(false);
           }
         }

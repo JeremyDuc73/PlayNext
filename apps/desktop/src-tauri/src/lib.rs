@@ -187,7 +187,8 @@ async fn start_microsoft_login(app: tauri::AppHandle, url: String) -> Result<(),
     Ok(())
 }
 
-const EPIC_LOGIN_URL: &str = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode";
+const EPIC_LOGIN_URL: &str =
+    "https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code";
 const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
 (() => {
   const codePatterns = [
@@ -209,7 +210,7 @@ const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
     if (!match?.[1]) return;
     redirected = true;
     window.location.replace(
-      `http://localhost/launcher/authorized?code=${encodeURIComponent(match[1])}`,
+      `https://localhost/launcher/authorized?code=${encodeURIComponent(match[1])}`,
     );
   };
 
@@ -242,6 +243,11 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
     let blank_url = "about:blank"
         .parse()
         .map_err(|error| format!("URL de fenêtre Epic invalide: {error}"))?;
+    let epic_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Dossier Epic impossible: {error}"))?
+        .join("epic-auth");
 
     let window = tauri::webview::WebviewWindowBuilder::new(
         &app,
@@ -252,6 +258,7 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
     .inner_size(620.0, 760.0)
     .min_inner_size(520.0, 620.0)
     .resizable(true)
+    .data_directory(epic_data_dir)
     .initialization_script(EPIC_CODE_CAPTURE_SCRIPT)
     .on_navigation(move |url| {
         let code = url
@@ -263,7 +270,7 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
         let is_epic_api_redirect = url
             .host_str()
             .is_some_and(|host| host.ends_with("epicgames.com"))
-            && url.path().contains("/id/api/redirect")
+            && (url.path().contains("/id/api/redirect") || url.path() == "/fnauth")
             && code.is_some();
         let is_epic_code_redirect = is_local_code_redirect || is_epic_api_redirect;
         if !is_epic_code_redirect {
@@ -290,6 +297,9 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
         }
     });
 
+    window
+        .clear_all_browsing_data()
+        .map_err(|error| format!("Cookies Epic impossibles à réinitialiser: {error}"))?;
     window
         .navigate(url)
         .map_err(|error| format!("Navigation Epic impossible: {error}"))?;

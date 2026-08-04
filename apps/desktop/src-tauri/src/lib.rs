@@ -291,9 +291,6 @@ async fn start_epic_login(app: tauri::AppHandle) -> Result<(), String> {
     });
 
     window
-        .clear_all_browsing_data()
-        .map_err(|error| format!("Cookies Epic impossibles à réinitialiser: {error}"))?;
-    window
         .navigate(url)
         .map_err(|error| format!("Navigation Epic impossible: {error}"))?;
     Ok(())

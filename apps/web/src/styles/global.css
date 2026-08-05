@@ -342,6 +342,14 @@ h3 {
   max-width: 820px;
 }
 
+.prose.page-intro {
+  max-width: none;
+}
+
+.page-intro h1 {
+  max-width: 100%;
+}
+
 .prose p,
 .prose li {
   color: var(--paper-2);

@@ -194,6 +194,12 @@ h3 {
   line-height: 1.55;
 }
 
+.hero h1 {
+  max-width: 650px;
+  font-size: clamp(44px, 5.4vw, 82px);
+  line-height: .92;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -239,31 +245,10 @@ h3 {
   background: var(--ink);
 }
 
-.hero-mark-inner {
-  position: relative;
-  width: min(62%, 360px);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--paper);
-  background: var(--paper);
-}
-
-.hero-mark-inner::after {
-  content: "";
-  position: absolute;
-  right: -14px;
-  bottom: -14px;
-  width: 42%;
-  height: 42%;
-  background: var(--veto);
-}
-
 .hero-mark img {
-  position: relative;
-  z-index: 1;
-  width: 62%;
-  height: 62%;
+  width: min(52%, 320px);
+  aspect-ratio: 1;
+  object-fit: contain;
 }
 
 .section {

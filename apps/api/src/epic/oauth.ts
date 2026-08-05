@@ -1,6 +1,9 @@
 /** Epic public launcher client used by Playnite-like integrations. */
-const EPIC_BASIC_AUTH =
-  "MzRhMDJjZjhmNDQxNGUyOWIxNTkyMTg3NmRhMzZmOWQ6ZGFhZmJjY2M3Mzc3NDUwMzlkZmZlNTNkOTRmYzc2Y2Y=";
+const EPIC_CLIENT_ID = "34a02cf8f4414e29b15921876da36f9a";
+const EPIC_CLIENT_SECRET = "daafbccc737745039dffe53d94fc76cf";
+const EPIC_BASIC_AUTH = Buffer.from(
+  `${EPIC_CLIENT_ID}:${EPIC_CLIENT_SECRET}`,
+).toString("base64");
 const OAUTH_TOKEN_URL =
   "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token";
 

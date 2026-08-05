@@ -26,6 +26,7 @@ import {
   isJunkGameName,
 } from "../lib/library-filter";
 import { pad2 } from "../lib/format";
+import { metaMapKey, resolveGameMeta, type GameMeta } from "../lib/meta";
 import { scanSteamLocal } from "../lib/steam";
 import { scanXboxLocal } from "../lib/xbox";
 import { Button } from "../ui/Button";
@@ -64,9 +65,22 @@ export function LibraryHub({
   const [msConfigured, setMsConfigured] = useState(false);
   const [msLinked, setMsLinked] = useState(false);
   const [epicLinked, setEpicLinked] = useState(false);
+  const [resolvedMeta, setResolvedMeta] = useState<Map<string, GameMeta>>(
+    new Map(),
+  );
 
   async function refreshGames() {
-    setGames(await fetchMyLibrary());
+    const nextGames = await fetchMyLibrary();
+    setGames(nextGames);
+    void resolveGameMeta(
+      nextGames.map((game) => ({
+        launcher: game.launcher,
+        externalId: game.externalId,
+        name: game.name,
+      })),
+    )
+      .then(setResolvedMeta)
+      .catch(() => undefined);
   }
 
   async function onSearchManual() {
@@ -578,20 +592,26 @@ export function LibraryHub({
           density={density}
           animateKey={`${launcher}:${installedOnly}:${visible.length}:${query}`}
         >
-          {visible.map((game, index) => (
-            <div key={game.id} role="listitem">
-              <GamePoster
-                name={game.name}
-                launcher={game.launcher}
-                externalId={game.externalId}
-                coverUrl={game.coverUrl}
-                priority={index < 24}
-                subtitle={`${game.launcher}${
-                  game.installed ? " · installé" : ""
-                }`}
-              />
-            </div>
-          ))}
+          {visible.map((game, index) => {
+            const meta = resolvedMeta.get(
+              metaMapKey(game.launcher, game.externalId),
+            );
+            return (
+              <div key={game.id} role="listitem">
+                <GamePoster
+                  name={game.name}
+                  launcher={game.launcher}
+                  externalId={game.externalId}
+                  coverUrl={meta?.coverUrl ?? game.coverUrl}
+                  fallbackUrls={meta?.fallbackUrls}
+                  priority={index < 24}
+                  subtitle={`${game.launcher}${
+                    game.installed ? " · installé" : ""
+                  }`}
+                />
+              </div>
+            );
+          })}
         </PosterGrid>
       )}
     </section>

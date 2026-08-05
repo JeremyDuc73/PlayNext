@@ -2,73 +2,75 @@
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Documentation — PlayNext">
+<Base
+  title="Fonctionnement — PlayNext"
+  description="Le fonctionnement de PlayNext : bibliothèques, sélection et vote."
+>
   <section class="section">
     <div class="prose">
-      <p class="eyebrow">Documentation · V1</p>
+      <p class="eyebrow">Fonctionnement</p>
       <span class="accent"></span>
-      <h1>Comprendre.</h1>
+      <h1>Un choix commun, sans débat sans fin.</h1>
       <p>
-        PlayNext croise les bibliothèques sans synchroniser les chemins locaux.
-        Les membres rejoignent explicitement les groupes et gardent le contrôle
-        de leurs données.
+        PlayNext ne remplace pas vos launchers. L’application prépare une
+        décision à partir des jeux réellement disponibles dans le groupe.
       </p>
     </div>
   </section>
 
   <section class="section">
     <div class="section-heading">
-      <h2>Parcours</h2>
-      <p>Le chemin principal tient dans une soirée.</p>
+      <h2>Le parcours</h2>
+      <p>Chaque personne sait ce qui se passe et ce qui reste privé.</p>
     </div>
     <div class="steps">
       <article class="step">
         <span class="step-number">01</span>
-        <h3>Discord</h3>
-        <p>Connexion minimale pour l’identité et les groupes.</p>
+        <h3>Se connecter</h3>
+        <p>Discord sert à reconnaître les membres et à rejoindre un groupe.</p>
       </article>
       <article class="step">
         <span class="step-number">02</span>
-        <h3>Bibliothèque</h3>
-        <p>Steam, Xbox, Epic et ajouts manuels selon la configuration.</p>
+        <h3>Synchroniser</h3>
+        <p>Steam, Xbox et Epic indiquent les jeux possédés ou installés.</p>
       </article>
       <article class="step">
         <span class="step-number">03</span>
-        <h3>Soirée</h3>
-        <p>Sélection personnelle, votes masqués, veto et résultat.</p>
+        <h3>Décider</h3>
+        <p>Chacun sélectionne, vote à bulletin secret, puis le groupe obtient un résultat.</p>
       </article>
     </div>
   </section>
 
   <section class="section">
     <div class="section-heading">
-      <h2>Données</h2>
-      <p>Ce qui est partagé est limité à ce qui sert la décision.</p>
+      <h2>Vos données</h2>
+      <p>La synchronisation sert à préparer le choix, pas à surveiller votre PC.</p>
     </div>
     <div class="manifesto">
       <div>
-        <strong>Synchronisé</strong>
-        <p>Identifiant du jeu, launcher, possession, installation et date.</p>
+        <strong>Partagé</strong>
+        <p>Nom du jeu, launcher, possession et état d’installation.</p>
       </div>
       <div>
         <strong>Jamais envoyé</strong>
-        <p>Chemins locaux, exécutables, nom du compte Windows et fichiers.</p>
+        <p>Chemins locaux, exécutables, fichiers et nom du compte Windows.</p>
       </div>
       <div>
         <strong>Privé</strong>
-        <p>Les votes individuels restent masqués aux autres joueurs.</p>
+        <p>Les autres voient la progression, pas le bulletin de chaque joueur.</p>
       </div>
       <div>
-        <strong>Corrigeable</strong>
-        <p>Une détection peut être masquée ou corrigée sans supprimer la source.</p>
+        <strong>Contrôlable</strong>
+        <p>Un titre peut être masqué ou ajouté manuellement à votre bibliothèque.</p>
       </div>
     </div>
   </section>
 
   <section class="section">
     <div class="actions">
-      <a class="button" href="/download">Télécharger PlayNext</a>
-      <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext">Lire le code</a>
+      <a class="button" href="/download">Télécharger l’application</a>
+      <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext">Voir le code</a>
     </div>
   </section>
 </Base>

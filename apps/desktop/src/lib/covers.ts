@@ -21,9 +21,8 @@ export function fallbackPosterStyle(name: string): {
   };
 }
 
-function steamPosterAsset(appId: string): string {
-  const name = "library_600x900.jpg";
-  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/${name}`;
+function steamPosterAsset(appId: string, filename: string): string {
+  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/${filename}`;
 }
 
 export function coverCandidates(input: {
@@ -40,7 +39,10 @@ export function coverCandidates(input: {
   if (input.launcher === "steam" && input.externalId) {
     const id = input.externalId.replace(/[^\d]/g, "");
     if (id) {
-      push(steamPosterAsset(id));
+      push(input.coverUrl);
+      push(steamPosterAsset(id, "library_600x900_2x.jpg"));
+      push(steamPosterAsset(id, "library_600x900.jpg"));
+      for (const fallback of input.fallbackUrls ?? []) push(fallback);
     }
   } else {
     push(input.coverUrl);

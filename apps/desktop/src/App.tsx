@@ -41,6 +41,18 @@ function microsoftErrorMessage(reason: string): string {
   return `Lien Microsoft échoué (${reason}).`;
 }
 
+function notificationMessage(message: string): string {
+  const clean = message.trim();
+  if (
+    /duplicate key|unauthenticated|epic_token_|microsoft_disconnect_|_failed_|_error_|_timeout|_cancelled|invalid_state|^HTTP \d/i.test(
+      clean,
+    )
+  ) {
+    return "Action impossible. Réessaie.";
+  }
+  return clean;
+}
+
 type HealthResponse = {
   ok: boolean;
   service: string;
@@ -56,7 +68,7 @@ const TABS: { id: NavId; label: string }[] = [
 ];
 
 const RAIL_COPY: Record<NavId, string> = {
-  evening: "Ce soir, on décide",
+  evening: "Choisir un jeu",
   group: "Groupe",
   library: "Bibliothèque partagée",
 };
@@ -77,6 +89,8 @@ export default function App() {
   const isDesktop = runningInDesktopShell();
   const shellRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
+  const notify = (message: string) =>
+    setAuthBanner(notificationMessage(message));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -88,7 +102,7 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (auth === "error") {
       const reason = params.get("reason") ?? "unknown";
-      setAuthBanner(`Connexion Discord échouée (${reason}).`);
+      notify(`Connexion Discord échouée (${reason}).`);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (xbox === "ok") {
       setAuthBanner("Compte Microsoft / Xbox lié.");
@@ -96,7 +110,7 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (xbox === "error") {
       const reason = params.get("reason") ?? "unknown";
-      setAuthBanner(microsoftErrorMessage(reason));
+      notify(microsoftErrorMessage(reason));
       setMicrosoftLinkedSignal((n) => n + 1);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (invite) {
@@ -124,7 +138,7 @@ export default function App() {
       if (parsed.kind === "microsoft") {
         if (!cancelled) {
           if (parsed.error) {
-            setAuthBanner(microsoftErrorMessage(parsed.error));
+            notify(microsoftErrorMessage(parsed.error));
             setMicrosoftLinkedSignal((n) => n + 1);
           } else if (parsed.ok) {
             setAuthBanner("Compte Microsoft / Xbox lié.");
@@ -138,7 +152,7 @@ export default function App() {
 
       if (parsed.error) {
         if (!cancelled) {
-          setAuthBanner(`Connexion Discord échouée (${parsed.error}).`);
+          notify(`Connexion Discord échouée (${parsed.error}).`);
           setLoginPending(false);
         }
         return;
@@ -154,7 +168,7 @@ export default function App() {
           }
         } catch (error) {
           if (!cancelled) {
-            setAuthBanner(
+            notify(
               error instanceof Error
                 ? `Échange de session desktop échoué (${error.message}).`
                 : "Échange de session desktop échoué.",
@@ -250,7 +264,7 @@ export default function App() {
       const payload = await startDiscordLogin();
       if (!payload || payload.kind !== "discord") return;
       if (payload.error) {
-        setAuthBanner(`Connexion Discord échouée (${payload.error}).`);
+        notify(`Connexion Discord échouée (${payload.error}).`);
         return;
       }
       if (!payload.handoff) {
@@ -261,7 +275,7 @@ export default function App() {
       setUser(nextUser);
       setAuthBanner("Connexion Discord réussie.");
     } catch (error) {
-      setAuthBanner(
+      notify(
         error instanceof Error
           ? `Connexion Discord échouée (${error.message}).`
           : "Connexion Discord échouée.",
@@ -291,12 +305,12 @@ export default function App() {
             transform: "rotate(180deg)",
           }}
         >
-          {user ? RAIL_COPY[nav] : "Ce soir, on décide"}
+          {user ? RAIL_COPY[nav] : "Choisir ensemble"}
         </p>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-topbar shrink-0 items-stretch border-b border-rule-strong">
+        <header className="sticky top-0 z-30 flex h-topbar shrink-0 items-stretch border-b border-rule-strong bg-ink-deep">
           <div className="flex items-center gap-3 px-5">
             <div>
               <span className="font-display text-lg uppercase tracking-[-0.03em]">
@@ -361,7 +375,9 @@ export default function App() {
           <div className="p-5 md:p-7">
             {authBanner ? (
               <div className="mb-5">
-                <Banner>{authBanner}</Banner>
+                <Banner onDismiss={() => setAuthBanner(null)}>
+                  {authBanner}
+                </Banner>
               </div>
             ) : null}
 
@@ -371,7 +387,7 @@ export default function App() {
                   <LibraryHub
                     enabled
                     microsoftLinkedSignal={microsoftLinkedSignal}
-                    onBanner={(message) => setAuthBanner(message)}
+                    onBanner={notify}
                   />
                 ) : (
                   <GroupsPanel
@@ -380,7 +396,7 @@ export default function App() {
                     currentUserId={user.id}
                     pendingInviteCode={pendingInviteCode}
                     onPendingInviteConsumed={() => setPendingInviteCode(null)}
-                    onBanner={(message) => setAuthBanner(message)}
+                    onBanner={notify}
                   />
                 )}
               </div>
@@ -399,7 +415,7 @@ export default function App() {
             {appInfo ? `v${appInfo.version}` : "—"}
             {isDesktop ? "" : " · Web"}
           </span>
-          <span className="pn-data">Ce soir, on décide.</span>
+          <span className="pn-data">Choisir ensemble.</span>
         </footer>
       </div>
     </div>
@@ -437,7 +453,7 @@ function GuestBoot({
       className="grid min-h-[70vh] items-center gap-10 border border-rule-strong lg:grid-cols-[1.1fr_0.9fr]"
     >
       <div className="p-8 md:p-12">
-        <p className="pn-data mb-4">Ce soir, on décide</p>
+        <p className="pn-data mb-4">Choisir ensemble</p>
         <h1 className="pn-display text-[clamp(3rem,8vw,6rem)] text-paper">
           Play
           <br />
@@ -445,7 +461,8 @@ function GuestBoot({
         </h1>
         <span className="pn-accent my-6" />
         <p className="max-w-sm text-sm text-paper-2">
-          Shortlist. Bulletins scellés. Un veto. On tranche ce soir.
+          Rassemblez les jeux du groupe, puis choisissez ensemble avec un vote
+          simple et secret.
         </p>
         <div className="mt-8">
           <Button

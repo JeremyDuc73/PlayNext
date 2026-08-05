@@ -5,22 +5,26 @@ const downloadUrl =
   "https://github.com/JeremyDuc73/PlayNext/releases/latest/download/PlayNext-Setup.exe";
 ---
 
-<Base>
+<Base
+  title="PlayNext — Choisir ensemble"
+  description="PlayNext aide un groupe d’amis à choisir un jeu à partir de leurs bibliothèques."
+>
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">PlayNext · application Windows</p>
+      <p class="eyebrow">Application Windows pour groupes</p>
       <span class="accent"></span>
-      <h1>On décide.</h1>
+      <h1>Choisir un jeu sans y passer la soirée.</h1>
       <p>
-        Les bibliothèques sont croisées, les choix restent secrets et le groupe
-        tranche enfin. Une soirée ne devrait pas commencer par trente minutes
-        de débat.
+        PlayNext rassemble les jeux de vos amis, propose les titres possibles et
+        organise le vote. Vous voyez ce qui est jouable avant de devoir choisir.
       </p>
       <div class="actions">
-        <a class="button" href={downloadUrl}>Télécharger pour Windows</a>
-        <a class="button secondary" href="/docs">Voir la documentation</a>
+        <a class="button" href={downloadUrl}>Télécharger l’application</a>
+        <a class="button secondary" href="/docs">Voir le fonctionnement</a>
       </div>
-      <p class="mono">Windows 10/11 · Discord · Tauri</p>
+      <p class="mono">
+        Windows 10/11 · Connexion Discord · Installation par utilisateur
+      </p>
     </div>
     <div class="hero-mark" aria-label="Logo PlayNext">
       <div class="hero-mark-inner">
@@ -31,52 +35,52 @@ const downloadUrl =
 
   <section class="section">
     <div class="section-heading">
-      <h2>Le rituel</h2>
+      <h2>Trois étapes</h2>
       <p>
-        Pas un launcher universel. Un bulletin de décision pour les groupes
-        qui savent déjà qu’ils vont perdre du temps à choisir.
+        Le groupe garde les informations utiles. La décision se fait dans
+        l’application, pas dans un fil de discussion interminable.
       </p>
     </div>
     <div class="steps">
       <article class="step">
         <span class="step-number">01</span>
-        <h3>Synchroniser</h3>
-        <p>PlayNext repère les jeux utiles sur les PC du groupe.</p>
+        <h3>Connecter</h3>
+        <p>Chaque joueur relie son compte et synchronise ses bibliothèques.</p>
       </article>
       <article class="step">
         <span class="step-number">02</span>
-        <h3>Sélectionner</h3>
-        <p>Chaque joueur choisit ses candidats. Les choix restent privés.</p>
+        <h3>Proposer</h3>
+        <p>Les jeux accessibles au groupe apparaissent. Chacun choisit ses candidats.</p>
       </article>
       <article class="step">
         <span class="step-number">03</span>
-        <h3>Trancher</h3>
-        <p>Vote jeu par jeu, veto limité, résultat expliqué.</p>
+        <h3>Voter</h3>
+        <p>Les bulletins restent secrets, puis le résultat désigne le jeu à lancer.</p>
       </article>
     </div>
   </section>
 
   <section class="section">
     <div class="section-heading">
-      <h2>Fait pour le groupe</h2>
-      <p>Les informations qui comptent sont visibles avant le vote.</p>
+      <h2>Pas de choix à l’aveugle</h2>
+      <p>PlayNext répond aux questions qui bloquent habituellement le groupe.</p>
     </div>
     <div class="manifesto">
       <div>
-        <strong>Qui possède ?</strong>
-        <p>Les bibliothèques croisées évitent de proposer un jeu inaccessible.</p>
+        <strong>Qui peut jouer ?</strong>
+        <p>Les bibliothèques croisées écartent les jeux que personne ne possède.</p>
       </div>
       <div>
-        <strong>Qui a installé ?</strong>
-        <p>Les contraintes de la soirée restent compréhensibles et ajustables.</p>
+        <strong>Qui l’a installé ?</strong>
+        <p>Vous distinguez un jeu prêt à lancer d’un jeu à télécharger.</p>
       </div>
       <div>
-        <strong>Qui a voté ?</strong>
-        <p>La progression est visible. Le choix de chacun ne l’est pas.</p>
+        <strong>Que vote chacun ?</strong>
+        <p>La progression est visible, mais les bulletins individuels restent privés.</p>
       </div>
       <div>
-        <strong>Pourquoi ce jeu ?</strong>
-        <p>Le résultat garde une trace des raisons, pas seulement un gagnant.</p>
+        <strong>Que lance-t-on ?</strong>
+        <p>Le résultat affiche un choix clair au lieu de relancer le débat.</p>
       </div>
     </div>
   </section>
@@ -84,11 +88,11 @@ const downloadUrl =
   <section class="section">
     <div class="download-box">
       <div>
-        <p class="eyebrow">Version de test</p>
-        <h3>Installer PlayNext</h3>
-        <p>Installateur Windows NSIS · installation par utilisateur.</p>
+        <p class="eyebrow">Pour commencer</p>
+        <h3>Installez, invitez, choisissez.</h3>
+        <p>Téléchargez l’application, connectez Discord et créez votre groupe.</p>
       </div>
-      <a class="button" href={downloadUrl}>Télécharger le setup</a>
+      <a class="button" href={downloadUrl}>Télécharger pour Windows</a>
     </div>
   </section>
 </Base>

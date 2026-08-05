@@ -8,6 +8,7 @@ import {
   steamCoverFallbackUrls,
   steamLibraryPosterUrl,
 } from "../meta/covers.js";
+import { fetchSteamCoverAssets } from "../steam/assets.js";
 
 type MetaRoutesOptions = {
   db: Db;
@@ -85,14 +86,51 @@ export const metaRoutes: FastifyPluginAsync<MetaRoutesOptions> = async (
       ]),
     );
 
+    const steamItems = items.filter((item) => {
+      if (item.launcher !== "steam") return false;
+      const row = byKey.get(metaKey(item.launcher, item.externalId));
+      return !row?.cover_url || row.source !== "steam_cdn";
+    });
+    if (steamItems.length > 0) {
+      const assets = await fetchSteamCoverAssets(
+        steamItems.map((item) => item.externalId),
+      );
+      for (const item of steamItems) {
+        const asset = assets.get(item.externalId.replace(/[^\d]/g, ""));
+        if (!asset?.coverUrl) continue;
+        await db.pool.query(
+          `
+            INSERT INTO game_meta (
+              launcher, external_id, name, cover_url, source, fetched_at
+            )
+            VALUES ('steam', $1, $2, $3, 'steam_cdn', now())
+            ON CONFLICT (launcher, external_id) DO UPDATE SET
+              name = EXCLUDED.name,
+              cover_url = EXCLUDED.cover_url,
+              source = EXCLUDED.source,
+              fetched_at = now()
+            WHERE game_meta.source <> 'igdb_manual'
+          `,
+          [item.externalId, item.name, asset.coverUrl],
+        );
+        byKey.set(metaKey("steam", item.externalId), {
+          launcher: "steam",
+          external_id: item.externalId,
+          cover_url: asset.coverUrl,
+          source: "steam_cdn",
+        });
+      }
+    }
+
     const results = items.map((item) => {
       const key = metaKey(item.launcher, item.externalId);
       const row = byKey.get(key);
       const cachedCover =
-        item.launcher !== "steam" &&
         row?.cover_url &&
-        (row.source === "igdb_manual" ||
-          !row.cover_url.includes("images.igdb.com"))
+        (item.launcher === "steam"
+          ? row.source === "steam_cdn"
+          : row.source === "igdb_manual" ||
+            !row.cover_url.includes("images.igdb.com"))
           ? row.cover_url
           : null;
       const coverUrl =

@@ -5,56 +5,69 @@ const downloadUrl =
   "https://github.com/JeremyDuc73/PlayNext/releases/latest/download/PlayNext-Setup.exe";
 ---
 
-<Base title="Télécharger PlayNext — Windows">
+<Base
+  title="Télécharger PlayNext — Windows"
+  description="Télécharger PlayNext pour Windows."
+>
   <section class="section">
     <div class="prose">
-      <p class="eyebrow">Distribution · Windows</p>
+      <p class="eyebrow">Application Windows</p>
       <span class="accent"></span>
-      <h1>Télécharger.</h1>
+      <h1>Installer PlayNext.</h1>
       <p>
-        PlayNext est une application Windows desktop-first. Le site présente
-        l’application ; les groupes et les votes se vivent dans l’app.
+        Téléchargez l’installateur, ouvrez-le, puis connectez-vous avec Discord
+        pour rejoindre ou créer un groupe.
       </p>
       <div class="actions">
-        <a class="button" href={downloadUrl}>Télécharger le setup</a>
-        <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext/releases">Voir les versions</a>
+        <a class="button" href={downloadUrl}>Télécharger l’installateur</a>
+        <a
+          class="button secondary"
+          href="https://github.com/JeremyDuc73/PlayNext/releases"
+        >
+          Voir les versions
+        </a>
       </div>
     </div>
   </section>
 
   <section class="section">
     <div class="section-heading">
-      <h2>Installation</h2>
-      <p>Une installation par utilisateur, sans privilèges administrateur inutiles.</p>
+      <h2>Avant de commencer</h2>
+      <p>Quelques informations utiles, rien de plus.</p>
     </div>
-    <ol class="prose">
-      <li>Télécharge le setup Windows.</li>
-      <li>Ouvre l’installeur et suis les étapes PlayNext.</li>
-      <li>Lance PlayNext depuis le menu Démarrer.</li>
-      <li>Connecte-toi avec Discord.</li>
-    </ol>
-    <p class="mono">
-      Prérequis · Windows 10/11 · WebView2 · connexion internet pour Discord
-    </p>
-    <p class="mono">
-      Signature du code Windows ·
-      <a href="https://signpath.org/">SignPath Foundation</a>
-    </p>
-    <p>
-      Les versions publiques de PlayNext utilisent la SignPath Foundation pour
-      la signature du code Windows. Les builds de test peuvent rester non
-      signés.
-    </p>
+    <div class="manifesto">
+      <div>
+        <strong>Système</strong>
+        <p>Windows 10 ou Windows 11.</p>
+      </div>
+      <div>
+        <strong>Connexion</strong>
+        <p>Une connexion internet est nécessaire pour Discord et la synchronisation.</p>
+      </div>
+      <div>
+        <strong>Installation</strong>
+        <p>L’application s’installe pour votre utilisateur, sans privilèges administrateur.</p>
+      </div>
+      <div>
+        <strong>Signature</strong>
+        <p>
+          Les versions publiques sont signées avec l’aide de
+          <a href="https://signpath.org/">SignPath Foundation</a>.
+        </p>
+      </div>
+    </div>
   </section>
 
   <section class="section">
     <div class="download-box">
       <div>
-        <p class="eyebrow">Dépôt public</p>
-        <h3>Code et versions</h3>
-        <p>Les notes de version et les artefacts sont publiés sur GitHub.</p>
+        <p class="eyebrow">Projet public</p>
+        <h3>Une question sur une version ?</h3>
+        <p>Consultez les notes de version et les problèmes connus sur GitHub.</p>
       </div>
-      <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext">Ouvrir GitHub</a>
+      <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext">
+        Ouvrir GitHub
+      </a>
     </div>
   </section>
 </Base>

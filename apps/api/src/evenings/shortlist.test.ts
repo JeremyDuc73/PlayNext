@@ -106,6 +106,19 @@ describe("buildShortlist", () => {
     });
     assert.equal(small.length, 1);
   });
+
+  it("deduplicates the same launcher record with different display names", () => {
+    const list = buildShortlist(
+      [
+        game({ name: "Game Standard", externalId: "42" }),
+        game({ name: "Game Definitive Edition", externalId: "42" }),
+      ],
+      { requireOwned: false, requireInstalled: false, shortlistSize: 5 },
+    );
+    assert.equal(list.length, 1);
+    assert.equal(list[0]!.launcher, "steam");
+    assert.equal(list[0]!.externalId, "42");
+  });
 });
 
 describe("scoring", () => {

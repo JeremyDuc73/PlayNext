@@ -61,7 +61,7 @@ export function buildShortlist(
   const recent = options.recentWinnerKeys ?? new Set<string>();
   const exclude = options.excludeKeys ?? new Set<string>();
 
-  const filtered = games.filter((game) => {
+  const eligible = games.filter((game) => {
     if (exclude.has(gameKey(game))) return false;
     if (game.ownedCount < 1) return false;
     if (game.groupPlayable === false) return false;
@@ -77,7 +77,18 @@ export function buildShortlist(
     return true;
   });
 
-  const ranked = filtered
+  // A title can be aggregated twice when launcher records use different
+  // display names for the same external ID. Keep one candidate per DB key.
+  const filtered = new Map<string, LibraryGameAgg>();
+  for (const game of eligible) {
+    const key = gameKey(game);
+    const current = filtered.get(key);
+    if (!current || rankScore(game) > rankScore(current)) {
+      filtered.set(key, game);
+    }
+  }
+
+  const ranked = [...filtered.values()]
     .map((game) => {
       const key = gameKey(game);
       const base = rankScore(game);

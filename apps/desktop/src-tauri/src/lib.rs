@@ -188,7 +188,7 @@ async fn start_microsoft_login(app: tauri::AppHandle, url: String) -> Result<(),
 }
 
 const EPIC_LOGIN_URL: &str =
-    "https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code";
+    "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode";
 const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
 (() => {
   const codePatterns = [
@@ -199,18 +199,31 @@ const EPIC_CODE_CAPTURE_SCRIPT: &str = r#"
 
   const captureCode = () => {
     if (redirected) return;
+    const text = document.documentElement?.textContent?.trim() ?? "";
+    let code = null;
+    try {
+      const response = JSON.parse(text);
+      if (typeof response.authorizationCode === "string") {
+        code = response.authorizationCode;
+      } else if (typeof response.redirectUrl === "string") {
+        code = new URL(response.redirectUrl).searchParams.get("code");
+      }
+    } catch {
+      // Epic may render the JSON inside a page instead of returning JSON.
+    }
     const content = [
-      document.documentElement?.textContent ?? "",
+      text,
       document.documentElement?.innerHTML ?? "",
     ].join("\n");
     const normalized = content.replaceAll("\\/", "/");
     const match = codePatterns
       .map((pattern) => normalized.match(pattern))
       .find(Boolean);
-    if (!match?.[1]) return;
+    code ??= match?.[1] ?? null;
+    if (!code) return;
     redirected = true;
     window.location.replace(
-      `https://localhost/launcher/authorized?code=${encodeURIComponent(match[1])}`,
+      `https://localhost/launcher/authorized?code=${encodeURIComponent(code)}`,
     );
   };
 

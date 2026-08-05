@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import { createHash } from "node:crypto";
 import type { Env } from "../config.js";
 import type { Db } from "../db.js";
 import { getSessionToken } from "../auth/request-session.js";
@@ -13,6 +14,10 @@ type AuthEpicRoutesOptions = {
   config: Env;
   db: Db;
 };
+
+function epicCodeFingerprint(code: string): string {
+  return createHash("sha256").update(code).digest("hex").slice(0, 12);
+}
 
 export const authEpicRoutes: FastifyPluginAsync<AuthEpicRoutesOptions> = async (
   app,
@@ -57,14 +62,27 @@ export const authEpicRoutes: FastifyPluginAsync<AuthEpicRoutesOptions> = async (
       });
     }
 
+    const codeFingerprint = epicCodeFingerprint(code);
+    request.log.info(
+      { codeLength: code.length, codeFingerprint },
+      "Epic authorization code received",
+    );
+
     try {
       await saveEpicLinkFromCode(db, config, userId, code);
     } catch (error) {
-      request.log.error({ err: error }, "Epic link failed");
+      request.log.error(
+        { err: error, codeLength: code.length, codeFingerprint },
+        "Epic link failed",
+      );
+      const detail = error instanceof Error ? error.message : "";
+      const tokenStatus = detail.match(/^epic_token_(\d+)/)?.[1];
       return reply.code(502).send({
         ok: false,
         error: "epic_link_failed",
-        message: "Code Epic invalide ou expiré. Relance la connexion.",
+        message: tokenStatus
+          ? `Échange Epic refusé (${tokenStatus}).`
+          : "Code Epic invalide ou expiré. Relance la connexion.",
       });
     }
 

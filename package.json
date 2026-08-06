@@ -12,6 +12,7 @@
     "dev:ui": "npm run dev -w @playnext/desktop",
     "build:api": "npm run build -w @playnext/api",
     "build:desktop": "npm run build -w @playnext/desktop",
+    "release:version": "node scripts/release-version.mjs",
     "typecheck": "npm run typecheck -w @playnext/api && npm run typecheck -w @playnext/desktop",
     "lint": "npm run typecheck",
     "docker:up": "docker compose up -d postgres redis",

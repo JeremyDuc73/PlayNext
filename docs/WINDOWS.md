@@ -68,6 +68,14 @@ Il :
 
 Le champ `release_tag` doit contenir un tag versionné, par exemple `v0.2.0`.
 
+Pour préparer une nouvelle release sans modifier les versions à la main :
+
+```bash
+npm run release:version -- 0.2.1
+```
+
+La commande met à jour la version desktop Tauri, Cargo, npm et le lockfile.
+
 ## Signature Windows
 
 Une application non signée peut afficher un avertissement SmartScreen, même si

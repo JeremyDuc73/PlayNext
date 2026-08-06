@@ -53,9 +53,6 @@ export function LibraryHub({
   const [query, setQuery] = useState("");
   const [launcher, setLauncher] = useState<LauncherFilter>("all");
   const [installedOnly, setInstalledOnly] = useState(false);
-  const [density, setDensity] = useState<"comfortable" | "compact">(
-    "comfortable",
-  );
   const [busy, setBusy] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualQuery, setManualQuery] = useState("");
@@ -523,16 +520,6 @@ export function LibraryHub({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <Button
-          variant="ghost"
-          onClick={() =>
-            setDensity((d) =>
-              d === "comfortable" ? "compact" : "comfortable",
-            )
-          }
-        >
-          {density === "comfortable" ? "Densité +" : "Densité −"}
-        </Button>
         {msLinked ? (
           <Button
             variant="ghost"
@@ -589,7 +576,6 @@ export function LibraryHub({
       ) : (
         <PosterGrid
           label="Bibliothèque"
-          density={density}
           animateKey={`${launcher}:${installedOnly}:${visible.length}:${query}`}
         >
           {visible.map((game, index) => {

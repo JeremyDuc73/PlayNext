@@ -29,6 +29,7 @@ import { pad2 } from "../lib/format";
 import { staggerIn, useGSAP } from "../lib/motion";
 import { AvatarStack } from "../ui/AvatarStack";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EmptyHint } from "../ui/EmptyHint";
 import { GamePoster } from "../ui/GamePoster";
 import { PosterGrid } from "../ui/PosterGrid";
@@ -71,6 +72,7 @@ export function GroupsPanel({
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const [composer, setComposer] = useState<"idle" | "create" | "join">("idle");
   const [showAdmin, setShowAdmin] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -279,19 +281,32 @@ export function GroupsPanel({
     }
   }
 
-  async function onDelete() {
+  function onDelete() {
     if (!selectedId || !detail) return;
-    if (!window.confirm(`Supprimer « ${detail.group.name} » ?`)) return;
+    setDeleteOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!selectedId || !detail) return;
+    const deletingId = selectedId;
     setBusy(true);
     try {
-      await deleteGroup(selectedId);
+      await deleteGroup(deletingId);
+      setGroups((current) => current.filter((group) => group.id !== deletingId));
       setSelectedId(null);
       setDetail(null);
-      const list = await refreshList();
-      if (list[0]) await openGroup(list[0].id);
-      onBanner("Supprimé.");
+      setDeleteOpen(false);
+      try {
+        const list = await refreshList();
+        if (list[0]) await openGroup(list[0].id);
+      } catch {
+        // The deleted group is already removed locally; retry on next refresh.
+      }
+      onBanner("Groupe supprimé.");
     } catch (error) {
-      onBanner(error instanceof Error ? error.message : "Suppression échouée.");
+      onBanner(
+        error instanceof Error ? error.message : "Suppression impossible.",
+      );
     } finally {
       setBusy(false);
     }
@@ -348,10 +363,11 @@ export function GroupsPanel({
   const sharedCount = library.filter((g) => g.ownedCount >= 2).length;
 
   return (
-    <section
-      ref={rootRef}
-      className="grid min-h-[70vh] border border-rule-strong lg:grid-cols-[260px_minmax(0,1fr)]"
-    >
+    <>
+      <section
+        ref={rootRef}
+        className="grid min-h-[70vh] border border-rule-strong lg:grid-cols-[260px_minmax(0,1fr)]"
+      >
       <aside className="border-b border-rule-strong lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between border-b border-rule-strong px-4 py-3">
           <p className="pn-data">Groupes</p>
@@ -767,6 +783,20 @@ export function GroupsPanel({
           </div>
         )}
       </div>
-    </section>
+      </section>
+      {deleteOpen && detail ? (
+        <ConfirmDialog
+          title="Supprimer le groupe ?"
+          confirmLabel="Supprimer"
+          busy={busy}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => {
+            if (!busy) setDeleteOpen(false);
+          }}
+        >
+          {`Le groupe « ${detail.group.name} » et ses soirées seront supprimés.`}
+        </ConfirmDialog>
+      ) : null}
+    </>
   );
 }

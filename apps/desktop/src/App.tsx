@@ -46,7 +46,7 @@ function microsoftErrorMessage(reason: string): string {
 function notificationMessage(message: string): string {
   const clean = message.trim();
   if (
-    /duplicate key|unauthenticated|epic_token_|microsoft_disconnect_|_failed_|_error_|_timeout|_cancelled|invalid_state|^HTTP \d/i.test(
+    /duplicate key|failed to fetch|unauthenticated|epic_token_|microsoft_disconnect_|_failed_|_error_|_timeout|_cancelled|invalid_state|^HTTP \d/i.test(
       clean,
     )
   ) {

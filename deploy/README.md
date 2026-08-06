@@ -102,7 +102,7 @@ qu’une Release GitHub :
 
 ```bash
 Dans GitHub Actions → **Windows build** → **Run workflow**, renseigner le tag
-`v0.1.1`.
+`v0.2.0`.
 ```
 
 La page `/download` pointe vers le setup de la dernière Release.
@@ -113,6 +113,16 @@ Ajouter dans GitHub Actions → Secrets :
 
 - `WINDOWS_CERTIFICATE_BASE64` : fichier `.pfx` encodé en Base64 ;
 - `WINDOWS_CERTIFICATE_PASSWORD` : mot de passe du `.pfx`.
+
+## Mise à jour intégrée
+
+La version `v0.2.0` active l’updater Tauri. Ajouter aussi :
+
+- `TAURI_SIGNING_PRIVATE_KEY` : contenu de `.tools/playnext-updater.key` ;
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` : laisser vide pour la clé actuelle.
+
+Ne jamais publier la clé privée. Le workflow publie `latest.json`, la signature
+et l’installateur nécessaires aux versions suivantes.
 
 Sans certificat reconnu, l’installeur est fonctionnel et personnalisé mais
 SmartScreen peut afficher « éditeur inconnu ». Il ne faut pas désactiver

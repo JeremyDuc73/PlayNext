@@ -63,9 +63,10 @@ Il :
 1. compile l’application ;
 2. génère l’installeur NSIS ;
 3. signe les exécutables si un certificat est configuré ;
-4. publie une Release GitHub avec `PlayNext-Setup.exe`.
+4. signe l’artefact updater ;
+5. publie une Release GitHub avec `PlayNext-Setup.exe`, sa signature et `latest.json`.
 
-Le champ `release_tag` doit contenir un tag versionné, par exemple `v0.1.1`.
+Le champ `release_tag` doit contenir un tag versionné, par exemple `v0.2.0`.
 
 ## Signature Windows
 
@@ -80,6 +81,16 @@ Le workflow accepte un certificat Authenticode `.pfx` via les secrets GitHub :
 Une alternative gratuite peut être demandée auprès de
 [SignPath Foundation](https://signpath.org/) pour un projet open source
 éligible.
+
+## Mise à jour intégrée
+
+La première version équipée de l’updater est `v0.2.0`. Elle doit être
+installée manuellement une fois. Les versions suivantes vérifient
+`latest.json`, téléchargent l’installateur signé et proposent un redémarrage.
+
+Le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` contient la clé privée générée par
+`tauri signer generate`. Elle ne doit jamais être commitée. La clé publique est
+déjà intégrée à la configuration Tauri.
 
 ## Connexion Discord
 

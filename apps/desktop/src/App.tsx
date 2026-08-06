@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import clsx from "clsx";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { LibraryHub } from "./components/LibraryHub";
@@ -86,6 +88,9 @@ export default function App() {
     null,
   );
   const [nav, setNav] = useState<NavId>("evening");
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   const isDesktop = runningInDesktopShell();
   const shellRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -205,7 +210,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.1.0",
+            version: "0.2.0",
             platform: "web-preview",
           });
         }
@@ -250,6 +255,24 @@ export default function App() {
     };
   }, [isDesktop]);
 
+  useEffect(() => {
+    if (!isDesktop) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void check({ timeout: 10000 })
+        .then((update) => {
+          if (!cancelled && update) setAvailableUpdate(update);
+        })
+        .catch(() => {
+          // Une mise à jour indisponible ne doit pas bloquer l’application.
+        });
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isDesktop]);
+
   useGSAP(
     () => {
       viewSwap(viewRef.current);
@@ -290,6 +313,18 @@ export default function App() {
     setUser(null);
     setAuthBanner("Déconnecté.");
     setLoginPending(false);
+  }
+
+  async function installUpdate() {
+    if (!availableUpdate || updateBusy) return;
+    setUpdateBusy(true);
+    try {
+      await availableUpdate.downloadAndInstall();
+      await relaunch();
+    } catch {
+      setUpdateBusy(false);
+      notify("Mise à jour impossible. Réessaie plus tard.");
+    }
   }
 
   const apiOk = Boolean(apiHealth?.ok) && !apiError;
@@ -373,6 +408,14 @@ export default function App() {
 
         <main className="min-h-0 flex-1 overflow-auto bg-ink">
           <div className="p-5 md:p-7">
+            {availableUpdate && !updateDismissed ? (
+              <UpdateNotice
+                update={availableUpdate}
+                busy={updateBusy}
+                onInstall={() => void installUpdate()}
+                onDismiss={() => setUpdateDismissed(true)}
+              />
+            ) : null}
             {authBanner ? (
               <div className="mb-5">
                 <Banner onDismiss={() => setAuthBanner(null)}>
@@ -481,6 +524,37 @@ function GuestBoot({
         </div>
       </div>
       <div className="hidden h-full border-l border-rule-strong bg-ink-deep lg:block" aria-hidden />
+    </div>
+  );
+}
+
+function UpdateNotice({
+  update,
+  busy,
+  onInstall,
+  onDismiss,
+}: {
+  update: Update;
+  busy: boolean;
+  onInstall: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-4 border border-rule-strong p-3">
+      <span className="pn-stamp">MISE À JOUR</span>
+      <p className="pn-data flex-1 text-paper">
+        Version {update.version} disponible.
+      </p>
+      <Button variant="primary" disabled={busy} onClick={onInstall}>
+        {busy ? "Installation…" : "Installer"}
+      </Button>
+      <button
+        type="button"
+        className="pn-data px-2 py-2 text-smoke hover:text-paper"
+        onClick={onDismiss}
+      >
+        Plus tard
+      </button>
     </div>
   );
 }

@@ -74,12 +74,14 @@ npm run dev:desktop
 | `GET /auth/me` | Session courante |
 | `POST /auth/microsoft/start` | Démarre lien Microsoft / Xbox (session requise) |
 | `POST /library/sync` | Sync Steam |
+| `POST /library/riot/sync` | Sync Riot local |
 | `POST /library/xbox/sync` | Sync Xbox (title history + installés) |
 | `POST /auth/epic/exchange` | Échange interne du code Epic capturé par l’application |
 | `POST /library/epic/sync` | Sync Epic (possédés + installés) |
 | `GET /library/me` | Bibliothèque sync |
 | `POST /library/manual/search` | Recherche manuelle IGDB |
 | `POST /library/manual` | Ajout d’un jeu catalogue à la bibliothèque |
+| `DELETE /library/manual/:externalId` | Suppression d’un jeu ajouté manuellement |
 
 Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`.  
 Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.md).

@@ -8,6 +8,7 @@
   croisée ;
 - [`EPIC.md`](./EPIC.md) — liaison et synchronisation Epic ;
 - [`XBOX.md`](./XBOX.md) — liaison Microsoft/Xbox et détection locale ;
+- [`RIOT.md`](./RIOT.md) — détection locale de League of Legends et VALORANT ;
 - [`IGDB.md`](./IGDB.md) — ajout manuel depuis le catalogue commun.
 
 ## Développement et production

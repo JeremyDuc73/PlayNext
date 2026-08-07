@@ -4,6 +4,7 @@ const LAUNCHER_RANK: Record<string, number> = {
   steam: 0,
   xbox: 1,
   epic: 2,
+  riot: 3,
 };
 
 /** Drop playtests, demos, modkits, etc. */
@@ -47,7 +48,7 @@ export function launcherRank(launcher: string): number {
 }
 
 /**
- * Keep one entry per normalized title, preferring steam → xbox → epic.
+ * Keep one entry per normalized title, preferring steam → xbox → epic → riot.
  * Among same launcher, prefer installed, then longer name (more specific).
  */
 export function dedupePreferLaunchers<

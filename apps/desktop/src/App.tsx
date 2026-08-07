@@ -21,6 +21,7 @@ import { gsap, prefersReducedMotion, useGSAP, viewSwap } from "./lib/motion";
 import { Banner } from "./ui/Banner";
 import { BrandMark } from "./ui/BrandMark";
 import { Button } from "./ui/Button";
+import { DataPanel } from "./ui/DataPanel";
 import { DiscordIcon } from "./ui/DiscordIcon";
 import { SquareAvatar } from "./ui/SquareAvatar";
 
@@ -88,6 +89,7 @@ export default function App() {
     null,
   );
   const [nav, setNav] = useState<NavId>("evening");
+  const [dataOpen, setDataOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateDismissed, setUpdateDismissed] = useState(false);
@@ -210,7 +212,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.2.1",
+            version: "0.2.2",
             platform: "web-preview",
           });
         }
@@ -395,6 +397,13 @@ export default function App() {
                 <button
                   type="button"
                   className="pn-data hover:text-paper"
+                  onClick={() => setDataOpen(true)}
+                >
+                  Mes données
+                </button>
+                <button
+                  type="button"
+                  className="pn-data hover:text-paper"
                   onClick={() => void logout()}
                 >
                   Quitter
@@ -461,6 +470,7 @@ export default function App() {
           <span className="pn-data">Choisir ensemble.</span>
         </footer>
       </div>
+      {dataOpen ? <DataPanel onClose={() => setDataOpen(false)} /> : null}
     </div>
   );
 }

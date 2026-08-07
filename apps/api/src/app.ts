@@ -37,6 +37,7 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(cors, {
     origin: corsOrigins,
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
   await app.register(healthRoutes, { db });
@@ -63,6 +64,7 @@ export async function buildApp(config: Env, db: Db) {
       me: "/auth/me",
       logout: "POST /auth/logout",
       librarySync: "POST /library/sync",
+      libraryRiotSync: "POST /library/riot/sync",
       libraryXboxSync: "POST /library/xbox/sync",
       libraryEpicSync: "POST /library/epic/sync",
       libraryMe: "GET /library/me",

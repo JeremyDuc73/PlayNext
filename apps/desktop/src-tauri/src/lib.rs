@@ -1,4 +1,5 @@
 mod epic;
+mod riot;
 mod steam;
 mod xbox;
 
@@ -8,6 +9,7 @@ use std::sync::{
 };
 
 use epic::EpicScanResult;
+use riot::RiotScanResult;
 use serde::Serialize;
 use steam::SteamScanResult;
 use xbox::XboxScanResult;
@@ -48,6 +50,11 @@ fn scan_xbox() -> XboxScanResult {
 #[tauri::command]
 fn scan_epic() -> EpicScanResult {
     epic::scan_epic_installed()
+}
+
+#[tauri::command]
+fn scan_riot() -> RiotScanResult {
+    riot::scan_riot_installed()
 }
 
 #[tauri::command]
@@ -351,6 +358,7 @@ pub fn run() {
             scan_steam,
             scan_xbox,
             scan_epic,
+            scan_riot,
             start_discord_login,
             start_microsoft_login,
             start_epic_login

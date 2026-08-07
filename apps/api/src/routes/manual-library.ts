@@ -141,4 +141,64 @@ export const manualLibraryRoutes: FastifyPluginAsync<Options> = async (
       },
     };
   });
+
+  app.delete<{
+    Params: { externalId: string };
+  }>("/library/manual/:externalId", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const externalId = request.params.externalId;
+    if (!/^\d+$/.test(externalId)) {
+      return reply.code(400).send({ ok: false, error: "invalid_id" });
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const deleted = await client.query(
+        `
+          DELETE FROM user_games
+          WHERE user_id = $1 AND launcher = 'manual' AND external_id = $2
+          RETURNING id
+        `,
+        [userId, externalId],
+      );
+      if (deleted.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return reply.code(404).send({
+          ok: false,
+          error: "game_not_in_library",
+        });
+      }
+      await client.query(
+        `
+          DELETE FROM user_hidden_games
+          WHERE user_id = $1 AND launcher = 'manual' AND external_id = $2
+        `,
+        [userId, externalId],
+      );
+      await client.query(
+        `
+          DELETE FROM group_hidden_games
+          WHERE user_id = $1 AND launcher = 'manual' AND external_id = $2
+        `,
+        [userId, externalId],
+      );
+      await client.query("COMMIT");
+      return { ok: true };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      request.log.error({ err: error }, "manual game deletion failed");
+      return reply.code(500).send({
+        ok: false,
+        error: "delete_failed",
+        message: "Suppression impossible.",
+      });
+    } finally {
+      client.release();
+    }
+  });
 };

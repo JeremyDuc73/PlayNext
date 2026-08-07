@@ -45,6 +45,12 @@ export async function fetchParticipantLibrary(
             AND h.launcher = ug.launcher
             AND h.external_id = ug.external_id
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM user_hidden_games uh
+          WHERE uh.user_id = ug.user_id
+            AND uh.launcher = ug.launcher
+            AND uh.external_id = ug.external_id
+        )
     `,
     [participantIds, groupId],
   );

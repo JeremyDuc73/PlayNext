@@ -4,6 +4,7 @@ const LAUNCHER_RANK: Record<string, number> = {
   steam: 0,
   xbox: 1,
   epic: 2,
+  riot: 3,
 };
 
 export function isJunkGameName(name: string): boolean {

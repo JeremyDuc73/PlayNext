@@ -933,6 +933,12 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
             AND ug.owned = true
             AND ug.hidden = false
             AND NOT EXISTS (
+              SELECT 1 FROM user_hidden_games uh
+              WHERE uh.user_id = ug.user_id
+                AND uh.launcher = ug.launcher
+                AND uh.external_id = ug.external_id
+            )
+            AND NOT EXISTS (
               SELECT 1 FROM group_hidden_games h
               WHERE h.group_id = m.group_id
                 AND h.user_id = m.user_id

@@ -94,6 +94,10 @@ export type LibraryGame = {
   year?: number | null;
 };
 
+export type HiddenLibraryGame = LibraryGame & {
+  hiddenAt: string;
+};
+
 export type SteamGamePayload = {
   launcher: "steam";
   externalId: string;
@@ -141,12 +145,92 @@ export async function syncSteamLibrary(
   };
 }
 
+export async function syncRiotLibrary(
+  games: Array<{
+    externalId: "league_of_legends" | "valorant";
+    name: "League of Legends" | "VALORANT";
+  }>,
+): Promise<{ synced: number; installed: number }> {
+  const response = await apiFetch("/library/riot/sync", {
+    method: "POST",
+    body: JSON.stringify({
+      games: games.map((game) => ({
+        ...game,
+        installed: true,
+        owned: true,
+        launchable: true,
+      })),
+    }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `sync_failed_${response.status}`);
+  }
+  const data = (await response.json()) as {
+    synced: number;
+    installed: number;
+  };
+  return { synced: data.synced, installed: data.installed };
+}
+
 export async function fetchMyLibrary(): Promise<LibraryGame[]> {
   const response = await apiFetch("/library/me");
   if (response.status === 401) return [];
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = (await response.json()) as { ok: boolean; games: LibraryGame[] };
   return data.games;
+}
+
+export async function fetchMyHiddenLibrary(): Promise<HiddenLibraryGame[]> {
+  const response = await apiFetch("/library/hidden");
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
+  }
+  const data = (await response.json()) as {
+    games: HiddenLibraryGame[];
+  };
+  return data.games;
+}
+
+export async function hideLibraryGame(
+  launcher: string,
+  externalId: string,
+): Promise<void> {
+  const response = await apiFetch("/library/hide", {
+    method: "POST",
+    body: JSON.stringify({ launcher, externalId }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
+  }
+}
+
+export async function unhideLibraryGame(
+  launcher: string,
+  externalId: string,
+): Promise<void> {
+  const response = await apiFetch("/library/unhide", {
+    method: "POST",
+    body: JSON.stringify({ launcher, externalId }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
+  }
 }
 
 export type ManualCatalogGame = {
@@ -188,6 +272,20 @@ export async function addManualGame(igdbId: number): Promise<void> {
       error?: string;
     } | null;
     throw new Error(data?.message ?? data?.error ?? `HTTP ${response.status}`);
+  }
+}
+
+export async function deleteManualGame(externalId: string): Promise<void> {
+  const response = await apiFetch(
+    `/library/manual/${encodeURIComponent(externalId)}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
   }
 }
 

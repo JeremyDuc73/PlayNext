@@ -3,16 +3,22 @@ import {
   disconnectEpic,
   disconnectMicrosoft,
   addManualGame,
+  deleteManualGame,
   exchangeEpicCode,
   fetchEpicStatus,
+  fetchMyHiddenLibrary,
   fetchMicrosoftStatus,
   fetchMyLibrary,
+  hideLibraryGame,
   startMicrosoftLink,
   syncEpicLibrary,
   syncSteamLibrary,
   syncXboxLibrary,
+  unhideLibraryGame,
   searchManualGames,
+  syncRiotLibrary,
   type ManualCatalogGame,
+  type HiddenLibraryGame,
   type LibraryGame,
 } from "../lib/api";
 import {
@@ -29,7 +35,9 @@ import { pad2 } from "../lib/format";
 import { metaMapKey, resolveGameMeta, type GameMeta } from "../lib/meta";
 import { scanSteamLocal } from "../lib/steam";
 import { scanXboxLocal } from "../lib/xbox";
+import { scanRiotLocal } from "../lib/riot";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EmptyHint } from "../ui/EmptyHint";
 import { GamePoster } from "../ui/GamePoster";
 import { PosterGrid } from "../ui/PosterGrid";
@@ -40,7 +48,14 @@ type Props = {
   onBanner: (message: string) => void;
 };
 
-type LauncherFilter = "all" | "steam" | "xbox" | "epic" | "manual";
+type LauncherFilter = "all" | "steam" | "xbox" | "epic" | "riot" | "manual";
+const LIBRARY_CACHE_KEY = "playnext_library_cache";
+
+type LibraryCache = {
+  games: LibraryGame[];
+  hiddenGames: HiddenLibraryGame[];
+  savedAt: string;
+};
 
 export function LibraryHub({
   enabled,
@@ -49,6 +64,7 @@ export function LibraryHub({
 }: Props) {
   const isDesktop = runningInDesktopShell();
   const [games, setGames] = useState<LibraryGame[]>([]);
+  const [hiddenGames, setHiddenGames] = useState<HiddenLibraryGame[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [launcher, setLauncher] = useState<LauncherFilter>("all");
@@ -58,6 +74,8 @@ export function LibraryHub({
   const [manualQuery, setManualQuery] = useState("");
   const [manualResults, setManualResults] = useState<ManualCatalogGame[]>([]);
   const [manualBusy, setManualBusy] = useState(false);
+  const [manualDeleteTarget, setManualDeleteTarget] =
+    useState<LibraryGame | null>(null);
 
   const [msConfigured, setMsConfigured] = useState(false);
   const [msLinked, setMsLinked] = useState(false);
@@ -67,17 +85,96 @@ export function LibraryHub({
   );
 
   async function refreshGames() {
-    const nextGames = await fetchMyLibrary();
-    setGames(nextGames);
-    void resolveGameMeta(
-      nextGames.map((game) => ({
-        launcher: game.launcher,
-        externalId: game.externalId,
-        name: game.name,
-      })),
-    )
-      .then(setResolvedMeta)
-      .catch(() => undefined);
+    try {
+      const [nextGames, nextHiddenGames] = await Promise.all([
+        fetchMyLibrary(),
+        fetchMyHiddenLibrary(),
+      ]);
+      setGames(nextGames);
+      setHiddenGames(nextHiddenGames);
+      try {
+        localStorage.setItem(
+          LIBRARY_CACHE_KEY,
+          JSON.stringify({
+            games: nextGames,
+            hiddenGames: nextHiddenGames,
+            savedAt: new Date().toISOString(),
+          } satisfies LibraryCache),
+        );
+      } catch {
+        // Local storage is optional.
+      }
+      void resolveGameMeta(
+        nextGames.map((game) => ({
+          launcher: game.launcher,
+          externalId: game.externalId,
+          name: game.name,
+        })),
+      )
+        .then(setResolvedMeta)
+        .catch(() => undefined);
+    } catch (error) {
+      try {
+        const cached = JSON.parse(
+          localStorage.getItem(LIBRARY_CACHE_KEY) ?? "null",
+        ) as LibraryCache | null;
+        if (cached?.games && cached.hiddenGames) {
+          setGames(cached.games);
+          setHiddenGames(cached.hiddenGames);
+          onBanner("Dernière bibliothèque disponible hors connexion.");
+          return;
+        }
+      } catch {
+        // Fall through to the normal error handling.
+      }
+      throw error;
+    }
+  }
+
+  async function onHideGame(game: LibraryGame) {
+    setBusy("hide-game");
+    try {
+      await hideLibraryGame(game.launcher, game.externalId);
+      await refreshGames();
+      onBanner("Jeu masqué.");
+    } catch (error) {
+      onBanner(error instanceof Error ? error.message : "Masquage impossible.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onUnhideGame(game: HiddenLibraryGame) {
+    setBusy("unhide-game");
+    try {
+      await unhideLibraryGame(game.launcher, game.externalId);
+      await refreshGames();
+      onBanner("Jeu réaffiché.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Réaffichage impossible.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onDeleteManualGame() {
+    if (!manualDeleteTarget) return;
+    const game = manualDeleteTarget;
+    setBusy("delete-manual");
+    try {
+      await deleteManualGame(game.externalId);
+      await refreshGames();
+      setManualDeleteTarget(null);
+      onBanner("Jeu supprimé de la bibliothèque.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Suppression impossible.",
+      );
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function onSearchManual() {
@@ -175,42 +272,18 @@ export function LibraryHub({
       steam: 0,
       xbox: 0,
       epic: 0,
+      riot: 0,
       manual: 0,
     };
     for (const g of cleaned) {
       if (g.launcher === "steam") c.steam += 1;
       if (g.launcher === "xbox") c.xbox += 1;
       if (g.launcher === "epic") c.epic += 1;
+      if (g.launcher === "riot") c.riot += 1;
       if (g.launcher === "manual") c.manual += 1;
     }
     return c;
   }, [cleaned]);
-
-  async function onScanSteam() {
-    if (!isDesktop) {
-      onBanner("Le scan Steam nécessite l’application Windows.");
-      return;
-    }
-    setBusy("steam");
-    try {
-      const result = await scanSteamLocal();
-      if (!result.steamFound) {
-        onBanner(result.warnings[0] ?? "Steam introuvable.");
-        return;
-      }
-      const sync = await syncSteamLibrary(result.games, result.steamId);
-      await refreshGames();
-      onBanner(
-        `Steam — ${sync.synced} jeux, ${sync.installed} installés.`,
-      );
-    } catch (error) {
-      onBanner(
-        error instanceof Error ? error.message : "Scan Steam échoué.",
-      );
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onConnectMs() {
     setBusy("ms-link");
@@ -234,35 +307,6 @@ export function LibraryHub({
     } catch (error) {
       const reason = error instanceof Error ? error.message : "";
       onBanner(reason || "Connexion Microsoft impossible.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onScanXbox() {
-    if (!msLinked) {
-      onBanner("Connecte d’abord Microsoft / Xbox.");
-      return;
-    }
-    setBusy("xbox");
-    try {
-      let installed: Array<{ externalId: string; name?: string }> = [];
-      if (isDesktop) {
-        const local = await scanXboxLocal();
-        installed = local.games.map((g) => ({
-          externalId: g.externalId,
-          name: g.name,
-        }));
-      }
-      const sync = await syncXboxLibrary(installed);
-      await refreshGames();
-      onBanner(
-        `Xbox — ${sync.synced} jeux (${sync.installed} installés).`,
-      );
-    } catch (error) {
-      onBanner(
-        error instanceof Error ? error.message : "Scan Xbox échoué.",
-      );
     } finally {
       setBusy(null);
     }
@@ -293,37 +337,76 @@ export function LibraryHub({
     }
   }
 
-  async function onScanEpic() {
-    if (!epicLinked) {
-      onBanner("Connecte d’abord Epic.");
+  async function onSyncAll() {
+    if (!isDesktop) {
+      onBanner("La synchronisation nécessite l’application Windows.");
       return;
     }
-    setBusy("epic");
+
+    setBusy("sync-all");
     try {
-      let installed: Array<{ externalId: string; name?: string }> = [];
-      if (isDesktop) {
-        const local = await scanEpicLocal();
-        installed = local.games.map((g) => ({
-          externalId: g.externalId,
-          name: g.name,
-        }));
+      const tasks: Array<Promise<unknown>> = [
+        (async () => {
+          const local = await scanSteamLocal();
+          if (!local.steamFound) return;
+          await syncSteamLibrary(local.games, local.steamId);
+        })(),
+        (async () => {
+          const local = await scanRiotLocal();
+          await syncRiotLibrary(
+            local.games.map((game) => ({
+              externalId: game.externalId,
+              name: game.name,
+            })),
+          );
+        })(),
+      ];
+
+      if (msLinked) {
+        tasks.push(
+          (async () => {
+            const local = await scanXboxLocal();
+            await syncXboxLibrary(
+              local.games.map((game) => ({
+                externalId: game.externalId,
+                name: game.name,
+              })),
+            );
+          })(),
+        );
       }
-      const sync = await syncEpicLibrary(installed);
+
+      if (epicLinked) {
+        tasks.push(
+          (async () => {
+            const local = await scanEpicLocal();
+            await syncEpicLibrary(
+              local.games.map((game) => ({
+                externalId: game.externalId,
+                name: game.name,
+              })),
+            );
+          })(),
+        );
+      }
+
+      const results = await Promise.allSettled(tasks);
       await refreshGames();
       onBanner(
-        `Epic — ${sync.synced} jeux (${sync.installed} installés).`,
+        results.some((result) => result.status === "rejected")
+          ? "Synchronisation partielle."
+          : "Synchronisation terminée.",
       );
-    } catch (error) {
-      onBanner(
-        error instanceof Error ? error.message : "Scan Epic échoué.",
-      );
+    } catch {
+      onBanner("Synchronisation impossible.");
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <section>
+    <>
+      <section>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-rule-strong pb-5">
         <div>
           <p className="pn-data mb-2">Catalogue</p>
@@ -336,7 +419,8 @@ export function LibraryHub({
         </div>
         <p className="pn-data">
           {pad2(counts.all)} titres · Steam {pad2(counts.steam)} · Xbox{" "}
-          {pad2(counts.xbox)} · Epic {pad2(counts.epic)} · Manuel{" "}
+          {pad2(counts.xbox)} · Epic {pad2(counts.epic)} · Riot{" "}
+          {pad2(counts.riot)} · Manuel{" "}
           {pad2(counts.manual)}
         </p>
       </header>
@@ -348,6 +432,7 @@ export function LibraryHub({
             ["steam", "Steam"],
             ["xbox", "Xbox"],
             ["epic", "Epic"],
+            ["riot", "Riot"],
             ["manual", "Manuel"],
           ] as const
         ).map(([key, label]) => (
@@ -390,18 +475,12 @@ export function LibraryHub({
           <Button
             variant="primary"
             disabled={Boolean(busy) || !isDesktop}
-            onClick={() => void onScanSteam()}
+            onClick={() => void onSyncAll()}
           >
-            {busy === "steam" ? "…" : "Scan Steam"}
+            {busy === "sync-all" ? "Synchronisation…" : "Synchroniser"}
           </Button>
           {msLinked ? (
-            <Button
-              variant="second"
-              disabled={Boolean(busy)}
-              onClick={() => void onScanXbox()}
-            >
-              {busy === "xbox" ? "…" : "Scan Xbox"}
-            </Button>
+            <span className="pn-data text-paper">Xbox lié</span>
           ) : msConfigured ? (
             <Button
               variant="second"
@@ -412,13 +491,7 @@ export function LibraryHub({
             </Button>
           ) : null}
           {epicLinked ? (
-            <Button
-              variant="second"
-              disabled={Boolean(busy)}
-              onClick={() => void onScanEpic()}
-            >
-              {busy === "epic" ? "…" : "Scan Epic"}
-            </Button>
+            <span className="pn-data text-paper">Epic lié</span>
           ) : (
             <Button
               variant="second"
@@ -571,7 +644,7 @@ export function LibraryHub({
       ) : visible.length === 0 ? (
         <EmptyHint
           title="Rien à afficher"
-          body="Scanne Steam / Xbox / Epic."
+            body="Scanne Steam / Xbox / Epic / Riot."
         />
       ) : (
         <PosterGrid
@@ -594,12 +667,75 @@ export function LibraryHub({
                   subtitle={`${game.launcher}${
                     game.installed ? " · installé" : ""
                   }`}
+                  footer={
+                    <button
+                      type="button"
+                      className={
+                        game.launcher === "manual"
+                          ? "pn-data mt-1 text-veto hover:text-paper"
+                          : "pn-data mt-1 hover:text-paper"
+                      }
+                      disabled={Boolean(busy)}
+                      onClick={() =>
+                        game.launcher === "manual"
+                          ? setManualDeleteTarget(game)
+                          : void onHideGame(game)
+                      }
+                    >
+                      {game.launcher === "manual" ? "Supprimer" : "Masquer"}
+                    </button>
+                  }
                 />
               </div>
             );
           })}
         </PosterGrid>
       )}
-    </section>
+      {hiddenGames.length > 0 ? (
+        <section className="mt-8 border-t border-rule-strong pt-5">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h3 className="pn-display text-2xl">Jeux masqués</h3>
+            <span className="pn-data">{pad2(hiddenGames.length)}</span>
+          </div>
+          <PosterGrid label="Jeux masqués" animateKey={`hidden:${hiddenGames.length}`}>
+            {hiddenGames.map((game) => (
+              <div key={game.id} role="listitem">
+                <GamePoster
+                  name={game.name}
+                  launcher={game.launcher}
+                  externalId={game.externalId}
+                  coverUrl={game.coverUrl}
+                  subtitle={game.launcher}
+                  footer={
+                    <button
+                      type="button"
+                      className="pn-data mt-1 hover:text-paper"
+                      disabled={Boolean(busy)}
+                      onClick={() => void onUnhideGame(game)}
+                    >
+                      Réafficher
+                    </button>
+                  }
+                />
+              </div>
+            ))}
+          </PosterGrid>
+        </section>
+      ) : null}
+      </section>
+      {manualDeleteTarget ? (
+        <ConfirmDialog
+          title="Supprimer ce jeu ?"
+          confirmLabel="Supprimer"
+          busy={busy === "delete-manual"}
+          onConfirm={() => void onDeleteManualGame()}
+          onCancel={() => {
+            if (busy !== "delete-manual") setManualDeleteTarget(null);
+          }}
+        >
+          {`« ${manualDeleteTarget.name} » sera retiré de ta bibliothèque.`}
+        </ConfirmDialog>
+      ) : null}
+    </>
   );
 }

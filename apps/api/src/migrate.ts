@@ -52,6 +52,22 @@ export async function migrate(db: Db): Promise<void> {
     CREATE INDEX IF NOT EXISTS user_games_user_id_idx ON user_games(user_id);
     CREATE INDEX IF NOT EXISTS user_games_launcher_idx ON user_games(launcher);
 
+    CREATE TABLE IF NOT EXISTS user_hidden_games (
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      launcher TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, launcher, external_id)
+    );
+
+    INSERT INTO user_hidden_games (user_id, launcher, external_id, name)
+      SELECT user_id, launcher, external_id, name
+      FROM user_games
+      WHERE hidden = true
+    ON CONFLICT (user_id, launcher, external_id) DO UPDATE
+      SET name = EXCLUDED.name;
+
     CREATE TABLE IF NOT EXISTS library_sync_runs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

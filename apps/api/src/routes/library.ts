@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { Env } from "../config.js";
 import { isMicrosoftConfigured } from "../config.js";
@@ -57,6 +58,23 @@ const epicSyncBodySchema = z.object({
   installed: z.array(epicInstalledSchema).max(5000).default([]),
 });
 
+const riotGameSchema = z.object({
+  externalId: z.enum(["league_of_legends", "valorant"]),
+  name: z.enum(["League of Legends", "VALORANT"]),
+  installed: z.literal(true),
+  owned: z.literal(true),
+  launchable: z.literal(true),
+});
+
+const riotSyncBodySchema = z.object({
+  games: z.array(riotGameSchema).max(2).default([]),
+});
+
+const hiddenGameSchema = z.object({
+  launcher: z.string().min(1).max(32),
+  externalId: z.string().min(1).max(256),
+});
+
 export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
   app,
   opts,
@@ -68,10 +86,115 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     return user?.id ?? null;
   }
 
+  async function syncSourceGames(
+    client: PoolClient,
+    userId: string,
+    launcher: string,
+    sourceGames: Array<{
+      externalId: string;
+      name: string;
+      installed: boolean;
+      owned: boolean;
+      launchable: boolean;
+    }>,
+  ): Promise<void> {
+    const games = new Map(
+      sourceGames.map((game) => [`${launcher}:${game.externalId}`, game]),
+    );
+    for (const game of games.values()) {
+      await client.query(
+        `
+          INSERT INTO user_games (
+            user_id, launcher, external_id, name,
+            installed, owned, launchable, hidden, synced_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
+          ON CONFLICT (user_id, launcher, external_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            installed = EXCLUDED.installed,
+            owned = EXCLUDED.owned,
+            launchable = EXCLUDED.launchable,
+            synced_at = now(),
+            updated_at = now()
+        `,
+        [
+          userId,
+          launcher,
+          game.externalId,
+          game.name,
+          game.installed,
+          game.owned,
+          game.launchable,
+        ],
+      );
+    }
+
+    const externalIds = [...games.values()].map((game) => game.externalId);
+    if (externalIds.length === 0) {
+      await client.query(
+        `DELETE FROM user_games WHERE user_id = $1 AND launcher = $2`,
+        [userId, launcher],
+      );
+    } else {
+      await client.query(
+        `
+          DELETE FROM user_games
+          WHERE user_id = $1
+            AND launcher = $2
+            AND NOT (external_id = ANY($3::text[]))
+        `,
+        [userId, launcher, externalIds],
+      );
+    }
+  }
+
   app.get("/library/steam/status", async () => ({
     ok: true,
     ownedApiConfigured: Boolean(config.STEAM_WEB_API_KEY),
   }));
+
+  app.post("/library/riot/sync", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = riotSyncBodySchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({
+        ok: false,
+        error: "invalid_body",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query("begin");
+      await syncSourceGames(client, userId, "riot", parsed.data.games);
+      await client.query(
+        `
+          INSERT INTO library_sync_runs (user_id, source, game_count)
+          VALUES ($1, 'riot', $2)
+        `,
+        [userId, parsed.data.games.length],
+      );
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      request.log.error({ err: error }, "Riot library sync failed");
+      return reply.code(500).send({ ok: false, error: "sync_failed" });
+    } finally {
+      client.release();
+    }
+
+    return {
+      ok: true,
+      synced: parsed.data.games.length,
+      installed: parsed.data.games.length,
+      source: "riot",
+    };
+  });
 
   app.post("/library/xbox/sync", async (request, reply) => {
     const userId = await requireUserId(request);
@@ -163,49 +286,23 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     const client = await db.pool.connect();
     try {
       await client.query("begin");
-      await client.query(
-        `
-          DELETE FROM user_games
-          WHERE user_id = $1 AND launcher = 'xbox'
-        `,
-        [userId],
-      );
-
+      await syncSourceGames(client, userId, "xbox", games);
       for (const game of games) {
+        if (!game.imageUrl) continue;
         await client.query(
           `
-            INSERT INTO user_games (
-              user_id, launcher, external_id, name,
-              installed, owned, launchable, hidden, synced_at
+            INSERT INTO game_meta (
+              launcher, external_id, name, cover_url, source, fetched_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
+            VALUES ($1, $2, $3, $4, 'xbox_titlehub', now())
+            ON CONFLICT (launcher, external_id) DO UPDATE SET
+              name = EXCLUDED.name,
+              cover_url = EXCLUDED.cover_url,
+              source = EXCLUDED.source,
+              fetched_at = now()
           `,
-          [
-            userId,
-            game.launcher,
-            game.externalId,
-            game.name,
-            game.installed,
-            game.owned,
-            game.launchable,
-          ],
+          [game.launcher, game.externalId, game.name, game.imageUrl],
         );
-        if (game.imageUrl) {
-          await client.query(
-            `
-              INSERT INTO game_meta (
-                launcher, external_id, name, cover_url, source, fetched_at
-              )
-              VALUES ($1, $2, $3, $4, 'xbox_titlehub', now())
-              ON CONFLICT (launcher, external_id) DO UPDATE SET
-                name = EXCLUDED.name,
-                cover_url = EXCLUDED.cover_url,
-                source = EXCLUDED.source,
-                fetched_at = now()
-            `,
-            [game.launcher, game.externalId, game.name, game.imageUrl],
-          );
-        }
       }
 
       await client.query(
@@ -303,49 +400,23 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     const client = await db.pool.connect();
     try {
       await client.query("begin");
-      await client.query(
-        `
-          DELETE FROM user_games
-          WHERE user_id = $1 AND launcher = 'epic'
-        `,
-        [userId],
-      );
-
+      await syncSourceGames(client, userId, "epic", games);
       for (const game of games) {
+        if (!game.imageUrl) continue;
         await client.query(
           `
-            INSERT INTO user_games (
-              user_id, launcher, external_id, name,
-              installed, owned, launchable, hidden, synced_at
+            INSERT INTO game_meta (
+              launcher, external_id, name, cover_url, source, fetched_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
+            VALUES ($1, $2, $3, $4, 'epic_catalog', now())
+            ON CONFLICT (launcher, external_id) DO UPDATE SET
+              name = EXCLUDED.name,
+              cover_url = COALESCE(EXCLUDED.cover_url, game_meta.cover_url),
+              source = EXCLUDED.source,
+              fetched_at = now()
           `,
-          [
-            userId,
-            game.launcher,
-            game.externalId,
-            game.name,
-            game.installed,
-            game.owned,
-            game.launchable,
-          ],
+          [game.launcher, game.externalId, game.name, game.imageUrl],
         );
-        if (game.imageUrl) {
-          await client.query(
-            `
-              INSERT INTO game_meta (
-                launcher, external_id, name, cover_url, source, fetched_at
-              )
-              VALUES ($1, $2, $3, $4, 'epic_catalog', now())
-              ON CONFLICT (launcher, external_id) DO UPDATE SET
-                name = EXCLUDED.name,
-                cover_url = COALESCE(EXCLUDED.cover_url, game_meta.cover_url),
-                source = EXCLUDED.source,
-                fetched_at = now()
-            `,
-            [game.launcher, game.externalId, game.name, game.imageUrl],
-          );
-        }
       }
 
       await client.query(
@@ -433,34 +504,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     try {
       await client.query("begin");
 
-      await client.query(
-        `
-          DELETE FROM user_games
-          WHERE user_id = $1 AND launcher = 'steam'
-        `,
-        [userId],
-      );
-
-      for (const game of games) {
-        await client.query(
-          `
-            INSERT INTO user_games (
-              user_id, launcher, external_id, name,
-              installed, owned, launchable, hidden, synced_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
-          `,
-          [
-            userId,
-            game.launcher,
-            game.externalId,
-            game.name,
-            game.installed,
-            game.owned,
-            game.launchable,
-          ],
-        );
-      }
+      await syncSourceGames(client, userId, "steam", games);
 
       await client.query(
         `
@@ -496,6 +540,141 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     };
   });
 
+  app.get("/library/hidden", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const result = await db.pool.query<{
+      launcher: string;
+      external_id: string;
+      name: string;
+      created_at: Date;
+      installed: boolean | null;
+      owned: boolean | null;
+      launchable: boolean | null;
+      cover_url: string | null;
+      year: number | null;
+    }>(
+      `
+        SELECT h.launcher, h.external_id, h.name, h.created_at,
+               ug.installed, ug.owned, ug.launchable,
+               gm.cover_url, gm.year
+        FROM user_hidden_games h
+        LEFT JOIN user_games ug
+          ON ug.user_id = h.user_id
+         AND ug.launcher = h.launcher
+         AND ug.external_id = h.external_id
+        LEFT JOIN game_meta gm
+          ON gm.launcher = h.launcher
+         AND gm.external_id = h.external_id
+        WHERE h.user_id = $1
+        ORDER BY h.name ASC
+      `,
+      [userId],
+    );
+
+    return {
+      ok: true,
+      games: result.rows.map((row) => ({
+        id: `${row.launcher}:${row.external_id}`,
+        launcher: row.launcher,
+        externalId: row.external_id,
+        name: row.name,
+        installed: Boolean(row.installed),
+        owned: row.owned ?? true,
+        launchable: row.launchable ?? false,
+        coverUrl: row.cover_url,
+        year: row.year,
+        hiddenAt: row.created_at,
+      })),
+    };
+  });
+
+  app.post("/library/hide", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = hiddenGameSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: "invalid_body" });
+    }
+
+    const game = await db.pool.query<{ name: string }>(
+      `
+        SELECT name
+        FROM user_games
+        WHERE user_id = $1 AND launcher = $2 AND external_id = $3
+          AND owned = true
+        LIMIT 1
+      `,
+      [userId, parsed.data.launcher, parsed.data.externalId],
+    );
+    if (!game.rows[0]) {
+      return reply.code(404).send({
+        ok: false,
+        error: "game_not_in_library",
+        message: "Jeu absent de ta bibliothèque.",
+      });
+    }
+
+    await db.pool.query(
+      `
+        INSERT INTO user_hidden_games (user_id, launcher, external_id, name)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id, launcher, external_id) DO UPDATE
+          SET name = EXCLUDED.name
+      `,
+      [
+        userId,
+        parsed.data.launcher,
+        parsed.data.externalId,
+        game.rows[0].name,
+      ],
+    );
+    await db.pool.query(
+      `
+        UPDATE user_games
+        SET hidden = true, updated_at = now()
+        WHERE user_id = $1 AND launcher = $2 AND external_id = $3
+      `,
+      [userId, parsed.data.launcher, parsed.data.externalId],
+    );
+    return { ok: true };
+  });
+
+  app.post("/library/unhide", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = hiddenGameSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: "invalid_body" });
+    }
+
+    await db.pool.query(
+      `
+        DELETE FROM user_hidden_games
+        WHERE user_id = $1 AND launcher = $2 AND external_id = $3
+      `,
+      [userId, parsed.data.launcher, parsed.data.externalId],
+    );
+    await db.pool.query(
+      `
+        UPDATE user_games
+        SET hidden = false, updated_at = now()
+        WHERE user_id = $1 AND launcher = $2 AND external_id = $3
+      `,
+      [userId, parsed.data.launcher, parsed.data.externalId],
+    );
+    return { ok: true };
+  });
+
   app.get("/library/me", async (request, reply) => {
     const userId = await requireUserId(request);
     if (!userId) {
@@ -526,7 +705,13 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         FROM user_games ug
         LEFT JOIN game_meta gm
           ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
-        WHERE ug.user_id = $1 AND ug.hidden = false
+        LEFT JOIN user_hidden_games uh
+          ON uh.user_id = ug.user_id
+         AND uh.launcher = ug.launcher
+         AND uh.external_id = ug.external_id
+        WHERE ug.user_id = $1
+          AND ug.hidden = false
+          AND uh.user_id IS NULL
         ORDER BY ug.name ASC
       `,
       [userId],

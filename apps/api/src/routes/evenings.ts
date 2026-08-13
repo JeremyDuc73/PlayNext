@@ -22,8 +22,9 @@ import {
 import { buildShortlist } from "../evenings/shortlist.js";
 import type { EveningStatus, VoteValue } from "../evenings/types.js";
 import { getMembership } from "../groups/membership.js";
-import { isManager } from "../groups/roles.js";
+import { isManager, isOwner } from "../groups/roles.js";
 import { notifyGroupDiscord } from "../discord/notify.js";
+import { steamLibraryPosterUrl } from "../meta/covers.js";
 
 type EveningsRoutesOptions = {
   db: Db;
@@ -148,6 +149,18 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     if (evening.created_by === userId) return true;
     const membership = await getMembership(db, evening.group_id, userId);
     return Boolean(membership && isManager(membership.role));
+  }
+
+  function isFinishedStatus(status: EveningStatus): boolean {
+    return status === "closed" || status === "cancelled";
+  }
+
+  async function deleteFinishedEvening(eveningId: string): Promise<void> {
+    await db.pool.query(
+      `UPDATE evenings SET winner_candidate_id = NULL WHERE id = $1`,
+      [eveningId],
+    );
+    await db.pool.query(`DELETE FROM evenings WHERE id = $1`, [eveningId]);
   }
 
   async function fetchViewerOwnedKeys(
@@ -992,13 +1005,16 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         return reply.code(404).send({ ok: false, error: "group_not_found" });
       }
 
-      const result = await db.pool.query<EveningRow>(
+      const result = await db.pool.query<
+        EveningRow & { winner_name: string | null }
+      >(
         `
-          SELECT *
-          FROM evenings
-          WHERE group_id = $1
-          ORDER BY created_at DESC
-          LIMIT 20
+          SELECT e.*, c.name AS winner_name
+          FROM evenings e
+          LEFT JOIN evening_candidates c ON c.id = e.winner_candidate_id
+          WHERE e.group_id = $1
+          ORDER BY e.created_at DESC
+          LIMIT 50
         `,
         [request.params.groupId],
       );
@@ -1012,8 +1028,64 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
           round: row.round,
           createdAt: row.created_at,
           winnerCandidateId: row.winner_candidate_id,
+          winnerName: row.winner_name,
         })),
       };
+    },
+  );
+
+  app.delete<{ Params: { groupId: string } }>(
+    "/groups/:groupId/evenings/history",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const membership = await getMembership(
+        db,
+        request.params.groupId,
+        userId,
+      );
+      if (!membership) {
+        return reply.code(404).send({ ok: false, error: "group_not_found" });
+      }
+      if (!isOwner(membership.role)) {
+        return reply.code(403).send({
+          ok: false,
+          error: "forbidden",
+          message: "Réservé au propriétaire.",
+        });
+      }
+
+      const client = await db.pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `
+            UPDATE evenings
+            SET winner_candidate_id = NULL
+            WHERE group_id = $1
+              AND status IN ('closed', 'cancelled')
+          `,
+          [request.params.groupId],
+        );
+        const deleted = await client.query(
+          `
+            DELETE FROM evenings
+            WHERE group_id = $1
+              AND status IN ('closed', 'cancelled')
+            RETURNING id
+          `,
+          [request.params.groupId],
+        );
+        await client.query("COMMIT");
+        return { ok: true, deleted: deleted.rowCount ?? 0 };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   );
 
@@ -1804,15 +1876,33 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       );
       const closed = updated.rows[0]!;
       if (winnerId) {
-        const winner = await db.pool.query<{ name: string }>(
-          `SELECT name FROM evening_candidates WHERE id = $1`,
+        const winner = await db.pool.query<{
+          name: string;
+          launcher: string;
+          external_id: string;
+          cover_url: string | null;
+        }>(
+          `
+            SELECT c.name, c.launcher, c.external_id, gm.cover_url
+            FROM evening_candidates c
+            LEFT JOIN game_meta gm
+              ON gm.launcher = c.launcher
+             AND gm.external_id = c.external_id
+            WHERE c.id = $1
+          `,
           [winnerId],
         );
-        const gameName = winner.rows[0]?.name;
-        if (gameName) {
+        const row = winner.rows[0];
+        if (row) {
+          const coverUrl =
+            row.cover_url ||
+            (row.launcher === "steam"
+              ? steamLibraryPosterUrl(row.external_id)
+              : null);
           void notifyGroupDiscord(db, config, closed.group_id, {
             kind: "chosen",
-            gameName,
+            gameName: row.name,
+            coverUrl,
           }).catch((error) => {
             app.log.warn(
               { err: error, groupId: closed.group_id },
@@ -2145,6 +2235,41 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         ok: true,
         evening: await serializeEvening(updated.rows[0]!, userId),
       };
+    },
+  );
+
+  app.delete<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      const membership = await getMembership(db, evening.group_id, userId);
+      if (!membership) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (!isOwner(membership.role)) {
+        return reply.code(403).send({
+          ok: false,
+          error: "forbidden",
+          message: "Réservé au propriétaire.",
+        });
+      }
+      if (!isFinishedStatus(evening.status)) {
+        return reply.code(400).send({
+          ok: false,
+          error: "evening_in_progress",
+          message: "Soirée encore en cours.",
+        });
+      }
+
+      await deleteFinishedEvening(evening.id);
+      return { ok: true };
     },
   );
 };

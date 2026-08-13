@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseDiscordChannelId } from "./bot.js";
-import { formatDiscordNotice } from "./messages.js";
+import { buildDiscordMessage, formatDiscordNotice } from "./messages.js";
 
 describe("parseDiscordChannelId", () => {
   it("accepts a snowflake", () => {
@@ -27,14 +27,36 @@ describe("formatDiscordNotice", () => {
   it("formats a lobby opening", () => {
     assert.equal(
       formatDiscordNotice("Les Copains", { kind: "lobby", playerCount: 5 }),
-      "LOBBY\nLes Copains\nSoirée ouverte · 05 joueurs",
+      "Lobby ouvert · Les Copains",
     );
   });
 
   it("formats the chosen game", () => {
     assert.equal(
       formatDiscordNotice("Les Copains", { kind: "chosen", gameName: "Hades" }),
-      "ON JOUE ÇA\nHades\nLes Copains",
+      "Jeu choisi · Hades",
     );
+  });
+});
+
+describe("buildDiscordMessage", () => {
+  it("uses a lobby embed", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "lobby",
+      playerCount: 5,
+    });
+    assert.equal(payload.embeds[0]?.title, "Lobby");
+    assert.equal(payload.embeds[0]?.description, "Les Copains");
+  });
+
+  it("puts the cover on the chosen-game embed", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "chosen",
+      gameName: "Hades",
+      coverUrl: "https://example.com/hades.jpg",
+    });
+    assert.equal(payload.embeds[0]?.title, "Hades");
+    assert.equal(payload.embeds[0]?.image?.url, "https://example.com/hades.jpg");
+    assert.match(payload.content, /Jeu choisi/);
   });
 });

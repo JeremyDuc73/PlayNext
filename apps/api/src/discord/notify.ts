@@ -2,7 +2,7 @@ import type { Env } from "../config.js";
 import type { Db } from "../db.js";
 import { postDiscordMessage } from "./bot.js";
 import {
-  formatDiscordNotice,
+  buildDiscordMessage,
   type DiscordNotice,
 } from "./messages.js";
 
@@ -29,6 +29,6 @@ export async function notifyGroupDiscord(
   await postDiscordMessage(
     config.DISCORD_BOT_TOKEN,
     group.discord_channel_id,
-    formatDiscordNotice(group.name, notice),
+    buildDiscordMessage(group.name, notice),
   );
 }

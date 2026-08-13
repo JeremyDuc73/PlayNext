@@ -545,6 +545,7 @@ export function GroupsPanel({
             currentUserId={currentUserId}
             members={detail.members}
             canOrganize={canManage}
+            isOwner={myRole === "owner"}
             onBanner={onBanner}
           />
         ) : (
@@ -652,21 +653,23 @@ export function GroupsPanel({
                       </div>
                     ) : (
                       <div className="mt-3 grid gap-3">
+                        <p className="text-sm text-paper-2">
+                          D’abord sur le serveur Discord, ensuite le salon.
+                        </p>
                         {discord.inviteUrl ? (
-                          <button
-                            type="button"
-                            className="pn-data w-fit hover:text-paper"
+                          <Button
+                            variant="primary"
                             onClick={() =>
                               void openExternalUrl(discord.inviteUrl!)
                             }
                           >
                             Inviter le bot
-                          </button>
+                          </Button>
                         ) : null}
                         <div className="flex flex-wrap gap-2">
                           <input
                             className="min-w-[200px] flex-1 border border-rule-strong bg-ink-deep px-3 py-2 font-data text-xs outline-none focus:border-paper"
-                            placeholder="Identifiant du salon"
+                            placeholder="Lien ou identifiant du salon"
                             value={discordChannelInput}
                             onChange={(event) =>
                               setDiscordChannelInput(event.target.value)

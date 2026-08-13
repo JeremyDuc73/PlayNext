@@ -108,9 +108,11 @@ export async function resolveDiscordChannel(
 export async function postDiscordMessage(
   token: string,
   channelId: string,
-  content: string,
+  payload: {
+    content?: string;
+    embeds?: unknown[];
+    allowed_mentions?: { parse: [] };
+  },
 ): Promise<void> {
-  await discordRequest(token, "POST", `/channels/${channelId}/messages`, {
-    content,
-  });
+  await discordRequest(token, "POST", `/channels/${channelId}/messages`, payload);
 }

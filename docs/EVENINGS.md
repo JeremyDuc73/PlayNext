@@ -46,6 +46,7 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 |---------|--------|
 | POST | `/groups/:groupId/evenings` |
 | GET | `/groups/:groupId/evenings` |
+| DELETE | `/groups/:groupId/evenings/history` (propriétaire, terminées / annulées) |
 | GET | `/me/open-evenings` |
 | GET | `/evenings/:id` |
 | POST | `/evenings/:id/ready` |
@@ -60,9 +61,15 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 | POST | `/evenings/:id/roulette` |
 | POST | `/evenings/:id/new-round` |
 | POST | `/evenings/:id/cancel` |
+| DELETE | `/evenings/:id` (propriétaire, terminée / annulée) |
 
 Polling UI ~2,5 s, y compris l’écran idle et les autres onglets
 (`GET /me/open-evenings`). WebSocket plus tard.
+
+`GET /groups/:groupId/evenings` renvoie aussi `winnerName` (jeu confirmé, sinon `null`).
+Sans titre saisi, l’UI affiche **Soirée du JJ/MM/AAAA**.
+Le propriétaire peut effacer une entrée terminée/annulée, ou tout l’historique d’un coup
+(`DELETE …/history` ne touche pas aux soirées en cours).
 
 Statuts : `lobby` → `selection` → `voting` → `revealed` → `closed` / `cancelled`.
 

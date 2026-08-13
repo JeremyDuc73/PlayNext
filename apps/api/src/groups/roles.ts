@@ -4,6 +4,10 @@ export function isManager(role: GroupRole): boolean {
   return role === "owner" || role === "admin";
 }
 
+export function isOwner(role: GroupRole): boolean {
+  return role === "owner";
+}
+
 export function roleRank(role: GroupRole): number {
   switch (role) {
     case "owner":

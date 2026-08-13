@@ -3,6 +3,9 @@ import {
   cancelEvening,
   closeEvening,
   createEvening,
+  clearEveningHistory,
+  deleteEvening,
+  eveningDisplayTitle,
   fetchEvening,
   isLiveEveningStatus,
   listEvenings,
@@ -31,7 +34,7 @@ import { EmptyHint } from "../ui/EmptyHint";
 import { coverCandidates, fallbackPosterStyle } from "../lib/covers";
 import { useCoverSrc } from "../lib/useCoverSrc";
 import { GamePoster } from "../ui/GamePoster";
-import { PresenceRow } from "../ui/PresenceRow";
+import { PresenceRow, PresenceStrip } from "../ui/PresenceRow";
 import { VoteBar } from "../ui/VoteBar";
 
 type Props = {
@@ -40,6 +43,7 @@ type Props = {
   currentUserId: string;
   members: GroupMember[];
   canOrganize: boolean;
+  isOwner: boolean;
   onBanner: (message: string) => void;
 };
 
@@ -57,6 +61,7 @@ export function EveningPanel({
   currentUserId,
   members,
   canOrganize,
+  isOwner,
   onBanner,
 }: Props) {
   const [history, setHistory] = useState<EveningSummary[]>([]);
@@ -74,6 +79,9 @@ export function EveningPanel({
   const [meta, setMeta] = useState<Map<string, GameMeta>>(new Map());
   const [setupOpen, setSetupOpen] = useState(false);
   const [skipUnreadyOpen, setSkipUnreadyOpen] = useState(false);
+  const [historyConfirm, setHistoryConfirm] = useState<"all" | string | null>(
+    null,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const eveningRef = useRef<Evening | null>(null);
   const selectionDirtyRef = useRef(false);
@@ -290,6 +298,38 @@ export function EveningPanel({
     }
   }
 
+  async function onDeleteHistoryItem(id: string) {
+    setBusy(true);
+    try {
+      await deleteEvening(id);
+      await refreshHistory();
+      setHistoryConfirm(null);
+      onBanner("Soirée effacée.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Suppression échouée.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onClearHistory() {
+    setBusy(true);
+    try {
+      await clearEveningHistory(groupId);
+      await refreshHistory();
+      setHistoryConfirm(null);
+      onBanner("Historique effacé.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Suppression échouée.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onReady() {
     if (!evening) return;
     setBusy(true);
@@ -334,6 +374,10 @@ export function EveningPanel({
     !evening ||
     evening.status === "closed" ||
     evening.status === "cancelled";
+  const pendingHistoryItem =
+    historyConfirm && historyConfirm !== "all"
+      ? history.find((item) => item.id === historyConfirm)
+      : undefined;
   return (
     <>
     <div ref={rootRef} className="grid gap-6">
@@ -372,7 +416,13 @@ export function EveningPanel({
               title="Aucune soirée en cours"
               body="Lance une nouvelle soirée pour choisir."
             />
-            <EveningHistory history={history} />
+            <EveningHistory
+              history={history}
+              isOwner={isOwner}
+              busy={busy}
+              onDelete={(id) => setHistoryConfirm(id)}
+              onClearAll={() => setHistoryConfirm("all")}
+            />
           </div>
         )
       ) : evening.status === "lobby" ? (
@@ -440,7 +490,7 @@ export function EveningPanel({
             void closeEvening(evening.id)
               .then((next) => applyEvening(next))
               .then(() => refreshHistory())
-              .then(() => onBanner("On joue ça."))
+              .then(() => onBanner("Choix confirmé."))
               .catch((e: Error) => onBanner(e.message))
           }
           onRoulette={() =>
@@ -483,6 +533,34 @@ export function EveningPanel({
         Les joueurs encore en attente sortent du tour.
       </ConfirmDialog>
     ) : null}
+    {historyConfirm === "all" ? (
+      <ConfirmDialog
+        title="Tout effacer"
+        confirmLabel="Tout effacer"
+        busy={busy}
+        onConfirm={() => void onClearHistory()}
+        onCancel={() => {
+          if (!busy) setHistoryConfirm(null);
+        }}
+      >
+        Toutes les soirées terminées.
+      </ConfirmDialog>
+    ) : historyConfirm ? (
+      <ConfirmDialog
+        title="Effacer la soirée"
+        confirmLabel="Effacer"
+        busy={busy}
+        onConfirm={() => void onDeleteHistoryItem(historyConfirm)}
+        onCancel={() => {
+          if (!busy) setHistoryConfirm(null);
+        }}
+      >
+        {eveningDisplayTitle(
+          pendingHistoryItem?.title,
+          pendingHistoryItem?.createdAt ?? new Date().toISOString(),
+        )}
+      </ConfirmDialog>
+    ) : null}
     </>
   );
 }
@@ -516,8 +594,9 @@ function LobbyView(props: {
   );
 
   return (
-    <section className="fixed inset-0 z-40 overflow-y-auto bg-ink p-6 md:p-10">
-      <div className="mx-auto grid min-h-full max-w-3xl content-start gap-8">
+    <section className="fixed inset-0 z-40 flex flex-col bg-ink">
+      <div className="min-h-0 flex-1 overflow-y-auto p-6 md:p-10">
+      <div className="mx-auto grid max-w-3xl content-start gap-8">
         <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
           <div>
             <p className="pn-data mb-2">Phase 00 · Lobby</p>
@@ -551,8 +630,11 @@ function LobbyView(props: {
         <div className="pn-sync w-full" aria-hidden>
           <i />
         </div>
+      </div>
+      </div>
 
-        <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-paper bg-ink py-4">
+        <footer className="shrink-0 border-t border-paper bg-ink px-6 py-3 md:px-10">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4">
           <p className="pn-data">
             {props.iAmParticipant
               ? myReady
@@ -585,8 +667,8 @@ function LobbyView(props: {
               </Button>
             ) : null}
           </div>
+          </div>
         </footer>
-      </div>
     </section>
   );
 }
@@ -631,8 +713,9 @@ function SelectionView(props: {
     );
 
   return (
-    <section className="fixed inset-0 z-40 overflow-y-auto bg-ink p-6 md:p-10">
-      <div className="mx-auto grid min-h-full max-w-7xl content-start gap-6">
+    <section className="fixed inset-0 z-40 flex flex-col bg-ink">
+      <div className="min-h-0 flex-1 overflow-y-auto p-6 md:p-10">
+      <div className="mx-auto grid max-w-7xl content-start gap-6">
         <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
           <div>
             <p className="pn-data mb-2">Phase 01 · Sélection</p>
@@ -698,21 +781,6 @@ function SelectionView(props: {
             <p className="pn-data pt-4">Aucun jeu choisi</p>
           )}
         </section>
-
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-rule pb-4">
-          <p className="pn-data">
-            {
-              props.evening.participants.filter(
-                (p) => p.present && p.selectionSubmitted,
-              ).length
-            }{" "}
-            / {props.evening.participants.filter((p) => p.present).length}{" "}
-            sélections déposées
-          </p>
-          <p className="pn-data">
-            Chaque joueur choisit 1 à {props.evening.shortlistSize}
-          </p>
-        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -781,16 +849,22 @@ function SelectionView(props: {
             })}
           </div>
         )}
+      </div>
+      </div>
 
-        <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-paper bg-ink py-4">
-          <p className="pn-data">
-            {!props.iAmParticipant
-              ? "Hors tour"
-              : props.selectionSubmitted
-                ? "Sélection déposée · modifiable avant le lancement"
-                : "Sélection personnelle · invisible aux autres"}
-          </p>
-          <div className="flex flex-wrap gap-3">
+        <footer className="shrink-0 border-t border-paper bg-ink px-6 py-3 md:px-10">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
+            <PresenceStrip
+              people={props.evening.participants
+                .filter((p) => p.present)
+                .map((p) => ({
+                  id: p.id,
+                  displayName: p.displayName,
+                  avatarUrl: p.avatarUrl,
+                  ready: p.selectionSubmitted,
+                }))}
+            />
+            <div className="flex flex-wrap items-center gap-3">
             {props.iAmParticipant ? (
               <Button
                 variant="primary"
@@ -801,7 +875,9 @@ function SelectionView(props: {
                   ? "Mettre à jour"
                   : "Valider ma sélection"}
               </Button>
-            ) : null}
+            ) : (
+              <p className="pn-data">Hors tour</p>
+            )}
             {props.iOrganize && props.evening.selectionComplete ? (
               <Button
                 variant="ghost"
@@ -811,9 +887,9 @@ function SelectionView(props: {
                 Lancer les votes
               </Button>
             ) : null}
+            </div>
           </div>
         </footer>
-      </div>
     </section>
   );
 }
@@ -1056,8 +1132,21 @@ function SetupForm(props: {
   );
 }
 
-function EveningHistory({ history }: { history: EveningSummary[] }) {
-  if (history.length === 0) return null;
+function EveningHistory({
+  history,
+  isOwner,
+  busy,
+  onDelete,
+  onClearAll,
+}: {
+  history: EveningSummary[];
+  isOwner: boolean;
+  busy: boolean;
+  onDelete: (id: string) => void;
+  onClearAll: () => void;
+}) {
+  const entries = history.filter((item) => !isLiveEveningStatus(item.status));
+  if (entries.length === 0) return null;
 
   const statusLabel = (status: EveningSummary["status"]): string => {
     switch (status) {
@@ -1080,21 +1169,50 @@ function EveningHistory({ history }: { history: EveningSummary[] }) {
     <section className="border border-rule-strong p-6">
       <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-rule pb-3">
         <p className="pn-data text-paper">Historique des soirées</p>
-        <p className="pn-data">{pad2(history.length)} entrées</p>
+        <div className="flex items-baseline gap-4">
+          <p className="pn-data">{pad2(entries.length)} entrées</p>
+          {isOwner ? (
+            <button
+              type="button"
+              className="pn-data text-veto hover:text-paper"
+              disabled={busy}
+              onClick={onClearAll}
+            >
+              Tout effacer
+            </button>
+          ) : null}
+        </div>
       </div>
       <ul className="m-0 list-none p-0">
-        {history.map((item) => (
+        {entries.map((item) => (
           <li
             key={item.id}
-            className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-rule py-3 last:border-b-0"
+            className={
+              isOwner
+                ? "grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto_auto] items-center gap-4 border-b border-rule py-3 last:border-b-0"
+                : "grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-rule py-3 last:border-b-0"
+            }
           >
             <span className="truncate font-ui text-xs font-bold uppercase tracking-[0.1em] text-paper">
-              {item.title || "Sans titre"}
+              {eveningDisplayTitle(item.title, item.createdAt)}
+            </span>
+            <span className="truncate text-sm text-paper-2">
+              {item.winnerName?.trim() || "—"}
             </span>
             <span className="pn-data">{statusLabel(item.status)}</span>
             <time className="pn-data" dateTime={item.createdAt}>
               {new Date(item.createdAt).toLocaleDateString("fr-FR")}
             </time>
+            {isOwner ? (
+              <button
+                type="button"
+                className="pn-data text-veto hover:text-paper"
+                disabled={busy}
+                onClick={() => onDelete(item.id)}
+              >
+                Effacer
+              </button>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -1219,7 +1337,7 @@ function ResultView(props: {
         {props.iOrganize ? (
           <div className="mt-auto flex flex-wrap items-center gap-4 pt-10">
             <Button variant="primary" disabled={props.busy} onClick={props.onConfirm}>
-              On joue ça
+              Confirmer
             </Button>
             <Button variant="ghost" disabled={props.busy} onClick={props.onNewRound}>
               Relancer un tour

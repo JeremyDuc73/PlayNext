@@ -95,6 +95,7 @@ export type EveningSummary = {
   round: number;
   createdAt: string;
   winnerCandidateId: string | null;
+  winnerName: string | null;
 };
 
 export type OpenEvening = {
@@ -113,6 +114,15 @@ export function isLiveEveningStatus(status: EveningStatus): boolean {
     status === "voting" ||
     status === "revealed"
   );
+}
+
+export function eveningDisplayTitle(
+  title: string | null | undefined,
+  createdAt: string,
+): string {
+  const trimmed = title?.trim();
+  if (trimmed) return trimmed;
+  return `Soirée du ${new Date(createdAt).toLocaleDateString("fr-FR")}`;
 }
 
 export type CreateEveningInput = {
@@ -294,6 +304,22 @@ export async function cancelEvening(eveningId: string): Promise<Evening> {
   if (!response.ok) throw new Error(await readError(response));
   const data = (await response.json()) as { evening: Evening };
   return data.evening;
+}
+
+export async function deleteEvening(eveningId: string): Promise<void> {
+  const response = await apiFetch(`/evenings/${eveningId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error(await readError(response));
+}
+
+export async function clearEveningHistory(groupId: string): Promise<number> {
+  const response = await apiFetch(`/groups/${groupId}/evenings/history`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { deleted?: number };
+  return data.deleted ?? 0;
 }
 
 export function voteLabel(value: VoteValue): string {

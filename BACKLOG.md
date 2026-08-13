@@ -226,7 +226,7 @@ Doc : `docs/EVENINGS.md`
 
 ### Historique & mémoire de groupe
 
-- [~] Historique soirées — liste de base disponible, détail à enrichir
+- [x] Historique soirées — nom, jeu choisi, suppression (propriétaire)
 
 - [ ] Notes / souvenirs / captures
 - [ ] Jeux les plus joués / délaissés

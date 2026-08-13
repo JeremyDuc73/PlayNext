@@ -1,7 +1,7 @@
 # Bot Discord PlayNext
 
 Le bot n’importe aucun membre. Il poste deux messages dans un salon lié :
-**Lobby ouvert** et **On joue ça**.
+**Lobby ouvert** et **Jeu choisi** (embed + jaquette si dispo).
 
 Même application Discord que l’OAuth de connexion. Pas de gateway, pas
 d’intents privilégiés.
@@ -33,14 +33,9 @@ Délier n’expulse pas le bot du serveur.
 
 ## Messages
 
-```text
-LOBBY
-Les Copains
-Soirée ouverte · 05 joueurs
+Embed vermillon, pied « PlayNext ». Notification courte + carte :
 
-ON JOUE ÇA
-Hades
-Les Copains
-```
+- Lobby : groupe, nombre de joueurs, « Soirée ouverte »
+- Jeu choisi : titre du jeu, groupe, jaquette si connue
 
 Pas de votes individuels. Si Discord est down, la soirée continue.

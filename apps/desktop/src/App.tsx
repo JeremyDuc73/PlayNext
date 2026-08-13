@@ -5,6 +5,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import clsx from "clsx";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { LibraryHub } from "./components/LibraryHub";
+import { ProfilePanel } from "./components/ProfilePanel";
 import {
   exchangeHandoff,
   fetchMe,
@@ -17,11 +18,11 @@ import {
   runningInDesktopShell,
   startDiscordLogin,
 } from "./lib/desktop-auth";
+import { fetchOpenEvenings } from "./lib/evenings";
 import { gsap, prefersReducedMotion, useGSAP, viewSwap } from "./lib/motion";
 import { Banner } from "./ui/Banner";
 import { BrandMark } from "./ui/BrandMark";
 import { Button } from "./ui/Button";
-import { DataPanel } from "./ui/DataPanel";
 import { DiscordIcon } from "./ui/DiscordIcon";
 import { SquareAvatar } from "./ui/SquareAvatar";
 
@@ -62,7 +63,7 @@ type HealthResponse = {
   database: "up" | "down";
 };
 
-type NavId = "evening" | "group" | "library";
+type NavId = "evening" | "group" | "library" | "profile";
 
 const TABS: { id: NavId; label: string }[] = [
   { id: "evening", label: "Soirée" },
@@ -74,6 +75,7 @@ const RAIL_COPY: Record<NavId, string> = {
   evening: "Choisir un jeu",
   group: "Groupe",
   library: "Bibliothèque partagée",
+  profile: "Profil",
 };
 
 export default function App() {
@@ -85,11 +87,15 @@ export default function App() {
   const [authBanner, setAuthBanner] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
   const [microsoftLinkedSignal, setMicrosoftLinkedSignal] = useState(0);
+  const [epicLinkedSignal, setEpicLinkedSignal] = useState(0);
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(
     null,
   );
   const [nav, setNav] = useState<NavId>("evening");
-  const [dataOpen, setDataOpen] = useState(false);
+  const [openEveningGroupId, setOpenEveningGroupId] = useState<string | null>(
+    null,
+  );
+  const seenOpenEveningId = useRef<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateDismissed, setUpdateDismissed] = useState(false);
@@ -275,6 +281,49 @@ export default function App() {
     };
   }, [isDesktop]);
 
+  useEffect(() => {
+    if (!user) {
+      seenOpenEveningId.current = null;
+      setOpenEveningGroupId(null);
+      return;
+    }
+    let cancelled = false;
+
+    async function checkOpenEvening() {
+      try {
+        const open = (await fetchOpenEvenings())[0];
+        if (cancelled) return;
+        if (!open) {
+          seenOpenEveningId.current = null;
+          setOpenEveningGroupId(null);
+          return;
+        }
+        setOpenEveningGroupId(open.groupId);
+        if (seenOpenEveningId.current === open.id) return;
+        seenOpenEveningId.current = open.id;
+        setNav((current) => {
+          if (current === "evening") return current;
+          if (open.status === "lobby") notify("Lobby ouvert.");
+          else if (open.status === "selection") notify("Sélection en cours.");
+          else if (open.status === "voting") notify("Vote en cours.");
+          return "evening";
+        });
+      } catch {
+        // Le polling ne doit pas spammer l’écran.
+      }
+    }
+
+    void checkOpenEvening();
+    const timer = window.setInterval(() => {
+      void checkOpenEvening();
+    }, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   useGSAP(
     () => {
       viewSwap(viewRef.current);
@@ -396,10 +445,14 @@ export default function App() {
                 />
                 <button
                   type="button"
-                  className="pn-data hover:text-paper"
-                  onClick={() => setDataOpen(true)}
+                  className={
+                    nav === "profile"
+                      ? "pn-data text-paper"
+                      : "pn-data hover:text-paper"
+                  }
+                  onClick={() => setNav("profile")}
                 >
-                  Mes données
+                  Profil
                 </button>
                 <button
                   type="button"
@@ -439,6 +492,22 @@ export default function App() {
                   <LibraryHub
                     enabled
                     microsoftLinkedSignal={microsoftLinkedSignal}
+                    epicLinkedSignal={epicLinkedSignal}
+                    onBanner={notify}
+                  />
+                ) : nav === "profile" ? (
+                  <ProfilePanel
+                    user={user}
+                    isDesktop={isDesktop}
+                    microsoftLinkedSignal={microsoftLinkedSignal}
+                    epicLinkedSignal={epicLinkedSignal}
+                    onConnectionChanged={(provider) => {
+                      if (provider === "microsoft") {
+                        setMicrosoftLinkedSignal((n) => n + 1);
+                      } else {
+                        setEpicLinkedSignal((n) => n + 1);
+                      }
+                    }}
                     onBanner={notify}
                   />
                 ) : (
@@ -446,6 +515,7 @@ export default function App() {
                     enabled
                     focus={nav === "evening" ? "evening" : "group"}
                     currentUserId={user.id}
+                    focusGroupId={openEveningGroupId}
                     pendingInviteCode={pendingInviteCode}
                     onPendingInviteConsumed={() => setPendingInviteCode(null)}
                     onBanner={notify}
@@ -470,7 +540,6 @@ export default function App() {
           <span className="pn-data">Choisir ensemble.</span>
         </footer>
       </div>
-      {dataOpen ? <DataPanel onClose={() => setDataOpen(false)} /> : null}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   hideGameFromGroup,
   joinInvite,
   leaveGroup,
+  linkGroupDiscord,
   listGroups,
   listInvites,
   removeMember,
@@ -19,6 +20,9 @@ import {
   setMemberRole,
   transferOwnership,
   unhideGameFromGroup,
+  unlinkGroupDiscord,
+  fetchGroupDiscord,
+  type GroupDiscord,
   type GroupInvite,
   type GroupLibraryGame,
   type GroupMember,
@@ -27,6 +31,7 @@ import {
 } from "../lib/groups";
 import { pad2 } from "../lib/format";
 import { staggerIn, useGSAP } from "../lib/motion";
+import { openExternalUrl } from "../lib/desktop-auth";
 import { AvatarStack } from "../ui/AvatarStack";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -42,6 +47,7 @@ type Props = {
   pendingInviteCode: string | null;
   onPendingInviteConsumed: () => void;
   onBanner: (message: string) => void;
+  focusGroupId?: string | null;
 };
 
 type LibraryFilter = "all" | "shared" | "installed";
@@ -53,6 +59,7 @@ export function GroupsPanel({
   pendingInviteCode,
   onPendingInviteConsumed,
   onBanner,
+  focusGroupId = null,
 }: Props) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +80,8 @@ export function GroupsPanel({
   const [composer, setComposer] = useState<"idle" | "create" | "join">("idle");
   const [showAdmin, setShowAdmin] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [discord, setDiscord] = useState<GroupDiscord | null>(null);
+  const [discordChannelInput, setDiscordChannelInput] = useState("");
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -127,7 +136,11 @@ export function GroupsPanel({
     void refreshList()
       .then((list) => {
         if (cancelled) return;
-        if (!selectedId && list[0]) void openGroup(list[0].id);
+        const preferred =
+          focusGroupId && list.some((group) => group.id === focusGroupId)
+            ? focusGroupId
+            : list[0]?.id;
+        if (preferred) void openGroup(preferred);
       })
       .catch(() => {
         if (!cancelled) onBanner("Impossible de charger les groupes.");
@@ -140,6 +153,33 @@ export function GroupsPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled || !focusGroupId) return;
+    if (focusGroupId === selectedId) return;
+    void openGroup(focusGroupId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, focusGroupId]);
+
+  useEffect(() => {
+    const role = detail?.group.myRole;
+    const can = role === "owner" || role === "admin";
+    if (!showAdmin || !can || !selectedId) {
+      setDiscord(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchGroupDiscord(selectedId)
+      .then((next) => {
+        if (!cancelled) setDiscord(next);
+      })
+      .catch(() => {
+        if (!cancelled) setDiscord(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showAdmin, selectedId, detail?.group.myRole]);
 
   useEffect(() => {
     if (!enabled || !pendingInviteCode) return;
@@ -353,6 +393,38 @@ export function GroupsPanel({
     }
   }
 
+  async function onLinkDiscord() {
+    if (!selectedId || !discordChannelInput.trim()) return;
+    setBusy(true);
+    try {
+      const next = await linkGroupDiscord(selectedId, discordChannelInput.trim());
+      setDiscord(next);
+      setDiscordChannelInput("");
+      onBanner("Salon Discord lié.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Liaison Discord impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onUnlinkDiscord() {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      setDiscord(await unlinkGroupDiscord(selectedId));
+      onBanner("Salon Discord délié.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Déliaison impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const myRole = detail?.group.myRole;
   const canManage = myRole === "owner" || myRole === "admin";
   const visibleLibrary = library.filter((game) => {
@@ -550,6 +622,66 @@ export function GroupsPanel({
                     >
                       Valider
                     </Button>
+                  </div>
+                ) : null}
+                {canManage ? (
+                  <div className="border-t border-rule-strong pt-4">
+                    <p className="pn-data mb-2">Discord</p>
+                    <h3 className="pn-display text-2xl">Salon du groupe</h3>
+                    {!discord ? (
+                      <p className="pn-data mt-3">…</p>
+                    ) : !discord.configured ? (
+                      <p className="mt-3 text-sm text-paper-2">
+                        Bot non configuré.
+                      </p>
+                    ) : discord.linked ? (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <p className="pn-data text-paper">
+                          {discord.guildName}
+                          {discord.channelName
+                            ? ` · ${discord.channelName}`
+                            : ""}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => void onUnlinkDiscord()}
+                        >
+                          Délier
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid gap-3">
+                        {discord.inviteUrl ? (
+                          <button
+                            type="button"
+                            className="pn-data w-fit hover:text-paper"
+                            onClick={() =>
+                              void openExternalUrl(discord.inviteUrl!)
+                            }
+                          >
+                            Inviter le bot
+                          </button>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            className="min-w-[200px] flex-1 border border-rule-strong bg-ink-deep px-3 py-2 font-data text-xs outline-none focus:border-paper"
+                            placeholder="Identifiant du salon"
+                            value={discordChannelInput}
+                            onChange={(event) =>
+                              setDiscordChannelInput(event.target.value)
+                            }
+                          />
+                          <Button
+                            variant="second"
+                            disabled={busy || !discordChannelInput.trim()}
+                            onClick={() => void onLinkDiscord()}
+                          >
+                            Lier
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : null}
                 <ul className="m-0 list-none p-0">

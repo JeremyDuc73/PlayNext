@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  disconnectEpic,
-  disconnectMicrosoft,
   addManualGame,
   deleteManualGame,
-  exchangeEpicCode,
   fetchEpicStatus,
   fetchMyHiddenLibrary,
   fetchMicrosoftStatus,
   fetchMyLibrary,
   hideLibraryGame,
-  startMicrosoftLink,
   syncEpicLibrary,
   syncSteamLibrary,
   syncXboxLibrary,
@@ -22,11 +18,9 @@ import {
   type LibraryGame,
 } from "../lib/api";
 import {
-  openExternalUrl,
   runningInDesktopShell,
-  startMicrosoftLoginNative,
 } from "../lib/desktop-auth";
-import { scanEpicLocal, startEpicLoginNative } from "../lib/epic";
+import { scanEpicLocal } from "../lib/epic";
 import {
   dedupePreferLaunchers,
   isJunkGameName,
@@ -45,6 +39,7 @@ import { PosterGrid } from "../ui/PosterGrid";
 type Props = {
   enabled: boolean;
   microsoftLinkedSignal?: number;
+  epicLinkedSignal?: number;
   onBanner: (message: string) => void;
 };
 
@@ -60,6 +55,7 @@ type LibraryCache = {
 export function LibraryHub({
   enabled,
   microsoftLinkedSignal = 0,
+  epicLinkedSignal = 0,
   onBanner,
 }: Props) {
   const isDesktop = runningInDesktopShell();
@@ -77,7 +73,6 @@ export function LibraryHub({
   const [manualDeleteTarget, setManualDeleteTarget] =
     useState<LibraryGame | null>(null);
 
-  const [msConfigured, setMsConfigured] = useState(false);
   const [msLinked, setMsLinked] = useState(false);
   const [epicLinked, setEpicLinked] = useState(false);
   const [resolvedMeta, setResolvedMeta] = useState<Map<string, GameMeta>>(
@@ -216,13 +211,11 @@ export function LibraryHub({
       fetchMicrosoftStatus()
         .then((s) => {
           if (!cancelled) {
-            setMsConfigured(s.configured);
             setMsLinked(s.linked);
           }
         })
         .catch(() => {
           if (!cancelled) {
-            setMsConfigured(false);
             setMsLinked(false);
           }
         }),
@@ -246,7 +239,7 @@ export function LibraryHub({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, microsoftLinkedSignal]);
+  }, [enabled, microsoftLinkedSignal, epicLinkedSignal]);
 
   const cleaned = useMemo(
     () => games.filter((g) => !isJunkGameName(g.name)),
@@ -284,58 +277,6 @@ export function LibraryHub({
     }
     return c;
   }, [cleaned]);
-
-  async function onConnectMs() {
-    setBusy("ms-link");
-    try {
-      const url = await startMicrosoftLink(isDesktop ? "desktop" : "web");
-      if (isDesktop) {
-        const payload = await startMicrosoftLoginNative(url);
-        if (payload.kind !== "microsoft") {
-          throw new Error("microsoft_callback_invalid");
-        }
-        if (payload.error) {
-          onBanner(`Lien Microsoft échoué (${payload.error}).`);
-        } else if (payload.ok) {
-          setMsLinked(true);
-          onBanner("Compte Microsoft / Xbox lié.");
-        }
-        return;
-      }
-      onBanner("Navigateur ouvert — valide Microsoft.");
-      await openExternalUrl(url);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "";
-      onBanner(reason || "Connexion Microsoft impossible.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onConnectEpic() {
-    if (!isDesktop) {
-      onBanner("La liaison Epic automatique nécessite l’application Windows.");
-      return;
-    }
-    setBusy("epic-link");
-    try {
-      const code = await startEpicLoginNative();
-      await exchangeEpicCode(code);
-      setEpicLinked(true);
-      onBanner("Compte Epic lié.");
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "";
-      if (reason === "epic_login_cancelled") {
-        onBanner("Connexion Epic annulée.");
-      } else if (reason === "epic_login_timeout") {
-        onBanner("Connexion Epic expirée.");
-      } else {
-        onBanner(reason || "Connexion Epic impossible.");
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onSyncAll() {
     if (!isDesktop) {
@@ -479,28 +420,6 @@ export function LibraryHub({
           >
             {busy === "sync-all" ? "Synchronisation…" : "Synchroniser"}
           </Button>
-          {msLinked ? (
-            <span className="pn-data text-paper">Xbox lié</span>
-          ) : msConfigured ? (
-            <Button
-              variant="second"
-              disabled={Boolean(busy)}
-              onClick={() => void onConnectMs()}
-            >
-              Lier Xbox
-            </Button>
-          ) : null}
-          {epicLinked ? (
-            <span className="pn-data text-paper">Epic lié</span>
-          ) : (
-            <Button
-              variant="second"
-              disabled={Boolean(busy)}
-              onClick={() => void onConnectEpic()}
-            >
-              Lier Epic
-            </Button>
-          )}
         </div>
       </div>
 
@@ -593,38 +512,6 @@ export function LibraryHub({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {msLinked ? (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              void disconnectMicrosoft()
-                .then(() => setMsLinked(false))
-                .then(() => onBanner("Microsoft déconnecté."))
-                .catch((error) =>
-                  onBanner(
-                    error instanceof Error
-                      ? error.message
-                      : "Déconnexion Xbox échouée.",
-                  ),
-                )
-            }
-          >
-            Déconnecter Xbox
-          </Button>
-        ) : null}
-        {epicLinked ? (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              void disconnectEpic()
-                .then(() => setEpicLinked(false))
-                .then(() => onBanner("Epic déconnecté."))
-                .catch(() => onBanner("Déconnexion Epic échouée."))
-            }
-          >
-            Déconnecter Epic
-          </Button>
-        ) : null}
       </div>
 
       <p className="pn-data mb-4">

@@ -2,6 +2,7 @@ import { apiFetch } from "./api";
 
 export type VoteValue = "hot" | "maybe" | "pass" | "veto";
 export type EveningStatus =
+  | "lobby"
   | "selection"
   | "voting"
   | "revealed"
@@ -48,6 +49,8 @@ export type EveningParticipant = {
   present: boolean;
   vetoAvailable: boolean;
   selectionSubmitted: boolean;
+  ready: boolean;
+  readyAt: string | null;
   hasVoted: boolean;
 };
 
@@ -63,6 +66,7 @@ export type Evening = {
   requireInstalled: boolean;
   shortlistSize: number;
   round: number;
+  lobbyComplete: boolean;
   selectionComplete: boolean;
   selectionCount: number;
   mySelectionIds: string[];
@@ -92,6 +96,24 @@ export type EveningSummary = {
   createdAt: string;
   winnerCandidateId: string | null;
 };
+
+export type OpenEvening = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  status: EveningStatus;
+  title: string | null;
+  createdAt: string;
+};
+
+export function isLiveEveningStatus(status: EveningStatus): boolean {
+  return (
+    status === "lobby" ||
+    status === "selection" ||
+    status === "voting" ||
+    status === "revealed"
+  );
+}
 
 export type CreateEveningInput = {
   title?: string;
@@ -137,6 +159,31 @@ export async function createEvening(
 
 export async function fetchEvening(eveningId: string): Promise<Evening> {
   const response = await apiFetch(`/evenings/${eveningId}`);
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evening: Evening };
+  return data.evening;
+}
+
+export async function fetchOpenEvenings(): Promise<OpenEvening[]> {
+  const response = await apiFetch("/me/open-evenings");
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evenings: OpenEvening[] };
+  return data.evenings;
+}
+
+export async function markEveningReady(eveningId: string): Promise<Evening> {
+  const response = await apiFetch(`/evenings/${eveningId}/ready`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { evening: Evening };
+  return data.evening;
+}
+
+export async function openEveningSelection(eveningId: string): Promise<Evening> {
+  const response = await apiFetch(`/evenings/${eveningId}/open-selection`, {
+    method: "POST",
+  });
   if (!response.ok) throw new Error(await readError(response));
   const data = (await response.json()) as { evening: Evening };
   return data.evening;

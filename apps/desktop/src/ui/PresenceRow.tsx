@@ -11,9 +11,15 @@ type Person = {
 
 type Props = {
   people: Person[];
+  readyLabel?: string;
+  waitingLabel?: string;
 };
 
-export function PresenceRow({ people }: Props) {
+export function PresenceRow({
+  people,
+  readyLabel = "Déposé",
+  waitingLabel = "Attente",
+}: Props) {
   const readyCount = people.filter((p) => p.ready).length;
 
   return (
@@ -30,7 +36,7 @@ export function PresenceRow({ people }: Props) {
       </div>
       <ul className="m-0 list-none p-0">
         {people.map((person, i) => (
-          <li key={person.id} className="pn-ledger-row">
+          <li key={person.id} className="pn-ledger-row" data-ticket>
             <span className="font-data text-[10px] tracking-[0.12em] text-smoke-dim">
               {pad2(i + 1)}
             </span>
@@ -52,10 +58,10 @@ export function PresenceRow({ people }: Props) {
               {person.veto ? (
                 "Veto"
               ) : person.ready ? (
-                "Déposé"
+                readyLabel
               ) : (
                 <>
-                  Attente <span className="pn-caret ml-1 align-middle" />
+                  {waitingLabel} <span className="pn-caret ml-1 align-middle" />
                 </>
               )}
             </span>

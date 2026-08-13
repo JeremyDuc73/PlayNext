@@ -130,6 +130,15 @@ export async function migrate(db: Db): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS groups_owner_id_idx ON groups(owner_id);
 
+    ALTER TABLE groups
+      ADD COLUMN IF NOT EXISTS discord_guild_id TEXT;
+    ALTER TABLE groups
+      ADD COLUMN IF NOT EXISTS discord_guild_name TEXT;
+    ALTER TABLE groups
+      ADD COLUMN IF NOT EXISTS discord_channel_id TEXT;
+    ALTER TABLE groups
+      ADD COLUMN IF NOT EXISTS discord_channel_name TEXT;
+
     CREATE TABLE IF NOT EXISTS group_members (
       group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -173,7 +182,7 @@ export async function migrate(db: Db): Promise<void> {
       group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
       created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status TEXT NOT NULL CHECK (
-        status IN ('selection', 'voting', 'revealed', 'closed', 'cancelled')
+        status IN ('lobby', 'selection', 'voting', 'revealed', 'closed', 'cancelled')
       ),
       title TEXT,
       duration_minutes INTEGER
@@ -213,7 +222,7 @@ export async function migrate(db: Db): Promise<void> {
       CHECK (shortlist_size BETWEEN 1 AND 5);
     ALTER TABLE evenings
       ADD CONSTRAINT evenings_status_check
-      CHECK (status IN ('selection', 'voting', 'revealed', 'closed', 'cancelled'));
+      CHECK (status IN ('lobby', 'selection', 'voting', 'revealed', 'closed', 'cancelled'));
     ALTER TABLE evenings
       ADD COLUMN IF NOT EXISTS vote_cursor INTEGER NOT NULL DEFAULT 0;
 
@@ -223,12 +232,15 @@ export async function migrate(db: Db): Promise<void> {
       present BOOLEAN NOT NULL DEFAULT true,
       veto_available BOOLEAN NOT NULL DEFAULT true,
       selection_submitted BOOLEAN NOT NULL DEFAULT false,
+      ready_at TIMESTAMPTZ,
       joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (evening_id, user_id)
     );
 
     ALTER TABLE evening_participants
       ADD COLUMN IF NOT EXISTS selection_submitted BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE evening_participants
+      ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
 
     UPDATE evenings
     SET status = 'selection'

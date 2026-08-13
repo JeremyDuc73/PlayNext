@@ -46,8 +46,8 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(authEpicRoutes, { config, db });
   await app.register(libraryRoutes, { db, config });
   await app.register(manualLibraryRoutes, { db, config });
-  await app.register(groupsRoutes, { db });
-  await app.register(eveningsRoutes, { db });
+  await app.register(groupsRoutes, { db, config });
+  await app.register(eveningsRoutes, { db, config });
   await app.register(metaRoutes, { db });
 
   app.get("/", async () => ({
@@ -70,9 +70,13 @@ export async function buildApp(config: Env, db: Db) {
       libraryMe: "GET /library/me",
       groups: "GET /groups",
       createGroup: "POST /groups",
+      groupDiscord: "GET /groups/:groupId/discord",
       joinInvite: "POST /invites/:code/join",
       createEvening: "POST /groups/:groupId/evenings",
       evening: "GET /evenings/:eveningId",
+      openEvenings: "GET /me/open-evenings",
+      eveningReady: "POST /evenings/:eveningId/ready",
+      eveningOpenSelection: "POST /evenings/:eveningId/open-selection",
       eveningVotes: "POST /evenings/:eveningId/votes",
     },
   }));

@@ -299,6 +299,49 @@ export async function unhideGameFromGroup(
   if (!response.ok) throw new Error(await readError(response));
 }
 
+export type GroupDiscord = {
+  configured: boolean;
+  inviteUrl: string | null;
+  linked: boolean;
+  guildId: string | null;
+  guildName: string | null;
+  channelId: string | null;
+  channelName: string | null;
+};
+
+export async function fetchGroupDiscord(
+  groupId: string,
+): Promise<GroupDiscord> {
+  const response = await apiFetch(`/groups/${groupId}/discord`);
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { discord: GroupDiscord };
+  return data.discord;
+}
+
+export async function linkGroupDiscord(
+  groupId: string,
+  channelId: string,
+): Promise<GroupDiscord> {
+  const response = await apiFetch(`/groups/${groupId}/discord`, {
+    method: "PUT",
+    body: JSON.stringify({ channelId }),
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { discord: GroupDiscord };
+  return data.discord;
+}
+
+export async function unlinkGroupDiscord(
+  groupId: string,
+): Promise<GroupDiscord> {
+  const response = await apiFetch(`/groups/${groupId}/discord`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const data = (await response.json()) as { discord: GroupDiscord };
+  return data.discord;
+}
+
 export function roleLabel(role: GroupRole): string {
   switch (role) {
     case "owner":

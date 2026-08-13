@@ -1,9 +1,17 @@
 export type EveningStatus =
+  | "lobby"
   | "selection"
   | "voting"
   | "revealed"
   | "closed"
   | "cancelled";
+
+export const OPEN_EVENING_STATUSES = [
+  "lobby",
+  "selection",
+  "voting",
+  "revealed",
+] as const satisfies readonly EveningStatus[];
 
 export type EveningVibe =
   | "chill"

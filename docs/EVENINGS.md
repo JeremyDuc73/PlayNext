@@ -4,12 +4,13 @@ Choisir un jeu pour ce soir : shortlist depuis la biblio croisée, votes masqué
 
 ## Flux
 
-1. Dans un groupe → **Lancer la soirée** (participants, durée, ambiance, contraintes)
-2. Chaque participant sélectionne 1 à N jeux dans le pool commun
-3. L’organisateur lance le vote quand toutes les sélections sont déposées
-4. Un seul jeu est affiché à la fois ; tous votent sur ce même jeu
-5. Quand tous ont voté, passage automatique au jeu suivant
-6. Résultat : **Confirmer** / revoter l’égalité / **Roulette** / nouveau tour / Annuler
+1. Dans un groupe → **Nouvelle soirée** (participants, durée, ambiance, contraintes)
+2. **Lobby** : chaque participant tamponne **Je suis prêt**. L’orga peut **Lancer sans eux** (absents hors tour).
+3. Quand tout le monde est prêt (ou l’orga lance), chacun sélectionne 1 à N jeux dans le pool commun
+4. L’organisateur lance le vote quand toutes les sélections sont déposées
+5. Un seul jeu est affiché à la fois ; tous votent sur ce même jeu
+6. Quand tous ont voté, passage automatique au jeu suivant
+7. Résultat : **Confirmer** / revoter l’égalité / **Roulette** / nouveau tour / Annuler
 
 ## Contraintes shortlist
 
@@ -45,7 +46,10 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 |---------|--------|
 | POST | `/groups/:groupId/evenings` |
 | GET | `/groups/:groupId/evenings` |
+| GET | `/me/open-evenings` |
 | GET | `/evenings/:id` |
+| POST | `/evenings/:id/ready` |
+| POST | `/evenings/:id/open-selection` |
 | POST | `/evenings/:id/selections` |
 | POST | `/evenings/:id/start-voting` |
 | POST | `/evenings/:id/current-vote` |
@@ -57,7 +61,10 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 | POST | `/evenings/:id/new-round` |
 | POST | `/evenings/:id/cancel` |
 
-Polling UI ~2,5 s (WebSocket plus tard).
+Polling UI ~2,5 s, y compris l’écran idle et les autres onglets
+(`GET /me/open-evenings`). WebSocket plus tard.
+
+Statuts : `lobby` → `selection` → `voting` → `revealed` → `closed` / `cancelled`.
 
 ## Tests moteur
 
@@ -68,7 +75,5 @@ npm run test:api
 ## Pas encore
 
 - Temps réel WebSocket
-- Lancement auto du jeu gagnant
 - Métadonnées durée catalogue
 - Exclusion absents journalisée fine
-- Bot Discord notifs

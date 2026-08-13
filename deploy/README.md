@@ -31,6 +31,9 @@ https://api.playnext.jeremyduc.dev/auth/discord/callback
 Les valeurs de production sont dans `deploy/.env.production.example`.
 Ne jamais copier `.env` dans Git.
 
+Bot de notifications : même application, token Bot, voir
+[`docs/DISCORD.md`](../docs/DISCORD.md).
+
 ## Caddy sur l’hôte
 
 Dans ton cas, Caddy n’apparaît pas dans `docker ps` : il est probablement

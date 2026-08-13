@@ -34,6 +34,9 @@ Le propriétaire ne peut pas quitter sans transférer (ou supprimer le groupe).
 | POST | `/groups/:id/library/hide` | Masquer mon jeu pour le groupe |
 | POST | `/groups/:id/library/unhide` | Réafficher |
 | GET | `/groups/:id/library/hidden` | Mes jeux masqués |
+| GET | `/groups/:id/discord` | Salon lié (admin+) |
+| PUT | `/groups/:id/discord` | `{ channelId }` — lier un salon |
+| DELETE | `/groups/:id/discord` | Délier |
 
 ## Invitation
 
@@ -69,8 +72,7 @@ Tu es « Buddy Dev » avec quelques jeux sample pour croiser la biblio.
 
 ## Pas encore (reste backlog)
 
-- Invitation / jonction depuis Discord (bot)
-- Liaison serveur + salon Discord
+- Invitation / jonction depuis Discord
 - Image upload (URL optionnelle côté API seulement)
 - Préférences collectives soirée
 - Ouverture automatique des invitations web dans l’application installée

@@ -1,7 +1,9 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { PoolClient } from "pg";
 import { z } from "zod";
 import { getSessionToken } from "../auth/request-session.js";
 import { findUserBySessionToken, toPublicUser } from "../auth/session.js";
+import type { Env } from "../config.js";
 import type { Db } from "../db.js";
 import { normalizeGameTitle } from "../library/filter.js";
 import {
@@ -13,13 +15,19 @@ import {
   resolveWinner,
   talliesFromVotes,
 } from "../evenings/scoring.js";
+import {
+  lobbyCanAdvance,
+  lobbyDropUserIds,
+} from "../evenings/lobby.js";
 import { buildShortlist } from "../evenings/shortlist.js";
 import type { EveningStatus, VoteValue } from "../evenings/types.js";
 import { getMembership } from "../groups/membership.js";
 import { isManager } from "../groups/roles.js";
+import { notifyGroupDiscord } from "../discord/notify.js";
 
 type EveningsRoutesOptions = {
   db: Db;
+  config: Env;
 };
 
 const vibeSchema = z.enum([
@@ -90,7 +98,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
   app,
   opts,
 ) => {
-  const { db } = opts;
+  const { db, config } = opts;
 
   async function requireUserId(
     request: FastifyRequest,
@@ -113,6 +121,21 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
   ): Promise<boolean> {
     const result = await db.pool.query(
       `SELECT 1 FROM evening_participants WHERE evening_id = $1 AND user_id = $2`,
+      [eveningId, userId],
+    );
+    return Boolean(result.rowCount);
+  }
+
+  async function isPresentParticipant(
+    eveningId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const result = await db.pool.query(
+      `
+        SELECT 1
+        FROM evening_participants
+        WHERE evening_id = $1 AND user_id = $2 AND present = true
+      `,
       [eveningId, userId],
     );
     return Boolean(result.rowCount);
@@ -222,6 +245,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       present: boolean;
       veto_available: boolean;
       selection_submitted: boolean;
+      ready_at: Date | null;
       discord_id: string;
       username: string;
       global_name: string | null;
@@ -229,7 +253,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     }>(
       `
         SELECT p.user_id, p.present, p.veto_available,
-               p.selection_submitted,
+               p.selection_submitted, p.ready_at,
                u.discord_id, u.username, u.global_name, u.avatar
         FROM evening_participants p
         JOIN users u ON u.id = p.user_id
@@ -323,6 +347,9 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     const allSelected =
       presentParticipants.length > 0 &&
       presentParticipants.every((p) => p.selection_submitted);
+    const allReady =
+      presentParticipants.length > 0 &&
+      presentParticipants.every((p) => p.ready_at != null);
     const currentVotedUserIds = new Set(
       currentVoteProgress.rows.map((row) => row.user_id),
     );
@@ -419,6 +446,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       shortlistSize: evening.shortlist_size,
       round: evening.round,
       selectionComplete: allSelected,
+      lobbyComplete: allReady,
       selectionCount: mySelections.rows.length,
       mySelectionIds: mySelections.rows.map((row) => row.candidate_id),
       currentCandidateIndex:
@@ -446,12 +474,16 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         present: row.present,
         vetoAvailable: row.veto_available,
         selectionSubmitted: row.selection_submitted,
+        ready: row.ready_at != null,
+        readyAt: row.ready_at,
         hasVoted:
-          evening.status === "selection"
-            ? row.selection_submitted
-            : evening.status === "voting"
-              ? currentVotedUserIds.has(row.user_id)
-              : votedUserIds.includes(row.user_id),
+          evening.status === "lobby"
+            ? row.ready_at != null
+            : evening.status === "selection"
+              ? row.selection_submitted
+              : evening.status === "voting"
+                ? currentVotedUserIds.has(row.user_id)
+                : votedUserIds.includes(row.user_id),
       })),
       candidates: candidates.rows.map((row) => ({
         id: row.id,
@@ -560,6 +592,134 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     }
 
     return (await loadEvening(evening.id))!;
+  }
+
+  async function loadLobbyParticipants(
+    eveningId: string,
+    client: PoolClient,
+  ) {
+    const result = await client.query<{
+      user_id: string;
+      present: boolean;
+      ready_at: Date | null;
+    }>(
+      `
+        SELECT user_id, present, ready_at
+        FROM evening_participants
+        WHERE evening_id = $1
+      `,
+      [eveningId],
+    );
+    return result.rows.map((row) => ({
+      userId: row.user_id,
+      present: row.present,
+      readyAt: row.ready_at,
+    }));
+  }
+
+  async function maybeAdvanceLobby(evening: EveningRow): Promise<EveningRow> {
+    if (evening.status !== "lobby") return evening;
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<EveningRow>(
+        `SELECT * FROM evenings WHERE id = $1 FOR UPDATE`,
+        [evening.id],
+      );
+      const current = locked.rows[0];
+      if (!current || current.status !== "lobby") {
+        await client.query("COMMIT");
+        return current ?? evening;
+      }
+      const participants = await loadLobbyParticipants(evening.id, client);
+      if (!lobbyCanAdvance(participants)) {
+        await client.query("COMMIT");
+        return current;
+      }
+      const updated = await client.query<EveningRow>(
+        `
+          UPDATE evenings
+          SET status = 'selection', updated_at = now()
+          WHERE id = $1
+          RETURNING *
+        `,
+        [evening.id],
+      );
+      await client.query("COMMIT");
+      return updated.rows[0]!;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async function openSelectionDroppingUnready(
+    evening: EveningRow,
+    organizerId: string,
+  ): Promise<EveningRow> {
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<EveningRow>(
+        `SELECT * FROM evenings WHERE id = $1 FOR UPDATE`,
+        [evening.id],
+      );
+      const current = locked.rows[0];
+      if (!current || current.status !== "lobby") {
+        await client.query("COMMIT");
+        return current ?? evening;
+      }
+      await client.query(
+        `
+          UPDATE evening_participants
+          SET ready_at = COALESCE(ready_at, now())
+          WHERE evening_id = $1 AND user_id = $2
+        `,
+        [evening.id, organizerId],
+      );
+      const participants = await loadLobbyParticipants(evening.id, client);
+      const dropIds = lobbyDropUserIds(participants, organizerId);
+      if (dropIds.length > 0) {
+        await client.query(
+          `
+            UPDATE evening_participants
+            SET present = false
+            WHERE evening_id = $1 AND user_id = ANY($2::uuid[])
+          `,
+          [evening.id, dropIds],
+        );
+      }
+      const remaining = await client.query<{ n: string }>(
+        `
+          SELECT COUNT(*)::text AS n
+          FROM evening_participants
+          WHERE evening_id = $1 AND present = true
+        `,
+        [evening.id],
+      );
+      if (Number(remaining.rows[0]?.n ?? 0) === 0) {
+        await client.query("ROLLBACK");
+        throw new Error("lobby_empty");
+      }
+      const updated = await client.query<EveningRow>(
+        `
+          UPDATE evenings
+          SET status = 'selection', updated_at = now()
+          WHERE id = $1
+          RETURNING *
+        `,
+        [evening.id],
+      );
+      await client.query("COMMIT");
+      return updated.rows[0]!;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async function revealEvening(evening: EveningRow): Promise<EveningRow> {
@@ -690,7 +850,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       const active = await db.pool.query<{ id: string }>(
         `
           SELECT id FROM evenings
-          WHERE group_id = $1 AND status IN ('selection', 'voting', 'revealed')
+          WHERE group_id = $1 AND status IN ('lobby', 'selection', 'voting', 'revealed')
           LIMIT 1
         `,
         [request.params.groupId],
@@ -748,7 +908,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
               group_id, created_by, status, title, duration_minutes, vibe,
               require_owned, require_installed, shortlist_size
             )
-            VALUES ($1,$2,'selection',$3,$4,$5,$6,$7,$8)
+            VALUES ($1,$2,'lobby',$3,$4,$5,$6,$7,$8)
             RETURNING *
           `,
           [
@@ -800,6 +960,12 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
 
         await client.query("COMMIT");
         const full = await serializeEvening(evening, userId);
+        void notifyGroupDiscord(db, config, evening.group_id, {
+          kind: "lobby",
+          playerCount: participantIds.length,
+        }).catch((error) => {
+          app.log.warn({ err: error, groupId: evening.group_id }, "discord_notify_failed");
+        });
         return reply.code(201).send({ ok: true, evening: full });
       } catch (error) {
         await client.query("ROLLBACK");
@@ -851,6 +1017,46 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
     },
   );
 
+  app.get("/me/open-evenings", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const result = await db.pool.query<{
+      id: string;
+      group_id: string;
+      group_name: string;
+      status: EveningStatus;
+      title: string | null;
+      created_at: Date;
+    }>(
+      `
+        SELECT e.id, e.group_id, g.name AS group_name,
+               e.status, e.title, e.created_at
+        FROM evening_participants p
+        JOIN evenings e ON e.id = p.evening_id
+        JOIN groups g ON g.id = e.group_id
+        WHERE p.user_id = $1
+          AND e.status IN ('lobby', 'selection', 'voting', 'revealed')
+        ORDER BY e.created_at DESC
+      `,
+      [userId],
+    );
+
+    return {
+      ok: true,
+      evenings: result.rows.map((row) => ({
+        id: row.id,
+        groupId: row.group_id,
+        groupName: row.group_name,
+        status: row.status,
+        title: row.title,
+        createdAt: row.created_at,
+      })),
+    };
+  });
+
   app.get<{ Params: { eveningId: string } }>(
     "/evenings/:eveningId",
     async (request, reply) => {
@@ -879,10 +1085,108 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         return { ok: true, evening: await serializeEvening(revealed, userId) };
       }
 
+      const current =
+        evening.status === "lobby" ? await maybeAdvanceLobby(evening) : evening;
+
       return {
         ok: true,
-        evening: await serializeEvening(evening, userId),
+        evening: await serializeEvening(current, userId),
       };
+    },
+  );
+
+  app.post<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId/ready",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (
+        evening.status === "selection" ||
+        evening.status === "voting" ||
+        evening.status === "revealed"
+      ) {
+        return {
+          ok: true,
+          evening: await serializeEvening(evening, userId),
+        };
+      }
+      if (evening.status !== "lobby") {
+        return reply.code(400).send({ ok: false, error: "not_lobby" });
+      }
+      if (!(await isPresentParticipant(evening.id, userId))) {
+        return reply.code(403).send({
+          ok: false,
+          error: "hors_tour",
+          message: "Hors tour.",
+        });
+      }
+
+      await db.pool.query(
+        `
+          UPDATE evening_participants
+          SET ready_at = COALESCE(ready_at, now())
+          WHERE evening_id = $1 AND user_id = $2
+        `,
+        [evening.id, userId],
+      );
+      const advanced = await maybeAdvanceLobby(evening);
+      return {
+        ok: true,
+        evening: await serializeEvening(advanced, userId),
+      };
+    },
+  );
+
+  app.post<{ Params: { eveningId: string } }>(
+    "/evenings/:eveningId/open-selection",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const evening = await loadEvening(request.params.eveningId);
+      if (!evening) {
+        return reply.code(404).send({ ok: false, error: "evening_not_found" });
+      }
+      if (!(await canOrganize(evening, userId))) {
+        return reply.code(403).send({ ok: false, error: "forbidden" });
+      }
+      if (
+        evening.status === "selection" ||
+        evening.status === "voting" ||
+        evening.status === "revealed"
+      ) {
+        return {
+          ok: true,
+          evening: await serializeEvening(evening, userId),
+        };
+      }
+      if (evening.status !== "lobby") {
+        return reply.code(400).send({ ok: false, error: "not_lobby" });
+      }
+
+      try {
+        const opened = await openSelectionDroppingUnready(evening, userId);
+        return {
+          ok: true,
+          evening: await serializeEvening(opened, userId),
+        };
+      } catch (error) {
+        if (error instanceof Error && error.message === "lobby_empty") {
+          return reply.code(400).send({
+            ok: false,
+            error: "lobby_empty",
+            message: "Personne n’est prêt.",
+          });
+        }
+        throw error;
+      }
     },
   );
 
@@ -900,8 +1204,12 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       if (evening.status !== "selection") {
         return reply.code(400).send({ ok: false, error: "not_selection" });
       }
-      if (!(await isParticipant(evening.id, userId))) {
-        return reply.code(403).send({ ok: false, error: "forbidden" });
+      if (!(await isPresentParticipant(evening.id, userId))) {
+        return reply.code(403).send({
+          ok: false,
+          error: "hors_tour",
+          message: "Hors tour.",
+        });
       }
 
       const parsed = selectionSchema.safeParse(request.body);
@@ -1069,8 +1377,12 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       if (evening.status !== "voting") {
         return reply.code(400).send({ ok: false, error: "not_voting" });
       }
-      if (!(await isParticipant(evening.id, userId))) {
-        return reply.code(403).send({ ok: false, error: "forbidden" });
+      if (!(await isPresentParticipant(evening.id, userId))) {
+        return reply.code(403).send({
+          ok: false,
+          error: "hors_tour",
+          message: "Hors tour.",
+        });
       }
       const parsed = currentVoteSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1268,8 +1580,12 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       if (evening.status !== "voting") {
         return reply.code(400).send({ ok: false, error: "not_voting" });
       }
-      if (!(await isParticipant(evening.id, userId))) {
-        return reply.code(403).send({ ok: false, error: "forbidden" });
+      if (!(await isPresentParticipant(evening.id, userId))) {
+        return reply.code(403).send({
+          ok: false,
+          error: "hors_tour",
+          message: "Hors tour.",
+        });
       }
 
       const parsed = votesSchema.safeParse(request.body);
@@ -1486,10 +1802,29 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         `,
         [evening.id, winnerId],
       );
+      const closed = updated.rows[0]!;
+      if (winnerId) {
+        const winner = await db.pool.query<{ name: string }>(
+          `SELECT name FROM evening_candidates WHERE id = $1`,
+          [winnerId],
+        );
+        const gameName = winner.rows[0]?.name;
+        if (gameName) {
+          void notifyGroupDiscord(db, config, closed.group_id, {
+            kind: "chosen",
+            gameName,
+          }).catch((error) => {
+            app.log.warn(
+              { err: error, groupId: closed.group_id },
+              "discord_notify_failed",
+            );
+          });
+        }
+      }
 
       return {
         ok: true,
-        evening: await serializeEvening(updated.rows[0]!, userId),
+        evening: await serializeEvening(closed, userId),
       };
     },
   );
@@ -1763,7 +2098,8 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       await db.pool.query(
         `
           UPDATE evening_participants
-          SET selection_submitted = false
+          SET selection_submitted = false,
+              ready_at = NULL
           WHERE evening_id = $1
         `,
         [evening.id],

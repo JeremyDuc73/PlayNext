@@ -2,10 +2,11 @@
 
 ## Produit
 
-- [`EVENINGS.md`](./EVENINGS.md) — sélection personnelle, vote séquentiel,
+- [`EVENINGS.md`](./EVENINGS.md) — lobby, sélection personnelle, vote séquentiel,
   veto, résultat ;
 - [`GROUPS.md`](./GROUPS.md) — groupes, invitations, rôles et bibliothèque
   croisée ;
+- [`DISCORD.md`](./DISCORD.md) — bot et salon de notifications ;
 - [`EPIC.md`](./EPIC.md) — liaison et synchronisation Epic ;
 - [`XBOX.md`](./XBOX.md) — liaison Microsoft/Xbox et détection locale ;
 - [`RIOT.md`](./RIOT.md) — détection locale de League of Legends et VALORANT ;

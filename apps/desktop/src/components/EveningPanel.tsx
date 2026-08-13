@@ -4,13 +4,17 @@ import {
   closeEvening,
   createEvening,
   fetchEvening,
+  isLiveEveningStatus,
   listEvenings,
+  markEveningReady,
   newEveningRound,
+  openEveningSelection,
   revoteTie,
   rouletteEvening,
   startVoting,
   submitCurrentVote,
   submitSelection,
+  vibeLabel,
   type Evening,
   type EveningSummary,
   type EveningVibe,
@@ -19,13 +23,15 @@ import {
 import type { GroupMember } from "../lib/groups";
 import { pad2 } from "../lib/format";
 import { metaMapKey, resolveGameMeta, type GameMeta } from "../lib/meta";
-import { gsap, prefersReducedMotion, staggerIn, useGSAP } from "../lib/motion";
+import { gsap, prefersReducedMotion, staggerIn, stampIn, useGSAP } from "../lib/motion";
 import { Button } from "../ui/Button";
 import { Checkbox } from "../ui/Checkbox";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EmptyHint } from "../ui/EmptyHint";
 import { coverCandidates, fallbackPosterStyle } from "../lib/covers";
 import { useCoverSrc } from "../lib/useCoverSrc";
 import { GamePoster } from "../ui/GamePoster";
+import { PresenceRow } from "../ui/PresenceRow";
 import { VoteBar } from "../ui/VoteBar";
 
 type Props = {
@@ -67,6 +73,7 @@ export function EveningPanel({
   const [selectionIds, setSelectionIds] = useState<string[]>([]);
   const [meta, setMeta] = useState<Map<string, GameMeta>>(new Map());
   const [setupOpen, setSetupOpen] = useState(false);
+  const [skipUnreadyOpen, setSkipUnreadyOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const eveningRef = useRef<Evening | null>(null);
   const selectionDirtyRef = useRef(false);
@@ -134,12 +141,7 @@ export function EveningPanel({
       try {
         const list = await refreshHistory();
         if (cancelled) return;
-        const open = list.find(
-          (e) =>
-            e.status === "selection" ||
-            e.status === "voting" ||
-            e.status === "revealed",
-        );
+        const open = list.find((e) => isLiveEveningStatus(e.status));
         if (open) await loadEvening(open.id);
         else {
           eveningRef.current = null;
@@ -160,20 +162,23 @@ export function EveningPanel({
   }, [groupId]);
 
   useEffect(() => {
-    if (
-      !evening ||
-      (evening.status !== "selection" &&
-        evening.status !== "voting" &&
-        evening.status !== "revealed")
-    ) {
-      return;
-    }
     const timer = window.setInterval(() => {
-      void loadEvening(evening.id).catch(() => undefined);
+      const current = eveningRef.current;
+      if (current && isLiveEveningStatus(current.status)) {
+        void loadEvening(current.id).catch(() => undefined);
+        return;
+      }
+      void refreshHistory()
+        .then((list) => {
+          const open = list.find((item) => isLiveEveningStatus(item.status));
+          if (open) return loadEvening(open.id);
+          return undefined;
+        })
+        .catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evening?.id, evening?.status]);
+  }, [groupId]);
 
   useGSAP(
     () => {
@@ -275,7 +280,7 @@ export function EveningPanel({
       applyEvening(created);
       setSetupOpen(false);
       await refreshHistory();
-      onBanner(`${pad2(created.candidates.length)} jeux à choisir.`);
+      onBanner("Lobby ouvert.");
     } catch (error) {
       onBanner(
         error instanceof Error ? error.message : "Création de soirée échouée.",
@@ -285,9 +290,38 @@ export function EveningPanel({
     }
   }
 
-  const iAmParticipant = Boolean(
-    evening?.participants.some((p) => p.id === currentUserId),
-  );
+  async function onReady() {
+    if (!evening) return;
+    setBusy(true);
+    try {
+      const next = await markEveningReady(evening.id);
+      applyEvening(next);
+    } catch (error) {
+      onBanner(error instanceof Error ? error.message : "Prêt impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onOpenSelection() {
+    if (!evening) return;
+    setBusy(true);
+    try {
+      const next = await openEveningSelection(evening.id);
+      applyEvening(next);
+      setSkipUnreadyOpen(false);
+      onBanner("Sélection ouverte.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Lancement impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const me = evening?.participants.find((p) => p.id === currentUserId);
+  const iAmParticipant = Boolean(me?.present);
   const mySelectionSubmitted = Boolean(
     evening?.participants.find((p) => p.id === currentUserId)
       ?.selectionSubmitted,
@@ -301,6 +335,7 @@ export function EveningPanel({
     evening.status === "closed" ||
     evening.status === "cancelled";
   return (
+    <>
     <div ref={rootRef} className="grid gap-6">
       {idle ? (
         setupOpen ? (
@@ -340,6 +375,24 @@ export function EveningPanel({
             <EveningHistory history={history} />
           </div>
         )
+      ) : evening.status === "lobby" ? (
+        <LobbyView
+          evening={evening}
+          groupName={groupName}
+          currentUserId={currentUserId}
+          iAmParticipant={iAmParticipant}
+          iOrganize={iOrganize}
+          busy={busy}
+          onReady={() => void onReady()}
+          onSkipUnready={() => setSkipUnreadyOpen(true)}
+          onCancel={() =>
+            void cancelEvening(evening.id)
+              .then((next) => applyEvening(next))
+              .then(() => refreshHistory())
+              .then(() => onBanner("Annulée."))
+              .catch((e: Error) => onBanner(e.message))
+          }
+        />
       ) : evening.status === "selection" ? (
         <SelectionView
           evening={evening}
@@ -415,6 +468,126 @@ export function EveningPanel({
         />
       ) : null}
     </div>
+    {skipUnreadyOpen && evening ? (
+      <ConfirmDialog
+        title="Lancer sans eux"
+        confirmLabel="Lancer sans eux"
+        confirmVariant="primary"
+        busy={busy}
+        busyLabel="Lancement…"
+        onConfirm={() => void onOpenSelection()}
+        onCancel={() => {
+          if (!busy) setSkipUnreadyOpen(false);
+        }}
+      >
+        Les joueurs encore en attente sortent du tour.
+      </ConfirmDialog>
+    ) : null}
+    </>
+  );
+}
+
+function LobbyView(props: {
+  evening: Evening;
+  groupName: string;
+  currentUserId: string;
+  iAmParticipant: boolean;
+  iOrganize: boolean;
+  busy: boolean;
+  onReady: () => void;
+  onSkipUnready: () => void;
+  onCancel: () => void;
+}) {
+  const stampRef = useRef<HTMLSpanElement>(null);
+  const present = props.evening.participants.filter((p) => p.present);
+  const me = present.find((p) => p.id === props.currentUserId);
+  const myReady = Boolean(me?.ready);
+  const waiting = present.some((p) => !p.ready);
+  const duration =
+    props.evening.durationMinutes == null
+      ? "Sans limite"
+      : `${props.evening.durationMinutes} min`;
+
+  useGSAP(
+    () => {
+      stampIn(stampRef.current);
+    },
+    { dependencies: [myReady] },
+  );
+
+  return (
+    <section className="fixed inset-0 z-40 overflow-y-auto bg-ink p-6 md:p-10">
+      <div className="mx-auto grid min-h-full max-w-3xl content-start gap-8">
+        <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
+          <div>
+            <p className="pn-data mb-2">Phase 00 · Lobby</p>
+            <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">Lobby</h2>
+            <p className="pn-data mt-3">
+              {props.groupName} · {vibeLabel(props.evening.vibe)} · {duration}
+            </p>
+          </div>
+          {props.iOrganize ? (
+            <button
+              type="button"
+              className="pn-data hover:text-paper"
+              disabled={props.busy}
+              onClick={props.onCancel}
+            >
+              Annuler
+            </button>
+          ) : null}
+        </header>
+
+        <PresenceRow
+          people={present.map((p) => ({
+            id: p.id,
+            displayName: p.displayName,
+            avatarUrl: p.avatarUrl,
+            ready: p.ready,
+          }))}
+          readyLabel="Prêt"
+        />
+
+        <div className="pn-sync w-full" aria-hidden>
+          <i />
+        </div>
+
+        <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-paper bg-ink py-4">
+          <p className="pn-data">
+            {props.iAmParticipant
+              ? myReady
+                ? "En attente des autres"
+                : "Présence requise"
+              : "Hors tour"}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {props.iAmParticipant && myReady ? (
+              <span ref={stampRef} className="pn-stamp">
+                Prêt
+              </span>
+            ) : null}
+            {props.iAmParticipant && !myReady ? (
+              <Button
+                variant="primary"
+                disabled={props.busy}
+                onClick={props.onReady}
+              >
+                Je suis prêt
+              </Button>
+            ) : null}
+            {props.iOrganize && waiting ? (
+              <Button
+                variant="second"
+                disabled={props.busy}
+                onClick={props.onSkipUnready}
+              >
+                Lancer sans eux
+              </Button>
+            ) : null}
+          </div>
+        </footer>
+      </div>
+    </section>
   );
 }
 
@@ -528,8 +701,13 @@ function SelectionView(props: {
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-rule pb-4">
           <p className="pn-data">
-            {props.evening.participants.filter((p) => p.selectionSubmitted).length}{" "}
-            / {props.evening.participants.length} sélections déposées
+            {
+              props.evening.participants.filter(
+                (p) => p.present && p.selectionSubmitted,
+              ).length
+            }{" "}
+            / {props.evening.participants.filter((p) => p.present).length}{" "}
+            sélections déposées
           </p>
           <p className="pn-data">
             Chaque joueur choisit 1 à {props.evening.shortlistSize}
@@ -606,9 +784,11 @@ function SelectionView(props: {
 
         <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-paper bg-ink py-4">
           <p className="pn-data">
-            {props.selectionSubmitted
-              ? "Sélection déposée · modifiable avant le lancement"
-              : "Sélection personnelle · invisible aux autres"}
+            {!props.iAmParticipant
+              ? "Hors tour"
+              : props.selectionSubmitted
+                ? "Sélection déposée · modifiable avant le lancement"
+                : "Sélection personnelle · invisible aux autres"}
           </p>
           <div className="flex flex-wrap gap-3">
             {props.iAmParticipant ? (
@@ -715,7 +895,7 @@ function SequentialVoteView(props: {
               </>
             ) : (
               <p className="pn-data border border-rule-strong px-4 py-4">
-                Spectateur · {pad2(props.evening.currentVotes)} /{" "}
+                Hors tour · {pad2(props.evening.currentVotes)} /{" "}
                 {pad2(props.evening.currentVotesTotal)} votes
               </p>
             )}
@@ -889,6 +1069,8 @@ function EveningHistory({ history }: { history: EveningSummary[] }) {
         return "Résultat";
       case "voting":
         return "Vote en cours";
+      case "lobby":
+        return "Lobby";
       case "selection":
         return "Sélection";
     }

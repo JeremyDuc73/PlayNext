@@ -19,6 +19,7 @@ const envSchema = z.object({
     .string()
     .url()
     .default("http://localhost:3001/auth/discord/callback"),
+  DISCORD_BOT_TOKEN: z.string().optional().default(""),
   STEAM_WEB_API_KEY: z.string().optional().default(""),
   MICROSOFT_CLIENT_ID: z.string().optional().default(""),
   /** Fallback when Entra app is confidential (Web) and requires a secret. */
@@ -50,6 +51,7 @@ function trimEnv(value: string | undefined): string | undefined {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Env {
   const normalized = {
     ...env,
+    DISCORD_BOT_TOKEN: trimEnv(env.DISCORD_BOT_TOKEN),
     MICROSOFT_CLIENT_ID: trimEnv(env.MICROSOFT_CLIENT_ID),
     MICROSOFT_CLIENT_SECRET: trimEnv(env.MICROSOFT_CLIENT_SECRET),
     MICROSOFT_REDIRECT_URI: trimEnv(env.MICROSOFT_REDIRECT_URI),
@@ -68,6 +70,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Env {
 
 export function isDiscordConfigured(config: Env): boolean {
   return Boolean(config.DISCORD_CLIENT_ID && config.DISCORD_CLIENT_SECRET);
+}
+
+export function isDiscordBotConfigured(config: Env): boolean {
+  return Boolean(config.DISCORD_BOT_TOKEN);
 }
 
 export function isIgdbConfigured(config: Env): boolean {

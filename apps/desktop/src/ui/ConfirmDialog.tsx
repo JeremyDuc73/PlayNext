@@ -1,10 +1,12 @@
-import { Button } from "./Button";
+import { Button, type Variant } from "./Button";
 
 type Props = {
   title: string;
   children: string;
   confirmLabel: string;
+  confirmVariant?: Variant;
   busy?: boolean;
+  busyLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -13,7 +15,9 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel,
+  confirmVariant = "veto",
   busy = false,
+  busyLabel = "Suppression…",
   onConfirm,
   onCancel,
 }: Props) {
@@ -53,8 +57,8 @@ export function ConfirmDialog({
           <Button variant="second" onClick={onCancel} disabled={busy}>
             Annuler
           </Button>
-          <Button variant="veto" onClick={onConfirm} disabled={busy}>
-            {busy ? "Suppression…" : confirmLabel}
+          <Button variant={confirmVariant} onClick={onConfirm} disabled={busy}>
+            {busy ? busyLabel : confirmLabel}
           </Button>
         </div>
       </div>

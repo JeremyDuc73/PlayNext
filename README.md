@@ -79,12 +79,18 @@ npm run dev:desktop
 | `POST /auth/epic/exchange` | Échange interne du code Epic capturé par l’application |
 | `POST /library/epic/sync` | Sync Epic (possédés + installés) |
 | `GET /library/me` | Bibliothèque sync |
+| `GET /me/open-evenings` | Soirées en cours (lobby / vote) |
+| `POST /evenings/:id/ready` | Tampon prêt au Lobby |
+| `POST /evenings/:id/open-selection` | Orga : lancer sans les absents |
+| `GET /groups/:id/discord` | Salon Discord lié |
+| `PUT /groups/:id/discord` | Lier un salon Discord |
 | `POST /library/manual/search` | Recherche manuelle IGDB |
 | `POST /library/manual` | Ajout d’un jeu catalogue à la bibliothèque |
 | `DELETE /library/manual/:externalId` | Suppression d’un jeu ajouté manuellement |
 
 Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`.  
-Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.md).
+Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.md) ·
+Bot : [`docs/DISCORD.md`](./docs/DISCORD.md).
 
 ## Scripts root
 

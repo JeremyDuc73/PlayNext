@@ -29,9 +29,9 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 3. **P1a — Scan Steam** ✅
   Connecteur Rust + fixtures, puis vrai scan sur le PC Windows. Sync API sans chemins. UI bibliothèque perso.
 4. **P1b — Autres launchers prioritaires** ✅ (partiel)
-   Steam + Xbox + Epic OK ; Riot local en validation Windows. Autres launchers **en pause**.
+   Steam + Xbox + Epic + Riot local OK. Autres launchers **en pause**.
 5. **P2 — Groupes** ← **cœur app OK**
-  Création, invitations lien, rôles, biblio croisée, masquage. Bot Discord / liaison serveur *après*.
+  Création, invitations lien, rôles, biblio croisée, masquage. Salon Discord notifs OK. Invitation depuis Discord *après*.
 6. **P3 — Soirée + votes + veto** ← **cœur OK**
   Shortlist, votes masqués, veto, révélation. WebSocket *après* (polling pour l’instant).
 7. **P4 — Achats collectifs**
@@ -109,7 +109,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [x] Steam Web API possession (profil) — via `STEAM_WEB_API_KEY` + steamId local
 - [x] Xbox / Microsoft Store — OAuth public+PKCE + title history + AppX installés (validé Windows)
 - [x] Epic Games Store — client public launcher, login WebView Tauri, library/catalogue + manifests `.item` (voir `docs/EPIC.md`)
-- [~] Riot local : League of Legends et VALORANT **séparés** — scan prêt, validation Windows restante
+- [x] Riot local : League of Legends et VALORANT **séparés** — validé sur Windows
 - [ ] Battle.net — plus tard
 - [ ] Ubisoft Connect — plus tard
 - [x] Ajout manuel depuis le catalogue IGDB ; dossier local choisi plus tard
@@ -137,24 +137,24 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [x] Création de groupe PlayNext
 - [x] Invitation par lien (`playnext://invite/<code>` + collage code)
 - [ ] Invitation / jonction depuis Discord
-- [ ] Liaison optionnelle serveur + salon Discord (pas d’import auto de tous les membres)
+- [x] Liaison optionnelle serveur + salon Discord (pas d’import auto de tous les membres)
 - [x] Rôles PlayNext : propriétaire, admin, membre (distincts des rôles Discord)
 
-- [~] Admin : nom, membres OK ; image URL API seule (pas d’upload) ; salon notif + préférences collectives plus tard
+- [~] Admin : nom, membres, salon Discord OK ; image URL API seule (pas d’upload) ; préférences collectives plus tard
 
 - [x] Bibliothèques partagées (états utiles uniquement) — possédé / installé par membre
 - [x] Masquage d’un jeu au groupe sans le supprimer en local
-- [ ] Bot / webhooks Discord :
-  - [ ] Nouvelle soirée
+- [x] Bot / webhooks Discord :
+  - [x] Nouvelle soirée (Lobby)
   - [ ] Votes terminés (sans votes individuels)
-  - [ ] Jeu choisi
+  - [x] Jeu choisi
   - [ ] Nouvelle proposition d’achat
   - [ ] Accord collectif → invitation soirée
   - [ ] Rappels facultatifs
 
 - [~] Deep links : invite → app OK ; Discord / web → ouverture app si installée
 
-Doc : `docs/GROUPS.md`
+Doc : `docs/GROUPS.md` · bot : `docs/DISCORD.md`
 
 ---
 
@@ -186,6 +186,7 @@ Doc : `docs/EVENINGS.md`
 ### Votes & veto
 
 - [x] Phase de sélection personnelle depuis la bibliothèque (1–5 jeux) avant le vote
+- [x] Lobby : présence tamponnée avant la sélection ; l’orga peut lancer sans les absents
 - [x] Vote séquentiel synchronisé, jeu par jeu
 - [x] Re-vote des égalités ou roulette au résultat
 - [x] Votes : Chaud / Pourquoi pas / Pass / Veto
@@ -196,12 +197,12 @@ Doc : `docs/EVENINGS.md`
 - [x] Révélation agrégée ; votes individuels privés par défaut
 - [x] Égalités : installé / possédé / roulette
 - [x] Tous éliminés → nouveau tour
-- [ ] Membre déconnecté / exclusion absents journalisée
+- [~] Membre déconnecté / exclusion absents journalisée — « Lancer sans eux » au Lobby (`present = false`)
 - [x] Roulette parmi meilleurs acceptés
 - [x] Relancer un tour en retirant refusés
-- [ ] Lancement du jeu gagnant
+- [-] Lancement du jeu gagnant — abandonné : l’affichage du résultat suffit
 
-- [~] Temps réel : polling UI 2,5 s ; WebSocket / Socket.IO plus tard
+- [~] Temps réel : polling UI 2,5 s (soirée live + idle + autres onglets) ; WebSocket plus tard
 
 ---
 
@@ -253,7 +254,7 @@ Doc : `docs/EVENINGS.md`
 
 ### APIs externes (caractère CDC)
 
-- [~] Discord OAuth + bot — OAuth fait, bot restant
+- [~] Discord OAuth + bot — OAuth + notifs salon ; invitation / jonction Discord plus tard
 - [~] IGDB — utilisé pour les ajouts manuels uniquement
 
 - [x] Steam Web API (recommandé)
@@ -354,11 +355,12 @@ Quand on reporte quelque chose hors phase prévue, ajouter une ligne :
 | 2026-07-30 | Bot Discord + salon notif + prefs collectives | P2 → après cœur groupes         | Groupes app d’abord ; bot ensuite                  |
 | 2026-07-30 | WebSocket soirées                             | P3 → après polling              | Flux sync d’abord ; realtime ensuite               |
 | 2026-07-30 | Site Astro vitrine/install                    | P0/P5 → après itération desktop | Tester dans l’app d’abord                          |
+| 2026-08-13 | Lancement du jeu gagnant                      | P3 → abandonné                  | L’affichage du résultat suffit                     |
 
 
 ---
 
 ## Prochaine action concrète
 
-**Mise en ligne** — finaliser Caddy/VPS, candidater SignPath, publier une
-première Release Windows et tester le parcours complet en production.
+**P4 — Achats collectifs** — propositions dans le groupe, réponses, quorum.
+Le bot Discord pourra ensuite notifier les propositions.

@@ -82,6 +82,8 @@ export async function logoutRequest(): Promise<void> {
   setStoredSessionToken(null);
 }
 
+export type GroupPlayableStatus = "multi" | "solo" | "pending" | "unknown";
+
 export type LibraryGame = {
   id: string;
   launcher: string;
@@ -93,6 +95,7 @@ export type LibraryGame = {
   coverUrl?: string | null;
   year?: number | null;
   groupPlayable?: boolean | null;
+  groupPlayableStatus?: GroupPlayableStatus;
 };
 
 export type HiddenLibraryGame = LibraryGame & {
@@ -193,6 +196,37 @@ export async function fetchMyLibrary(): Promise<{
     games: data.games,
     groupPlayableQueued: data.groupPlayableQueued ?? 0,
   };
+}
+
+export async function stampLibraryPlayable(
+  launcher: string,
+  externalId: string,
+  playable: boolean,
+): Promise<void> {
+  const response = await apiFetch("/library/playable", {
+    method: "POST",
+    body: JSON.stringify({ launcher, externalId, playable }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
+  }
+}
+
+export async function retryUnknownPlayable(): Promise<number> {
+  const response = await apiFetch("/library/playable/retry", { method: "POST" });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
+  }
+  const data = (await response.json()) as { reopened?: number };
+  return data.reopened ?? 0;
 }
 
 export async function fetchMyHiddenLibrary(): Promise<HiddenLibraryGame[]> {

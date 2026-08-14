@@ -1,19 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   disconnectEpic,
   disconnectMicrosoft,
   exchangeEpicCode,
   fetchEpicStatus,
   fetchMicrosoftStatus,
+  fetchMyLibrary,
+  retryUnknownPlayable,
+  stampLibraryPlayable,
   startMicrosoftLink,
+  type LibraryGame,
+  type User,
 } from "../lib/api";
 import {
   openExternalUrl,
   startMicrosoftLoginNative,
 } from "../lib/desktop-auth";
 import { startEpicLoginNative } from "../lib/epic";
-import type { User } from "../lib/api";
+import { pad2 } from "../lib/format";
+import {
+  launcherLabel,
+  playableStatus,
+  playableStatusLabel,
+  summarizePlayable,
+} from "../lib/playable-status";
 import { Button } from "../ui/Button";
+import { PlayableStamp } from "../ui/PlayableStamp";
 import { SquareAvatar } from "../ui/SquareAvatar";
 
 type Props = {
@@ -37,6 +49,28 @@ export function ProfilePanel({
   const [microsoftLinked, setMicrosoftLinked] = useState(false);
   const [epicLinked, setEpicLinked] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [libraryGames, setLibraryGames] = useState<LibraryGame[]>([]);
+  const [libraryQueued, setLibraryQueued] = useState(0);
+  const [restFilter, setRestFilter] = useState<"all" | "pending" | "unknown">(
+    "all",
+  );
+
+  const ranking = useMemo(
+    () => summarizePlayable(libraryGames),
+    [libraryGames],
+  );
+  const restVisible = useMemo(() => {
+    if (restFilter === "all") return ranking.remaining;
+    return ranking.remaining.filter(
+      (game) => playableStatus(game) === restFilter,
+    );
+  }, [ranking.remaining, restFilter]);
+
+  async function refreshLibrary() {
+    const library = await fetchMyLibrary();
+    setLibraryGames(library.games);
+    setLibraryQueued(library.groupPlayableQueued);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +94,28 @@ export function ProfilePanel({
       cancelled = true;
     };
   }, [microsoftLinkedSignal, epicLinkedSignal]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void refreshLibrary().catch(() => {
+      if (cancelled) return;
+      setLibraryGames([]);
+      setLibraryQueued(0);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (libraryQueued <= 0) return;
+    const timer = window.setInterval(() => {
+      void refreshLibrary().catch(() => undefined);
+    }, 8000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraryQueued]);
 
   async function linkMicrosoft() {
     setBusy("microsoft-link");
@@ -132,6 +188,38 @@ export function ProfilePanel({
     }
   }
 
+  async function onStampPlayable(game: LibraryGame, playable: boolean) {
+    setBusy("playable");
+    try {
+      await stampLibraryPlayable(game.launcher, game.externalId, playable);
+      await refreshLibrary();
+      onBanner(playable ? "Classé multi." : "Classé solo.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Classement impossible.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRetryUnknown() {
+    setBusy("retry-playable");
+    try {
+      const reopened = await retryUnknownPlayable();
+      await refreshLibrary();
+      onBanner(
+        reopened > 0 ? "Sans réponse relancés." : "Rien à relancer.",
+      );
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Relance impossible.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <section className="grid max-w-4xl gap-6">
       <header className="border-b border-rule-strong pb-5">
@@ -179,6 +267,104 @@ export function ProfilePanel({
         </div>
       </section>
 
+      <section className="border border-rule-strong">
+        <div className="border-b border-rule-strong p-4">
+          <p className="pn-data">Multi / solo</p>
+          <h3 className="pn-display mt-2 text-2xl">Classement</h3>
+          <p className="mt-3 max-w-2xl text-sm text-paper-2">
+            Steam Store puis IGDB. Tampon Multi / Solo sur un titre restant :
+            ça compte pour le groupe. Relancer ne retente que les sans réponse.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-y divide-rule-strong border-b border-rule-strong sm:grid-cols-4 sm:divide-y-0">
+          <StatCell label="Titres" value={pad2(ranking.total)} />
+          <StatCell label="Classés" value={pad2(ranking.classified)} />
+          <StatCell label="En attente" value={pad2(ranking.pending)} />
+          <StatCell label="Sans réponse" value={pad2(ranking.unknown)} />
+        </div>
+        {ranking.pending > 0 ? (
+          <p className="flex items-center gap-2 border-b border-rule-strong px-4 py-3 pn-data">
+            Classement <span className="pn-sync w-20"><i /></span>
+          </p>
+        ) : null}
+        {ranking.remaining.length === 0 ? (
+          <p className="px-4 py-6 pn-data">Tous les titres sont classés.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2 border-b border-rule-strong px-4 py-3">
+              {(
+                [
+                  ["all", "Restants"],
+                  ["pending", "En attente"],
+                  ["unknown", "Sans réponse"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={
+                    restFilter === key
+                      ? "pn-data text-paper"
+                      : "pn-data hover:text-paper"
+                  }
+                  onClick={() => setRestFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+              {ranking.unknown > 0 ? (
+                <div className="ml-auto">
+                  <Button
+                    variant="second"
+                    disabled={Boolean(busy)}
+                    onClick={() => void onRetryUnknown()}
+                  >
+                    {busy === "retry-playable"
+                      ? "Relance…"
+                      : "Relancer les sans réponse"}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+            {restVisible.length === 0 ? (
+              <p className="px-4 py-6 pn-data">Aucun titre dans ce filtre.</p>
+            ) : (
+              <ul className="m-0 list-none p-0">
+                {restVisible.map((game, index) => {
+                  const status = playableStatus(game);
+                  return (
+                    <li
+                      key={`${game.launcher}:${game.externalId}`}
+                      className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-b border-rule px-4 py-3"
+                    >
+                      <span className="pn-data text-smoke-dim">
+                        {pad2(index + 1)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-ui text-xs font-bold uppercase tracking-[0.08em]">
+                          {game.name}
+                        </span>
+                        <span className="pn-data mt-1 block">
+                          {launcherLabel(game.launcher)}
+                          {" · "}
+                          {playableStatusLabel(status)}
+                        </span>
+                      </span>
+                      <PlayableStamp
+                        disabled={Boolean(busy)}
+                        onPick={(playable) =>
+                          void onStampPlayable(game, playable)
+                        }
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </section>
+
       <section className="border border-rule-strong p-4">
         <p className="pn-data mb-2">Données</p>
         <h3 className="pn-display text-2xl">Ce que PlayNext conserve</h3>
@@ -189,6 +375,15 @@ export function ProfilePanel({
         </p>
       </section>
     </section>
+  );
+}
+
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="px-4 py-4">
+      <p className="pn-data">{label}</p>
+      <p className="pn-display mt-2 text-3xl">{value}</p>
+    </div>
   );
 }
 

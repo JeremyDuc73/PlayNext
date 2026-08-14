@@ -208,4 +208,14 @@
   .pn-ballot > button[data-veto] { @apply flex-none w-[158px] border-r-0 border-l border-paper text-veto; }
   .pn-ballot > button[data-veto]:hover,
   .pn-ballot > button[data-veto][aria-pressed="true"] { @apply bg-veto text-ink-deep; }
+
+  .pn-stamp-pair { @apply flex border border-paper; }
+  .pn-stamp-pair > button {
+    @apply px-3 py-2 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-paper
+           transition-[background-color,color] duration-90 cursor-pointer bg-transparent border-0;
+  }
+  .pn-stamp-pair > button + button { @apply border-l border-paper; }
+  .pn-stamp-pair > button:hover { @apply bg-paper text-ink-deep; }
+  .pn-stamp-pair > button:disabled { @apply text-smoke cursor-default; }
+  .pn-stamp-pair > button:disabled:hover { @apply bg-transparent text-smoke; }
 }

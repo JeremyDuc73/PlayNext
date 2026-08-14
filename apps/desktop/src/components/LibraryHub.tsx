@@ -26,6 +26,7 @@ import {
   isJunkGameName,
 } from "../lib/library-filter";
 import { pad2 } from "../lib/format";
+import { summarizePlayable } from "../lib/playable-status";
 import { metaMapKey, resolveGameMeta, type GameMeta } from "../lib/meta";
 import { scanSteamLocal } from "../lib/steam";
 import { scanXboxLocal } from "../lib/xbox";
@@ -300,16 +301,7 @@ export function LibraryHub({
     return c;
   }, [cleaned]);
 
-  const ranking = useMemo(() => {
-    const titles = dedupePreferLaunchers(cleaned);
-    let classified = 0;
-    for (const game of titles) {
-      if (game.groupPlayable === true || game.groupPlayable === false) {
-        classified += 1;
-      }
-    }
-    return { classified, total: titles.length };
-  }, [cleaned]);
+  const ranking = useMemo(() => summarizePlayable(cleaned), [cleaned]);
 
   async function onSyncAll() {
     if (!isDesktop) {
@@ -571,13 +563,18 @@ export function LibraryHub({
 
       <p className="pn-data mb-4">
         {pad2(visible.length)} jeu{visible.length > 1 ? "x" : ""}
-        {ranking.classified < ranking.total ? (
+        {ranking.pending > 0 ? (
           <>
             {" · "}
-            {pad2(ranking.classified)} / {pad2(ranking.total)} classés
+            {pad2(ranking.pending)} en attente
+          </>
+        ) : ranking.unknown > 0 ? (
+          <>
+            {" · "}
+            {pad2(ranking.unknown)} sans réponse
           </>
         ) : null}
-        {groupPlayableQueued > 0 ? (
+        {ranking.pending > 0 ? (
           <>
             {" · "}
             <span className="inline-flex items-center gap-2">

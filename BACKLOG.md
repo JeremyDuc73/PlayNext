@@ -135,6 +135,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 - [x] Exclusions playtest / demo / modkit (`isJunkGameName`)
 - [x] Exclusions outils : steam (hors SteamWorld), wallpaper, 3DMark, Aim Lab, Discord, RPG Maker XP
+- [x] Classement multi / solo : Steam + IGDB, tampon manuel sur les restants, relance des sans réponse
 
 ---
 

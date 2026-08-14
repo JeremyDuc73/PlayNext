@@ -76,11 +76,27 @@ export function isGroupPlayableQueued(input: {
   launcher: string;
   groupPlayable: boolean | null;
   source?: string | null;
+  igdbConfigured?: boolean;
 }): boolean {
   if (input.groupPlayable != null) return false;
   if (input.launcher === "riot") return false;
   if (input.source && TERMINAL_PLAYABLE_SOURCES.has(input.source)) return false;
+  if (input.igdbConfigured === false && input.source) return false;
   return true;
+}
+
+export type GroupPlayableKind = "multi" | "solo" | "pending" | "unknown";
+
+export function groupPlayableKind(input: {
+  launcher: string;
+  groupPlayable: boolean | null;
+  source?: string | null;
+  igdbConfigured?: boolean;
+}): GroupPlayableKind {
+  if (input.groupPlayable === true) return "multi";
+  if (input.groupPlayable === false) return "solo";
+  if (isGroupPlayableQueued(input)) return "pending";
+  return "unknown";
 }
 
 export function takeRoundRobin<T>(
@@ -529,6 +545,7 @@ async function persistUnknownViaIgdb(
         launcher: game.launcher,
         groupPlayable: row?.group_playable ?? null,
         source: row?.group_playable_source,
+        igdbConfigured: true,
       })
     ) {
       return false;
@@ -567,6 +584,59 @@ async function persistUnknownViaIgdb(
   return written;
 }
 
+export function gamesSharingNormalizedTitle<
+  T extends { name: string },
+>(games: T[], name: string): T[] {
+  const key = normalizeGameTitle(name);
+  if (!key) return [];
+  return games.filter((game) => normalizeGameTitle(game.name) === key);
+}
+
+export async function stampManualGroupPlayable(
+  db: Db,
+  games: Array<{ launcher: string; externalId: string; name: string }>,
+  playable: boolean,
+): Promise<number> {
+  let written = 0;
+  for (const game of games) {
+    await upsertGroupPlayable(db, {
+      launcher: game.launcher,
+      externalId: game.externalId,
+      name: game.name,
+      playable,
+      source: "manual",
+    });
+    written += 1;
+  }
+  return written;
+}
+
+export async function reopenUnknownGroupPlayable(
+  db: Db,
+  games: Array<{ launcher: string; externalId: string }>,
+): Promise<number> {
+  if (games.length === 0) return 0;
+  const result = await db.pool.query(
+    `
+      UPDATE game_meta gm
+      SET group_playable = NULL,
+          group_playable_source = NULL,
+          fetched_at = now()
+      FROM unnest($1::text[], $2::text[]) AS x(launcher, external_id)
+      WHERE gm.launcher = x.launcher
+        AND gm.external_id = x.external_id
+        AND gm.group_playable IS NULL
+        AND gm.group_playable_source IS NOT NULL
+        AND gm.group_playable_source NOT IN ('manual', 'riot')
+    `,
+    [
+      games.map((game) => game.launcher),
+      games.map((game) => game.externalId),
+    ],
+  );
+  return result.rowCount ?? 0;
+}
+
 let enriching: Promise<void> | null = null;
 
 export async function persistMissingGroupPlayable(
@@ -574,8 +644,9 @@ export async function persistMissingGroupPlayable(
   games: Array<{ launcher: string; externalId: string; name: string }>,
   config?: Env,
 ): Promise<void> {
-  if (enriching) return enriching;
-  enriching = (async () => {
+  const previous = enriching;
+  const run = (async () => {
+    if (previous) await previous;
     await persistMissingSteamGroupPlayable(
       db,
       games.filter((game) => game.launcher === "steam"),
@@ -584,7 +655,8 @@ export async function persistMissingGroupPlayable(
     await persistMissingGroupPlayableBySteamTitle(db, games);
     if (config) await persistUnknownViaIgdb(db, games, config);
   })().finally(() => {
-    enriching = null;
+    if (enriching === run) enriching = null;
   });
-  return enriching;
+  enriching = run;
+  return run;
 }

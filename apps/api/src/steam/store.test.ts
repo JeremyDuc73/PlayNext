@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  gamesSharingNormalizedTitle,
   groupPlayableFromSteamCategories,
+  groupPlayableKind,
   isGroupPlayableQueued,
   shouldStopSteamEnrichment,
   steamTitleSearchWrite,
@@ -58,6 +60,64 @@ describe("isGroupPlayableQueued", () => {
         source: "igdb_miss",
       }),
       false,
+    );
+  });
+
+  it("treats a store miss as settled when IGDB is off", () => {
+    assert.equal(
+      isGroupPlayableQueued({
+        launcher: "xbox",
+        groupPlayable: null,
+        source: "steam_store_search_miss",
+        igdbConfigured: false,
+      }),
+      false,
+    );
+  });
+});
+
+describe("groupPlayableKind", () => {
+  it("splits classified, pending, and catalogue misses", () => {
+    assert.equal(
+      groupPlayableKind({
+        launcher: "steam",
+        groupPlayable: true,
+        source: "steam_store",
+      }),
+      "multi",
+    );
+    assert.equal(
+      groupPlayableKind({
+        launcher: "steam",
+        groupPlayable: null,
+        source: null,
+      }),
+      "pending",
+    );
+    assert.equal(
+      groupPlayableKind({
+        launcher: "xbox",
+        groupPlayable: null,
+        source: "igdb_miss",
+      }),
+      "unknown",
+    );
+  });
+});
+
+describe("gamesSharingNormalizedTitle", () => {
+  it("keeps every launcher copy of the same title", () => {
+    const games = [
+      { launcher: "xbox", name: "Hades" },
+      { launcher: "epic", name: "Hades" },
+      { launcher: "steam", name: "Celeste" },
+    ];
+    assert.deepEqual(
+      gamesSharingNormalizedTitle(games, "HADES"),
+      [
+        { launcher: "xbox", name: "Hades" },
+        { launcher: "epic", name: "Hades" },
+      ],
     );
   });
 });

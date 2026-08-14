@@ -2,7 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { Env } from "../config.js";
-import { isMicrosoftConfigured } from "../config.js";
+import { isMicrosoftConfigured, isIgdbConfigured } from "../config.js";
 import type { Db } from "../db.js";
 import { getSessionToken } from "../auth/request-session.js";
 import { findUserBySessionToken } from "../auth/session.js";
@@ -15,9 +15,17 @@ import {
 import { fetchSteamOwnedGames, mergeSteamLibrary } from "../steam/owned.js";
 import { getValidEpicAccessToken } from "../epic/tokens.js";
 import { fetchEpicLibrary, mergeEpicLibrary } from "../epic/library.js";
-import { filterJunkGames, isJunkGameName, normalizeGameTitle, resolveGroupPlayable } from "../library/filter.js";
+import { filterJunkGames, isJunkGameName, normalizeGameTitle, resolveGroupPlayable, groupPlayableOverride } from "../library/filter.js";
 import { riotCoverUrl } from "../meta/covers.js";
-import { persistMissingGroupPlayable, loadGroupPlayableByTitle, isGroupPlayableQueued } from "../steam/store.js";
+import {
+  persistMissingGroupPlayable,
+  loadGroupPlayableByTitle,
+  isGroupPlayableQueued,
+  groupPlayableKind,
+  gamesSharingNormalizedTitle,
+  stampManualGroupPlayable,
+  reopenUnknownGroupPlayable,
+} from "../steam/store.js";
 
 type LibraryRoutesOptions = {
   db: Db;
@@ -75,6 +83,10 @@ const riotSyncBodySchema = z.object({
 const hiddenGameSchema = z.object({
   launcher: z.string().min(1).max(32),
   externalId: z.string().min(1).max(256),
+});
+
+const playableStampSchema = hiddenGameSchema.extend({
+  playable: z.boolean(),
 });
 
 export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
@@ -712,6 +724,136 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     return { ok: true };
   });
 
+  app.post("/library/playable", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = playableStampSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: "invalid_body" });
+    }
+
+    const owned = await db.pool.query<{
+      launcher: string;
+      external_id: string;
+      name: string;
+      group_playable: boolean | null;
+    }>(
+      `
+        SELECT ug.launcher, ug.external_id, ug.name, gm.group_playable
+        FROM user_games ug
+        LEFT JOIN game_meta gm
+          ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
+        WHERE ug.user_id = $1 AND ug.hidden = false
+      `,
+      [userId],
+    );
+    const target = owned.rows.find(
+      (row) =>
+        row.launcher === parsed.data.launcher &&
+        row.external_id === parsed.data.externalId,
+    );
+    if (!target) {
+      return reply.code(404).send({
+        ok: false,
+        error: "game_not_in_library",
+        message: "Jeu absent de ta bibliothèque.",
+      });
+    }
+    if (target.launcher === "riot" || groupPlayableOverride(target.name) != null) {
+      return reply.code(409).send({
+        ok: false,
+        error: "playable_locked",
+        message: "Titre déjà tranché.",
+      });
+    }
+
+    const byTitle = await loadGroupPlayableByTitle(db);
+    const current = resolveGroupPlayable({
+      name: target.name,
+      launcher: target.launcher,
+      stored: target.group_playable,
+      byTitle: byTitle.get(normalizeGameTitle(target.name)),
+    });
+    if (current != null) {
+      return reply.code(409).send({
+        ok: false,
+        error: "playable_locked",
+        message: "Titre déjà classé.",
+      });
+    }
+
+    const stamped = await stampManualGroupPlayable(
+      db,
+      gamesSharingNormalizedTitle(owned.rows, target.name).map((row) => ({
+        launcher: row.launcher,
+        externalId: row.external_id,
+        name: row.name,
+      })),
+      parsed.data.playable,
+    );
+    return { ok: true, stamped };
+  });
+
+  app.post("/library/playable/retry", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const games = await db.pool.query<{
+      launcher: string;
+      external_id: string;
+      name: string;
+      group_playable: boolean | null;
+      group_playable_source: string | null;
+    }>(
+      `
+        SELECT ug.launcher, ug.external_id, ug.name,
+               gm.group_playable, gm.group_playable_source
+        FROM user_games ug
+        LEFT JOIN game_meta gm
+          ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
+        WHERE ug.user_id = $1 AND ug.hidden = false
+      `,
+      [userId],
+    );
+
+    const igdbConfigured = isIgdbConfigured(config);
+    const byTitle = await loadGroupPlayableByTitle(db);
+    const unknown = games.rows
+      .filter((row) => !isJunkGameName(row.name))
+      .filter((row) => {
+        const groupPlayable = resolveGroupPlayable({
+          name: row.name,
+          launcher: row.launcher,
+          stored: row.group_playable,
+          byTitle: byTitle.get(normalizeGameTitle(row.name)),
+        });
+        return (
+          groupPlayableKind({
+            launcher: row.launcher,
+            groupPlayable,
+            source: row.group_playable_source,
+            igdbConfigured,
+          }) === "unknown"
+        );
+      })
+      .map((row) => ({
+        launcher: row.launcher,
+        externalId: row.external_id,
+        name: row.name,
+      }));
+
+    const reopened = await reopenUnknownGroupPlayable(db, unknown);
+    void persistMissingGroupPlayable(db, unknown, config).catch((error) => {
+      request.log.warn({ err: error }, "group_playable_retry_failed");
+    });
+    return { ok: true, reopened };
+  });
+
   app.get("/library/me", async (request, reply) => {
     const userId = await requireUserId(request);
     if (!userId) {
@@ -767,6 +909,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       [userId],
     );
 
+    const igdbConfigured = isIgdbConfigured(config);
     const byTitle = await loadGroupPlayableByTitle(db);
     const mapped = games.rows
       .filter((row) => !isJunkGameName(row.name))
@@ -777,6 +920,12 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
           stored: row.group_playable,
           byTitle: byTitle.get(normalizeGameTitle(row.name)),
         });
+        const playableInput = {
+          launcher: row.launcher,
+          groupPlayable,
+          source: row.group_playable_source,
+          igdbConfigured,
+        };
         return {
           id: row.id,
           launcher: row.launcher,
@@ -790,11 +939,8 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
             row.cover_url ?? riotCoverUrl(row.launcher, row.external_id),
           year: row.year,
           groupPlayable,
-          queued: isGroupPlayableQueued({
-            launcher: row.launcher,
-            groupPlayable,
-            source: row.group_playable_source,
-          }),
+          groupPlayableStatus: groupPlayableKind(playableInput),
+          queued: isGroupPlayableQueued(playableInput),
         };
       });
 
@@ -824,6 +970,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         coverUrl: game.coverUrl,
         year: game.year,
         groupPlayable: game.groupPlayable,
+        groupPlayableStatus: game.groupPlayableStatus,
       })),
       groupPlayableQueued: mapped.filter((game) => game.queued).length,
       lastSync: lastSync.rows[0]

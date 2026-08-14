@@ -92,7 +92,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 
 - [x] Direction artistique — **« BULLETIN »** (Tailwind + GSAP) : encre, filets, blocs inversés, tampons
 - [x] Tokens CSS + composants `apps/desktop/src/ui/*`
-- [x] Covers launcher (Steam CDN, TitleHub, Epic) ; IGDB manuel pour le catalogue
+- [x] Covers launcher (Steam CDN, TitleHub, Epic, Riot/Twitch) ; IGDB manuel pour le catalogue
 
 - [~] Principes UX CDC : vide / chargement de base ; hors ligne / MAJ / confidentialité à approfondir
 - [~] Accessibilité de base (focus, contraste, clavier) — focus visible + contraste ; approfondir en P5
@@ -110,6 +110,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [x] Xbox / Microsoft Store — OAuth public+PKCE + title history + AppX installés (validé Windows)
 - [x] Epic Games Store — client public launcher, login WebView Tauri, library/catalogue + manifests `.item` (voir `docs/EPIC.md`)
 - [x] Riot local : League of Legends et VALORANT **séparés** — validé sur Windows
+- [x] Jaquettes Riot (LoL, VALORANT) — box art Twitch
 - [ ] Battle.net — plus tard
 - [ ] Ubisoft Connect — plus tard
 - [x] Ajout manuel depuis le catalogue IGDB ; dossier local choisi plus tard
@@ -130,6 +131,11 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
 - [x] Sync manuelle
 - [x] Mode hors ligne limité (biblio locale + dernières données sync)
 
+### Filtres biblio
+
+- [x] Exclusions playtest / demo / modkit (`isJunkGameName`)
+- [x] Exclusions outils : steam (hors SteamWorld), wallpaper, 3DMark, Aim Lab, Discord, RPG Maker XP
+
 ---
 
 ## P2 — Groupes & Discord
@@ -148,6 +154,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
   - [x] Nouvelle soirée (Lobby)
   - [ ] Votes terminés (sans votes individuels)
   - [x] Jeu choisi
+  - [ ] Proposition de soirée (jeu + places)
   - [ ] Nouvelle proposition d’achat
   - [ ] Accord collectif → invitation soirée
   - [ ] Rappels facultatifs
@@ -168,12 +175,16 @@ Doc : `docs/EVENINGS.md`
 - [x] Durée
 - [x] Ambiance
 - [x] Sélection depuis les bibliothèques personnelles / installation optionnelle
+- [ ] Proposition directe : un membre choisit un jeu + un max de places (soirée sans shortlist / votes)
+  - [ ] Annonce Discord (salon du groupe) — plus tard
+  - [ ] Réservation des places par les autres membres — plus tard
 
 - [~] Préférences (récents via diversité gagnants ; oubliés / campagne / gratuit / exclusions fines plus tard)
 
 ### Recommandation (règles, pas IA obligatoire)
 
 - [x] Filtres obligatoires (participants / compatibilité) + installation optionnelle
+- [x] Soirées / groupes : hors solo (Steam Store + même titre Xbox/Epic + IGDB manuel)
 
 - [~] Classement (installé, possession, diversité récents ; envie/fréquence/historique enrichis plus tard)
 
@@ -356,6 +367,7 @@ Quand on reporte quelque chose hors phase prévue, ajouter une ligne :
 | 2026-07-30 | WebSocket soirées                             | P3 → après polling              | Flux sync d’abord ; realtime ensuite               |
 | 2026-07-30 | Site Astro vitrine/install                    | P0/P5 → après itération desktop | Tester dans l’app d’abord                          |
 | 2026-08-13 | Lancement du jeu gagnant                      | P3 → abandonné                  | L’affichage du résultat suffit                     |
+| 2026-08-13 | Proposition soirée : Discord + réservation    | P3 → après le flux jeu + places | D’abord créer/proposer ; notif et places ensuite   |
 
 
 ---

@@ -1,7 +1,21 @@
-/** Covers launcher : Steam CDN (+ TitleHub / Epic via game_meta). */
+/** Covers launcher : Steam CDN (+ TitleHub / Epic via game_meta + Twitch Riot). */
 
 export function metaKey(launcher: string, externalId: string): string {
   return `${launcher}:${externalId}`;
+}
+
+const RIOT_COVERS: Record<string, string> = {
+  league_of_legends:
+    "https://static-cdn.jtvnw.net/ttv-boxart/League%20of%20Legends.jpg",
+  valorant: "https://static-cdn.jtvnw.net/ttv-boxart/VALORANT.jpg",
+};
+
+export function riotCoverUrl(
+  launcher: string,
+  externalId: string,
+): string | null {
+  if (launcher !== "riot") return null;
+  return RIOT_COVERS[externalId] ?? null;
 }
 
 export function steamLibraryPosterUrl(

@@ -49,6 +49,7 @@ Le propriétaire ne peut pas quitter sans transférer (ou supprimer le groupe).
 
 - Agrège les `user_games` des membres (`owned`, non `hidden` globalement)
 - Exclut les entrées de `group_hidden_games` **par membre**
+- Exclut les jeux solo connus (Steam, même titre Xbox/Epic, IGDB manuel). La biblio perso les garde.
 - États utiles : qui possède / qui a installé, compteurs `X/Y`
 - Masquer ≠ supprimer de la biblio perso
 

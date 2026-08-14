@@ -24,7 +24,7 @@ import type { EveningStatus, VoteValue } from "../evenings/types.js";
 import { getMembership } from "../groups/membership.js";
 import { isManager, isOwner } from "../groups/roles.js";
 import { notifyGroupDiscord } from "../discord/notify.js";
-import { steamLibraryPosterUrl } from "../meta/covers.js";
+import { riotCoverUrl, steamLibraryPosterUrl } from "../meta/covers.js";
 
 type EveningsRoutesOptions = {
   db: Db;
@@ -1898,7 +1898,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
             row.cover_url ||
             (row.launcher === "steam"
               ? steamLibraryPosterUrl(row.external_id)
-              : null);
+              : riotCoverUrl(row.launcher, row.external_id));
           void notifyGroupDiscord(db, config, closed.group_id, {
             kind: "chosen",
             gameName: row.name,

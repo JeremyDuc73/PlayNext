@@ -1,3 +1,4 @@
+import { isVisibleInGroup } from "../library/filter.js";
 import type { LibraryGameAgg, ShortlistCandidate } from "./types.js";
 
 export type ShortlistOptions = {
@@ -64,7 +65,7 @@ export function buildShortlist(
   const eligible = games.filter((game) => {
     if (exclude.has(gameKey(game))) return false;
     if (game.ownedCount < 1) return false;
-    if (game.groupPlayable === false) return false;
+    if (!isVisibleInGroup(game.groupPlayable ?? null)) return false;
     if (options.requireOwned && game.ownedCount < game.participantCount) {
       return false;
     }

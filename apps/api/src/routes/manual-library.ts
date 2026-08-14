@@ -110,9 +110,9 @@ export const manualLibraryRoutes: FastifyPluginAsync<Options> = async (
       `
         INSERT INTO game_meta (
           launcher, external_id, name, igdb_id, cover_image_id,
-          cover_url, year, source, fetched_at
+          cover_url, year, source, group_playable, group_playable_source, fetched_at
         )
-        VALUES ('manual', $1, $2, $3, $4, $5, $6, 'igdb_manual', now())
+        VALUES ('manual', $1, $2, $3, $4, $5, $6, 'igdb_manual', $7, 'igdb', now())
         ON CONFLICT (launcher, external_id) DO UPDATE SET
           name = EXCLUDED.name,
           igdb_id = EXCLUDED.igdb_id,
@@ -120,6 +120,8 @@ export const manualLibraryRoutes: FastifyPluginAsync<Options> = async (
           cover_url = EXCLUDED.cover_url,
           year = EXCLUDED.year,
           source = 'igdb_manual',
+          group_playable = EXCLUDED.group_playable,
+          group_playable_source = EXCLUDED.group_playable_source,
           fetched_at = now()
       `,
       [
@@ -129,6 +131,7 @@ export const manualLibraryRoutes: FastifyPluginAsync<Options> = async (
         game.coverImageId,
         game.coverUrl,
         game.year,
+        game.groupPlayable,
       ],
     );
 

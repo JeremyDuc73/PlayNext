@@ -50,11 +50,15 @@ describe("buildShortlist", () => {
       [
         game({ name: "Elden Ring", externalId: "1245620", groupPlayable: false }),
         game({ name: "Overcooked 2", externalId: "728880", groupPlayable: true }),
+        game({ name: "Unknown", externalId: "9", groupPlayable: null }),
       ],
       { requireOwned: true, requireInstalled: false, shortlistSize: 8 },
     );
 
-    assert.deepEqual(list.map((candidate) => candidate.name), ["Overcooked 2"]);
+    assert.deepEqual(list.map((candidate) => candidate.name), [
+      "Overcooked 2",
+      "Unknown",
+    ]);
   });
 
   it("penalizes recent winners but can still include them", () => {

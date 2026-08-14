@@ -20,9 +20,14 @@ import {
 } from "../groups/roles.js";
 import {
   isJunkGameName,
+  isVisibleInGroup,
   launcherRank,
+  mergeGroupPlayable,
   normalizeGameTitle,
+  resolveGroupPlayable,
 } from "../library/filter.js";
+import { riotCoverUrl } from "../meta/covers.js";
+import { persistMissingGroupPlayable, loadGroupPlayableByTitle } from "../steam/store.js";
 
 type GroupsRoutesOptions = {
   db: Db;
@@ -1121,13 +1126,17 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
         username: string;
         global_name: string | null;
         avatar: string | null;
+        group_playable: boolean | null;
       }>(
         `
           SELECT ug.launcher, ug.external_id, ug.name, ug.installed, ug.launchable,
-                 u.id AS user_id, u.discord_id, u.username, u.global_name, u.avatar
+                 u.id AS user_id, u.discord_id, u.username, u.global_name, u.avatar,
+                 gm.group_playable
           FROM group_members m
           JOIN users u ON u.id = m.user_id
           JOIN user_games ug ON ug.user_id = m.user_id
+          LEFT JOIN game_meta gm
+            ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
           WHERE m.group_id = $1
             AND ug.owned = true
             AND ug.hidden = false
@@ -1149,6 +1158,19 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
         [request.params.groupId],
       );
 
+      void persistMissingGroupPlayable(
+        db,
+        games.rows.map((row) => ({
+          launcher: row.launcher,
+          externalId: row.external_id,
+          name: row.name,
+        })),
+      ).catch((error) => {
+        request.log.warn({ err: error }, "group_playable_enrich_failed");
+      });
+
+      const playableByTitle = await loadGroupPlayableByTitle(db);
+
       type Owner = {
         userId: string;
         displayName: string;
@@ -1165,6 +1187,7 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
           externalId: string;
           name: string;
           owners: Map<string, Owner>;
+          groupPlayable: boolean | null;
         }
       >();
 
@@ -1189,6 +1212,13 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
           launchable: row.launchable,
         };
 
+        const rowGroupPlayable = resolveGroupPlayable({
+          name: row.name,
+          launcher: row.launcher,
+          stored: row.group_playable,
+          byTitle: playableByTitle.get(titleKey),
+        });
+
         const existing = byTitle.get(titleKey);
         if (!existing) {
           byTitle.set(titleKey, {
@@ -1196,6 +1226,7 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
             externalId: row.external_id,
             name: row.name,
             owners: new Map([[owner.userId, owner]]),
+            groupPlayable: rowGroupPlayable,
           });
           continue;
         }
@@ -1206,6 +1237,11 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
         } else if (owner.installed && !prev.installed) {
           existing.owners.set(owner.userId, owner);
         }
+
+        existing.groupPlayable = mergeGroupPlayable(
+          existing.groupPlayable,
+          rowGroupPlayable,
+        );
 
         if (launcherRank(row.launcher) < launcherRank(existing.launcher)) {
           existing.launcher = row.launcher;
@@ -1227,6 +1263,7 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
       );
 
       const libraryBase = [...byTitle.values()]
+        .filter((game) => isVisibleInGroup(game.groupPlayable))
         .map((game) => {
           const owners = [...game.owners.values()];
           return {
@@ -1285,7 +1322,10 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
 
       const library = libraryBase.map((game) => ({
         ...game,
-        coverUrl: coverByKey.get(game.key) ?? null,
+        coverUrl:
+          coverByKey.get(game.key) ??
+          riotCoverUrl(game.launcher, game.externalId) ??
+          null,
       }));
 
       return {

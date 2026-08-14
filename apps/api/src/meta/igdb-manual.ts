@@ -1,5 +1,6 @@
 import type { Env } from "../config.js";
 import { isIgdbConfigured } from "../config.js";
+import { groupPlayableFromIgdbModes } from "../library/filter.js";
 
 type TokenCache = {
   token: string;
@@ -14,6 +15,7 @@ export type ManualCatalogGame = {
   coverImageId: string | null;
   coverUrl: string | null;
   year: number | null;
+  groupPlayable: boolean | null;
 };
 
 function igdbCoverUrl(imageId: string): string {
@@ -70,6 +72,7 @@ function mapGame(raw: {
   name?: string;
   cover?: { image_id?: string };
   first_release_date?: number;
+  game_modes?: number[];
 }): ManualCatalogGame {
   const coverImageId = raw.cover?.image_id ?? null;
   return {
@@ -80,6 +83,7 @@ function mapGame(raw: {
     year: raw.first_release_date
       ? new Date(raw.first_release_date * 1000).getUTCFullYear()
       : null,
+    groupPlayable: groupPlayableFromIgdbModes(raw.game_modes),
   };
 }
 
@@ -98,11 +102,12 @@ export async function searchManualGames(
     name?: string;
     cover?: { image_id?: string };
     first_release_date?: number;
+    game_modes?: number[];
   };
   const rows = await post<Raw>(
     config,
     `search "${escapeSearch(value)}";\n` +
-      "fields name, cover.image_id, first_release_date;\n" +
+      "fields name, cover.image_id, first_release_date, game_modes;\n" +
       "where version_parent = null;\n" +
       "limit 12;",
   );
@@ -118,10 +123,11 @@ export async function fetchManualGame(
     name?: string;
     cover?: { image_id?: string };
     first_release_date?: number;
+    game_modes?: number[];
   };
   const rows = await post<Raw>(
     config,
-    `fields name, cover.image_id, first_release_date;\n` +
+    `fields name, cover.image_id, first_release_date, game_modes;\n` +
       `where id = ${Math.floor(igdbId)};\n` +
       "limit 1;",
   );

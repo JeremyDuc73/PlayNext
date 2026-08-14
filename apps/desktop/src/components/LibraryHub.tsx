@@ -65,6 +65,7 @@ export function LibraryHub({
   const [query, setQuery] = useState("");
   const [launcher, setLauncher] = useState<LauncherFilter>("all");
   const [installedOnly, setInstalledOnly] = useState(false);
+  const [playMode, setPlayMode] = useState<"all" | "multi" | "solo">("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualQuery, setManualQuery] = useState("");
@@ -253,10 +254,12 @@ export function LibraryHub({
     return scoped.filter((g) => {
       if (launcher !== "all" && g.launcher !== launcher) return false;
       if (installedOnly && !g.installed) return false;
+      if (playMode === "multi" && g.groupPlayable !== true) return false;
+      if (playMode === "solo" && g.groupPlayable !== false) return false;
       if (q && !g.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [cleaned, launcher, installedOnly, query]);
+  }, [cleaned, launcher, installedOnly, playMode, query]);
 
   const counts = useMemo(() => {
     const dedupedAll = dedupePreferLaunchers(cleaned);
@@ -401,6 +404,28 @@ export function LibraryHub({
           onClick={() => setInstalledOnly((v) => !v)}
         >
           Installés
+        </button>
+        <button
+          type="button"
+          className={
+            playMode === "multi"
+              ? "pn-data text-paper"
+              : "pn-data hover:text-paper"
+          }
+          onClick={() => setPlayMode((v) => (v === "multi" ? "all" : "multi"))}
+        >
+          Multi
+        </button>
+        <button
+          type="button"
+          className={
+            playMode === "solo"
+              ? "pn-data text-paper"
+              : "pn-data hover:text-paper"
+          }
+          onClick={() => setPlayMode((v) => (v === "solo" ? "all" : "solo"))}
+        >
+          Solo
         </button>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button

@@ -25,12 +25,18 @@ Chaque joueur choisit ensuite entre 1 et N jeux, avec N fixé par l’hôte entr
 | Pas en commun | `ownedCount < participants` + indication des absents |
 | Installation | filtre optionnel au lancement du pool |
 | Durée | minutes libres entre 15 et 600, ou sans limite |
-| Jouable en groupe | exclut les jeux marqués solo par le catalogue launcher |
+| Jouable en groupe | exclut les jeux marqués solo (Steam Store + exceptions) |
 | Fallback | si 0 résultat → assouplit l’installation |
 
 Diversité : les gagnants récents du groupe sont pénalisés (pas exclus).
-La propriété « jouable en groupe » vient du Steam Store quand disponible ;
-les exceptions produit restent dans le filtre (ex. Elden Ring).
+La propriété « jouable en groupe » vient du Steam Store (catégories multi / co-op).
+Les solo **connus** n’apparaissent ni dans la biblio groupe ni dans le pool de soirée ;
+ils restent dans la bibliothèque personnelle (filtre Multi / Solo).
+Les titres encore non classés restent visibles dans le groupe le temps du
+classement. Steam Store classe les AppIDs Steam ; le même titre est réutilisé
+pour Xbox / Epic / manuel. Les jeux absents de Steam sont cherchés par nom
+dans le Store (titre strictement identique). Les ajouts manuels IGDB utilisent
+les `game_modes`. LoL / VALORANT sont toujours multi.
 
 ## Scores
 

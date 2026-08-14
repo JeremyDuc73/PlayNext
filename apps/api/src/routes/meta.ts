@@ -5,6 +5,7 @@ import { findUserBySessionToken } from "../auth/session.js";
 import type { Db } from "../db.js";
 import {
   metaKey,
+  riotCoverUrl,
   steamCoverFallbackUrls,
   steamLibraryPosterUrl,
 } from "../meta/covers.js";
@@ -137,7 +138,7 @@ export const metaRoutes: FastifyPluginAsync<MetaRoutesOptions> = async (
         cachedCover ??
         (item.launcher === "steam"
           ? steamLibraryPosterUrl(item.externalId)
-          : null);
+          : riotCoverUrl(item.launcher, item.externalId));
 
       return {
         key,
@@ -153,7 +154,11 @@ export const metaRoutes: FastifyPluginAsync<MetaRoutesOptions> = async (
         genres: [] as string[],
         source:
           (row?.source === "igdb" ? null : row?.source) ??
-          (item.launcher === "steam" ? "steam_cdn" : "none"),
+          (item.launcher === "steam"
+            ? "steam_cdn"
+            : item.launcher === "riot"
+              ? "twitch_boxart"
+              : "none"),
       };
     });
 

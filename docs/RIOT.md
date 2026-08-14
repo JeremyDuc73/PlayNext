@@ -19,3 +19,7 @@ riot:valorant
 
 Le Riot Client seul n’est pas ajouté comme jeu. Les deux titres restent séparés
 dans la bibliothèque.
+
+Les jaquettes viennent du CDN Twitch (box art 600×800), comme pour les covers
+Steam / Xbox / Epic. Un nouveau **Scan Riot** n’est pas obligatoire : la liste
+et les soirées résolvent déjà l’URL.

@@ -19,7 +19,13 @@ export function isJunkGameName(name: string): boolean {
     n.includes("(demo)") ||
     n.includes("[demo]") ||
     n.includes(" - playtest") ||
-    n.includes("(playtest)")
+    n.includes("(playtest)") ||
+    /\bsteam(?!\s*world)/i.test(n) ||
+    /\bwallpaper\b/i.test(n) ||
+    /3d\s*mark/i.test(n) ||
+    /\baim\s*labs?\b/i.test(n) ||
+    /\bdiscord\b/i.test(n) ||
+    /\brpg\s*maker\s*xp\b/i.test(n)
   );
 }
 

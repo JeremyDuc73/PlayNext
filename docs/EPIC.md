@@ -38,6 +38,7 @@ Au sync, PlayNext lit `keyImages` du catalogue (`DieselGameBoxTall` / `OfferImag
 - Le code d’auth expire rapidement
 - On ne garde que les **jeux lançables** (filtre catalogue Epic, style Playnite) : pas DLC seuls, extras, plugins, Unreal Engine
 - Titres *playtest* / *demo* / *modkit* exclus automatiquement
+- Aussi exclus : Steam (outils, pas SteamWorld), wallpaper, 3DMark, Aim Lab, Discord, RPG Maker XP
 - Les titres viennent du **catalogue** Epic (plus d’IDs hex bruts)
 - Jeux gérés par EA/Ubisoft via Epic peuvent encore apparaître
 - Rescanne après MAJ pour rafraîchir la liste

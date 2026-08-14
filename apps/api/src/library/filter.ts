@@ -7,7 +7,7 @@ const LAUNCHER_RANK: Record<string, number> = {
   riot: 3,
 };
 
-/** Drop playtests, demos, modkits, etc. */
+/** Drop playtests, demos, tools, and other non-games. */
 export function isJunkGameName(name: string): boolean {
   const n = name.toLowerCase();
   // word-ish matches so "Democracy" isn't killed by "demo"
@@ -21,7 +21,13 @@ export function isJunkGameName(name: string): boolean {
     n.includes("(demo)") ||
     n.includes("[demo]") ||
     n.includes(" - playtest") ||
-    n.includes("(playtest)")
+    n.includes("(playtest)") ||
+    /\bsteam(?!\s*world)/i.test(n) ||
+    /\bwallpaper\b/i.test(n) ||
+    /3d\s*mark/i.test(n) ||
+    /\baim\s*labs?\b/i.test(n) ||
+    /\bdiscord\b/i.test(n) ||
+    /\brpg\s*maker\s*xp\b/i.test(n)
   );
 }
 
@@ -98,12 +104,53 @@ export function filterJunkGames<T extends { name: string }>(games: T[]): T[] {
 /**
  * Exceptions produit : certains jeux ont du coop en ligne mais ne sont pas
  * adaptés à une décision de groupe « on joue tous ensemble ».
- * Ils restent visibles dans la bibliothèque.
+ * Ils restent visibles dans la bibliothèque personnelle.
  */
 const GROUP_INCOMPATIBLE_TITLES = new Set(["elden ring"]);
 
+const GROUP_PLAYABLE_TITLES = new Set(["league of legends", "valorant"]);
+
 export function groupPlayableOverride(name: string): boolean | null {
-  return GROUP_INCOMPATIBLE_TITLES.has(normalizeGameTitle(name))
-    ? false
-    : null;
+  const key = normalizeGameTitle(name);
+  if (GROUP_INCOMPATIBLE_TITLES.has(key)) return false;
+  if (GROUP_PLAYABLE_TITLES.has(key)) return true;
+  return null;
+}
+
+export function resolveGroupPlayable(input: {
+  name: string;
+  launcher: string;
+  stored?: boolean | null;
+  byTitle?: boolean | null;
+}): boolean | null {
+  const override = groupPlayableOverride(input.name);
+  if (override != null) return override;
+  if (input.launcher === "riot") return true;
+  if (input.stored != null) return input.stored;
+  return input.byTitle ?? null;
+}
+
+/** IGDB : 1 solo · 2 multi · 3 coop · 4 split-screen · 5 MMO · 6 battle royale */
+export function groupPlayableFromIgdbModes(
+  modeIds: number[] | null | undefined,
+): boolean | null {
+  if (!modeIds?.length) return null;
+  const GROUP = new Set([2, 3, 4, 5, 6]);
+  if (modeIds.some((id) => GROUP.has(id))) return true;
+  if (modeIds.includes(1)) return false;
+  return null;
+}
+
+/** Solo connus hors groupe / soirée. Inconnus visibles jusqu’au classement Steam. */
+export function isVisibleInGroup(playable: boolean | null): boolean {
+  return playable !== false;
+}
+
+export function mergeGroupPlayable(
+  current: boolean | null,
+  next: boolean | null,
+): boolean | null {
+  if (current === true || next === true) return true;
+  if (current === false || next === false) return false;
+  return null;
 }

@@ -1,10 +1,13 @@
 import type { Db } from "../db.js";
 import {
-  groupPlayableOverride,
   isJunkGameName,
+  isVisibleInGroup,
   launcherRank,
+  mergeGroupPlayable,
   normalizeGameTitle,
+  resolveGroupPlayable,
 } from "../library/filter.js";
+import { loadGroupPlayableByTitle } from "../steam/store.js";
 import type { LibraryGameAgg } from "./types.js";
 
 /** Aggregate owned/installed games for a set of evening participants. */
@@ -55,6 +58,7 @@ export async function fetchParticipantLibrary(
     [participantIds, groupId],
   );
 
+  const playableByTitle = await loadGroupPlayableByTitle(db);
   const participantCount = participantIds.length;
 
   type Acc = {
@@ -65,23 +69,18 @@ export async function fetchParticipantLibrary(
     groupPlayable: boolean | null;
   };
 
-  function mergeGroupPlayable(
-    current: boolean | null,
-    next: boolean | null,
-  ): boolean | null {
-    if (current === true || next === true) return true;
-    if (current === false || next === false) return false;
-    return null;
-  }
-
   const byTitle = new Map<string, Acc>();
 
   for (const row of result.rows) {
     if (isJunkGameName(row.name)) continue;
     const titleKey = normalizeGameTitle(row.name);
     if (!titleKey) continue;
-    const rowGroupPlayable =
-      groupPlayableOverride(row.name) ?? row.group_playable ?? null;
+    const rowGroupPlayable = resolveGroupPlayable({
+      name: row.name,
+      launcher: row.launcher,
+      stored: row.group_playable,
+      byTitle: playableByTitle.get(titleKey),
+    });
 
     const existing = byTitle.get(titleKey);
     if (!existing) {
@@ -117,8 +116,14 @@ export async function fetchParticipantLibrary(
       ownedCount: acc.owners.size,
       installedCount: [...acc.owners.values()].filter(Boolean).length,
       participantCount,
-      groupPlayable: groupPlayableOverride(acc.name) ?? acc.groupPlayable,
+      groupPlayable: resolveGroupPlayable({
+        name: acc.name,
+        launcher: acc.launcher,
+        stored: acc.groupPlayable,
+        byTitle: playableByTitle.get(normalizeGameTitle(acc.name)),
+      }),
     }))
+    .filter((game) => isVisibleInGroup(game.groupPlayable ?? null))
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 

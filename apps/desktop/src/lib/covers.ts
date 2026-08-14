@@ -25,6 +25,20 @@ function steamPosterAsset(appId: string, filename: string): string {
   return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/${filename}`;
 }
 
+const RIOT_COVERS: Record<string, string> = {
+  league_of_legends:
+    "https://static-cdn.jtvnw.net/ttv-boxart/League%20of%20Legends.jpg",
+  valorant: "https://static-cdn.jtvnw.net/ttv-boxart/VALORANT.jpg",
+};
+
+export function riotCoverUrl(
+  launcher: string | undefined,
+  externalId: string | undefined,
+): string | null {
+  if (launcher !== "riot" || !externalId) return null;
+  return RIOT_COVERS[externalId] ?? null;
+}
+
 export function coverCandidates(input: {
   coverUrl?: string | null;
   launcher?: string;
@@ -44,6 +58,10 @@ export function coverCandidates(input: {
       push(steamPosterAsset(id, "library_600x900.jpg"));
       for (const fallback of input.fallbackUrls ?? []) push(fallback);
     }
+  } else if (input.launcher === "riot") {
+    push(input.coverUrl);
+    push(riotCoverUrl(input.launcher, input.externalId));
+    push(input.fallbackUrls?.[0]);
   } else {
     push(input.coverUrl);
     // Les launchers non-Steam ne possèdent pas de ladder fiable :

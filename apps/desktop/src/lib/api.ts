@@ -92,6 +92,7 @@ export type LibraryGame = {
   launchable: boolean;
   coverUrl?: string | null;
   year?: number | null;
+  groupPlayable?: boolean | null;
 };
 
 export type HiddenLibraryGame = LibraryGame & {

@@ -15,7 +15,9 @@ import {
 import { fetchSteamOwnedGames, mergeSteamLibrary } from "../steam/owned.js";
 import { getValidEpicAccessToken } from "../epic/tokens.js";
 import { fetchEpicLibrary, mergeEpicLibrary } from "../epic/library.js";
-import { filterJunkGames, isJunkGameName } from "../library/filter.js";
+import { filterJunkGames, isJunkGameName, normalizeGameTitle, resolveGroupPlayable } from "../library/filter.js";
+import { riotCoverUrl } from "../meta/covers.js";
+import { persistMissingGroupPlayable, loadGroupPlayableByTitle } from "../steam/store.js";
 
 type LibraryRoutesOptions = {
   db: Db;
@@ -172,6 +174,28 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     try {
       await client.query("begin");
       await syncSourceGames(client, userId, "riot", parsed.data.games);
+      for (const game of parsed.data.games) {
+        const coverUrl = riotCoverUrl("riot", game.externalId);
+        if (!coverUrl) continue;
+        await client.query(
+          `
+            INSERT INTO game_meta (
+              launcher, external_id, name, cover_url, source,
+              group_playable, group_playable_source, fetched_at
+            )
+            VALUES ('riot', $1, $2, $3, 'twitch_boxart', true, 'riot', now())
+            ON CONFLICT (launcher, external_id) DO UPDATE SET
+              name = EXCLUDED.name,
+              cover_url = EXCLUDED.cover_url,
+              source = EXCLUDED.source,
+              group_playable = EXCLUDED.group_playable,
+              group_playable_source = EXCLUDED.group_playable_source,
+              fetched_at = now()
+            WHERE game_meta.source <> 'igdb_manual'
+          `,
+          [game.externalId, game.name, coverUrl],
+        );
+      }
       await client.query(
         `
           INSERT INTO library_sync_runs (user_id, source, game_count)
@@ -525,6 +549,17 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
 
     const installed = games.filter((g) => g.installed).length;
 
+    void persistMissingGroupPlayable(
+      db,
+      games.map((game) => ({
+        launcher: "steam",
+        externalId: game.externalId,
+        name: game.name,
+      })),
+    ).catch((error) => {
+      request.log.warn({ err: error }, "steam_group_playable_enrich_failed");
+    });
+
     return {
       ok: true,
       synced: games.length,
@@ -585,7 +620,8 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         installed: Boolean(row.installed),
         owned: row.owned ?? true,
         launchable: row.launchable ?? false,
-        coverUrl: row.cover_url,
+        coverUrl:
+          row.cover_url ?? riotCoverUrl(row.launcher, row.external_id),
         year: row.year,
         hiddenAt: row.created_at,
       })),
@@ -692,6 +728,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       synced_at: Date;
       cover_url: string | null;
       year: number | null;
+      group_playable: boolean | null;
     }>(
       `
         SELECT ug.id, ug.launcher, ug.external_id, ug.name, ug.installed,
@@ -701,7 +738,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
                   AND gm.source <> 'igdb_manual' THEN NULL
                  ELSE gm.cover_url
                END AS cover_url,
-               gm.year
+               gm.year, gm.group_playable
         FROM user_games ug
         LEFT JOIN game_meta gm
           ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
@@ -728,6 +765,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       [userId],
     );
 
+    const byTitle = await loadGroupPlayableByTitle(db);
     const mapped = games.rows
       .filter((row) => !isJunkGameName(row.name))
       .map((row) => ({
@@ -739,9 +777,27 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         owned: row.owned,
         launchable: row.launchable,
         syncedAt: row.synced_at,
-        coverUrl: row.cover_url,
+        coverUrl:
+          row.cover_url ?? riotCoverUrl(row.launcher, row.external_id),
         year: row.year,
+        groupPlayable: resolveGroupPlayable({
+          name: row.name,
+          launcher: row.launcher,
+          stored: row.group_playable,
+          byTitle: byTitle.get(normalizeGameTitle(row.name)),
+        }),
       }));
+
+    void persistMissingGroupPlayable(
+      db,
+      mapped.map((game) => ({
+        launcher: game.launcher,
+        externalId: game.externalId,
+        name: game.name,
+      })),
+    ).catch((error) => {
+      request.log.warn({ err: error }, "group_playable_enrich_failed");
+    });
 
     return {
       ok: true,

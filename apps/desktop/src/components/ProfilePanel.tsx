@@ -8,6 +8,7 @@ import {
   fetchMyLibrary,
   retryUnknownPlayable,
   stampLibraryPlayable,
+  clearLibraryPlayable,
   startMicrosoftLink,
   type LibraryGame,
   type User,
@@ -203,6 +204,21 @@ export function ProfilePanel({
     }
   }
 
+  async function onClearPlayable(game: LibraryGame) {
+    setBusy("clear-playable");
+    try {
+      await clearLibraryPlayable(game.launcher, game.externalId);
+      await refreshLibrary();
+      onBanner("Tampon annulé.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Annulation impossible.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onRetryUnknown() {
     setBusy("retry-playable");
     try {
@@ -272,8 +288,9 @@ export function ProfilePanel({
           <p className="pn-data">Multi / solo</p>
           <h3 className="pn-display mt-2 text-2xl">Classement</h3>
           <p className="mt-3 max-w-2xl text-sm text-paper-2">
-            Steam Store puis IGDB. Tampon Multi / Solo sur un titre restant :
-            ça compte pour le groupe. Relancer ne retente que les sans réponse.
+            Steam Store puis IGDB, noms Xbox / Epic nettoyés. Tampon Multi / Solo
+            sur un titre restant : ça compte pour le groupe. Annuler remet le
+            titre en file. Relancer ne retente que les sans réponse.
           </p>
         </div>
         <div className="grid grid-cols-2 divide-x divide-y divide-rule-strong border-b border-rule-strong sm:grid-cols-4 sm:divide-y-0">
@@ -363,6 +380,42 @@ export function ProfilePanel({
             )}
           </>
         )}
+        {ranking.manuals.length > 0 ? (
+          <>
+            <div className="border-t border-rule-strong px-4 py-3">
+              <p className="pn-data">Tampons manuels</p>
+            </div>
+            <ul className="m-0 list-none p-0">
+              {ranking.manuals.map((game, index) => (
+                <li
+                  key={`manual:${game.launcher}:${game.externalId}`}
+                  className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-b border-rule px-4 py-3"
+                >
+                  <span className="pn-data text-smoke-dim">
+                    {pad2(index + 1)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-ui text-xs font-bold uppercase tracking-[0.08em]">
+                      {game.name}
+                    </span>
+                    <span className="pn-data mt-1 block">
+                      {launcherLabel(game.launcher)}
+                      {" · "}
+                      {playableStatusLabel(playableStatus(game))}
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    disabled={Boolean(busy)}
+                    onClick={() => void onClearPlayable(game)}
+                  >
+                    {busy === "clear-playable" ? "…" : "Annuler"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </section>
 
       <section className="border border-rule-strong p-4">

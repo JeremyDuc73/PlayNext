@@ -22,6 +22,7 @@ export function isJunkGameName(name: string): boolean {
     n.includes("[demo]") ||
     n.includes(" - playtest") ||
     n.includes("(playtest)") ||
+    (/\blauncher\b/i.test(n) && !/\bminecraft\s+launcher\b/i.test(n)) ||
     /\bsteam(?!\s*world)/i.test(n) ||
     /\bwallpaper\b/i.test(n) ||
     /3d\s*mark/i.test(n) ||
@@ -31,7 +32,10 @@ export function isJunkGameName(name: string): boolean {
   );
 }
 
-/** Normalize title for cross-launcher duplicate detection. */
+/** Normalize title for cross-launcher duplicate detection and catalogue match. */
+const TITLE_NOISE =
+  /\b(goty|game of the year|game preview|early access|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows(?:\s*10)?|win10|pc|xbox|steam|epic|preview|battlemode|launcher|beta|alpha|celebration|anniversary|legendary|premium|enhanced|microsoft store)\b/g;
+
 export function normalizeGameTitle(name: string): string {
   return name
     .toLowerCase()
@@ -40,13 +44,61 @@ export function normalizeGameTitle(name: string): string {
     .replace(/™|®|©/g, "")
     .replace(/\([^)]*\)/g, " ")
     .replace(/\[[^\]]*\]/g, " ")
-    .replace(
-      /\b(goty|game of the year|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows|pc|xbox|steam|epic)\b/g,
-      " ",
-    )
+    .replace(TITLE_NOISE, " ")
     .replace(/[^a-z0-9]+/g, " ")
+    .replace(/beta$/g, "")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+/** Terme envoyé à Steam / IGDB : sans parenthèses ni suffixe Windows. */
+export function catalogSearchTerm(name: string): string {
+  let raw = name
+    .replace(/™|®|©/g, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ");
+  const parts = raw.split(/\s+[-–—]\s+/);
+  if (parts.length > 1) {
+    const tail = normalizeGameTitle(parts.slice(1).join(" "));
+    if (!tail || /^(windows|pc|xbox|steam|epic|win10)$/.test(tail)) {
+      raw = parts[0] ?? raw;
+    }
+  }
+  return normalizeGameTitle(raw) || normalizeGameTitle(name);
+}
+
+/** 2 = même titre · 1 = préfixe prudent · 0 = non. */
+export function catalogMatchRank(wanted: string, candidate: string): number {
+  const a = normalizeGameTitle(wanted);
+  const b = normalizeGameTitle(candidate);
+  if (!a || !b) return 0;
+  if (a === b || a.replace(/\s+/g, "") === b.replace(/\s+/g, "")) return 2;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  const words = short.split(" ").filter(Boolean).length;
+  if (words < 3 || short.length < 12) return 0;
+  if (!long.startsWith(`${short} `)) return 0;
+  const extra = long.slice(short.length).trim().split(" ").filter(Boolean);
+  if (extra.length === 0 || extra.length > 2) return 0;
+  return 1;
+}
+
+export function titlesMatchForCatalog(wanted: string, candidate: string): boolean {
+  return catalogMatchRank(wanted, candidate) > 0;
+}
+
+export function pickCatalogMatch<T>(
+  wanted: string,
+  items: T[],
+  nameOf: (item: T) => string,
+): T | undefined {
+  let best: { item: T; rank: number } | undefined;
+  for (const item of items) {
+    const rank = catalogMatchRank(wanted, nameOf(item));
+    if (rank === 0) continue;
+    if (!best || rank > best.rank) best = { item, rank };
+    if (rank === 2) return item;
+  }
+  return best?.item;
 }
 
 export function launcherRank(launcher: string): number {

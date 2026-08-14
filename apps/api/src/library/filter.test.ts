@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  catalogSearchTerm,
   dedupePreferLaunchers,
   groupPlayableFromIgdbModes,
   groupPlayableOverride,
   isJunkGameName,
   isVisibleInGroup,
   normalizeGameTitle,
+  pickCatalogMatch,
   resolveGroupPlayable,
+  titlesMatchForCatalog,
 } from "./filter.js";
 
 describe("isJunkGameName", () => {
@@ -27,6 +30,7 @@ describe("isJunkGameName", () => {
     assert.equal(isJunkGameName("Aimlabs"), true);
     assert.equal(isJunkGameName("Discord"), true);
     assert.equal(isJunkGameName("RPG Maker XP"), true);
+    assert.equal(isJunkGameName("Epic Games Launcher"), true);
   });
 
   it("keeps normal titles", () => {
@@ -36,6 +40,8 @@ describe("isJunkGameName", () => {
     assert.equal(isJunkGameName("SteamWorld Dig"), false);
     assert.equal(isJunkGameName("League of Legends"), false);
     assert.equal(isJunkGameName("VALORANT"), false);
+    assert.equal(isJunkGameName("Minecraft"), false);
+    assert.equal(isJunkGameName("Minecraft Launcher"), false);
   });
 });
 
@@ -115,5 +121,92 @@ describe("dedupePreferLaunchers", () => {
     ]);
     assert.equal(out.length, 1);
     assert.equal(out[0]!.launcher, "steam");
+  });
+});
+
+describe("normalizeGameTitle", () => {
+  it("strips Xbox/Epic store noise", () => {
+    assert.equal(
+      normalizeGameTitle("DOOM ETERNAL (BATTLEMODE - PC)"),
+      "doom eternal",
+    );
+    assert.equal(
+      normalizeGameTitle("HARDSPACE: SHIPBREAKER - WINDOWS"),
+      "hardspace shipbreaker",
+    );
+    assert.equal(
+      normalizeGameTitle("HEROES OF MIGHT AND MAGIC: OLDEN ERA (GAME PREVIEW)"),
+      "heroes of might and magic olden era",
+    );
+    assert.equal(normalizeGameTitle("KILLINGFLOOR2BETA"), "killingfloor2");
+    assert.equal(normalizeGameTitle("ROCKET LEAGUE®"), "rocket league");
+    assert.equal(
+      normalizeGameTitle("STAR WARS™ BATTLEFRONT™ II: CELEBRATION EDITION"),
+      "star wars battlefront ii",
+    );
+    assert.equal(normalizeGameTitle("SNOWRUNNER - WINDOWS"), "snowrunner");
+    assert.equal(
+      normalizeGameTitle("LIGHTYEAR FRONTIER (GAME PREVIEW)"),
+      "lightyear frontier",
+    );
+    assert.equal(normalizeGameTitle("Minecraft Launcher"), "minecraft");
+  });
+});
+
+describe("catalogSearchTerm", () => {
+  it("drops Windows tails but keeps real subtitles", () => {
+    assert.equal(
+      catalogSearchTerm("HARDSPACE: SHIPBREAKER - WINDOWS"),
+      "hardspace shipbreaker",
+    );
+    assert.equal(
+      catalogSearchTerm("HUNDRED DAYS - WINEMAKING SIMULATOR"),
+      "hundred days winemaking simulator",
+    );
+    assert.equal(
+      catalogSearchTerm("DOOM ETERNAL (BATTLEMODE - PC)"),
+      "doom eternal",
+    );
+  });
+});
+
+describe("titlesMatchForCatalog", () => {
+  it("matches glued names and store suffixes", () => {
+    assert.equal(
+      titlesMatchForCatalog("KILLINGFLOOR2BETA", "Killing Floor 2"),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog("DOOM ETERNAL (BATTLEMODE - PC)", "DOOM Eternal"),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog("ROCKET LEAGUE®", "Rocket League"),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog("Minecraft Launcher", "Minecraft"),
+      true,
+    );
+  });
+
+  it("does not match a franchise prefix to a sequel", () => {
+    assert.equal(
+      titlesMatchForCatalog("Call of Duty: Black Ops 6", "Call of Duty"),
+      false,
+    );
+    assert.equal(titlesMatchForCatalog("Killing Floor 2", "Killing Floor"), false);
+  });
+
+  it("prefers an exact catalogue hit over a prefix", () => {
+    const hit = pickCatalogMatch(
+      "Heroes of Might and Magic: Olden Era",
+      [
+        { name: "Heroes of Might and Magic 3" },
+        { name: "Heroes of Might and Magic: Olden Era" },
+      ],
+      (row) => row.name,
+    );
+    assert.equal(hit?.name, "Heroes of Might and Magic: Olden Era");
   });
 });

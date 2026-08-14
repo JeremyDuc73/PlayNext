@@ -2,7 +2,12 @@ import type { Db } from "../db.js";
 import type { Env } from "../config.js";
 import { isIgdbConfigured } from "../config.js";
 import { lookupIgdbGroupPlayable } from "../meta/igdb-manual.js";
-import { mergeGroupPlayable, normalizeGameTitle } from "../library/filter.js";
+import {
+  mergeGroupPlayable,
+  normalizeGameTitle,
+  catalogSearchTerm,
+  pickCatalogMatch,
+} from "../library/filter.js";
 
 export type GroupPlayable = boolean | null;
 
@@ -405,8 +410,10 @@ async function copyGroupPlayableByTitle(
 
 async function searchSteamAppId(name: string): Promise<SteamSearchLookup> {
   try {
+    const term = catalogSearchTerm(name);
+    if (!term) return { status: "miss" };
     const url = new URL("https://store.steampowered.com/api/storesearch/");
-    url.searchParams.set("term", name);
+    url.searchParams.set("term", term);
     url.searchParams.set("l", "english");
     url.searchParams.set("cc", "US");
     const response = await steamFetch(url);
@@ -419,16 +426,15 @@ async function searchSteamAppId(name: string): Promise<SteamSearchLookup> {
       };
     }
     const data = (await response.json()) as StoreSearch;
-    const wanted = normalizeGameTitle(name);
-    if (!wanted) return { status: "miss" };
-    for (const item of data.items ?? []) {
-      if (item.type && item.type !== "app") continue;
-      if (!item.id) continue;
-      if (normalizeGameTitle(item.name ?? "") === wanted) {
-        return { status: "match", appId: String(item.id) };
-      }
-    }
-    return { status: "miss" };
+    const match = pickCatalogMatch(
+      name,
+      (data.items ?? []).filter(
+        (item) => (!item.type || item.type === "app") && item.id,
+      ),
+      (item) => item.name ?? "",
+    );
+    if (!match?.id) return { status: "miss" };
+    return { status: "match", appId: String(match.id) };
   } catch {
     return { status: "retry" };
   }
@@ -609,6 +615,30 @@ export async function stampManualGroupPlayable(
     written += 1;
   }
   return written;
+}
+
+export async function clearManualGroupPlayable(
+  db: Db,
+  games: Array<{ launcher: string; externalId: string }>,
+): Promise<number> {
+  if (games.length === 0) return 0;
+  const result = await db.pool.query(
+    `
+      UPDATE game_meta gm
+      SET group_playable = NULL,
+          group_playable_source = NULL,
+          fetched_at = now()
+      FROM unnest($1::text[], $2::text[]) AS x(launcher, external_id)
+      WHERE gm.launcher = x.launcher
+        AND gm.external_id = x.external_id
+        AND gm.group_playable_source = 'manual'
+    `,
+    [
+      games.map((game) => game.launcher),
+      games.map((game) => game.externalId),
+    ],
+  );
+  return result.rowCount ?? 0;
 }
 
 export async function reopenUnknownGroupPlayable(

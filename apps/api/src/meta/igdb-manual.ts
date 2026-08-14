@@ -2,7 +2,8 @@ import type { Env } from "../config.js";
 import { isIgdbConfigured } from "../config.js";
 import {
   groupPlayableFromIgdbModes,
-  normalizeGameTitle,
+  catalogSearchTerm,
+  pickCatalogMatch,
 } from "../library/filter.js";
 
 type TokenCache = {
@@ -126,7 +127,7 @@ export async function lookupIgdbGroupPlayable(
   | { status: "classified"; playable: boolean }
 > {
   if (!isIgdbConfigured(config)) return { status: "miss" };
-  const value = name.trim().slice(0, 100);
+  const value = catalogSearchTerm(name) || name.trim().slice(0, 100);
   if (!value) return { status: "miss" };
 
   type Raw = {
@@ -136,17 +137,17 @@ export async function lookupIgdbGroupPlayable(
   };
   const rows = await post<Raw>(
     config,
-    `search "${escapeSearch(value)}";\n` +
+    `search "${escapeSearch(value.slice(0, 100))}";\n` +
       "fields name, game_modes;\n" +
       "where version_parent = null;\n" +
       "limit 8;",
   );
   if (rows == null) return { status: "retry" };
 
-  const wanted = normalizeGameTitle(value);
-  if (!wanted) return { status: "miss" };
-  const match = rows.find(
-    (row) => row.id && normalizeGameTitle(row.name ?? "") === wanted,
+  const match = pickCatalogMatch(
+    name,
+    rows.filter((row) => row.id),
+    (row) => row.name ?? "",
   );
   if (!match) return { status: "miss" };
   const playable = groupPlayableFromIgdbModes(match.game_modes);

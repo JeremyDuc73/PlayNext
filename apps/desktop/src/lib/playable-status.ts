@@ -17,14 +17,13 @@ export function summarizePlayable(games: LibraryGame[]) {
   let pending = 0;
   let unknown = 0;
   const remaining: LibraryGame[] = [];
+  const manuals: LibraryGame[] = [];
   for (const game of titles) {
     const status = playableStatus(game);
-    if (status === "multi") {
-      multi += 1;
-      continue;
-    }
-    if (status === "solo") {
-      solo += 1;
+    if (status === "multi" || status === "solo") {
+      if (status === "multi") multi += 1;
+      else solo += 1;
+      if (game.groupPlayableManual) manuals.push(game);
       continue;
     }
     if (status === "pending") pending += 1;
@@ -38,6 +37,9 @@ export function summarizePlayable(games: LibraryGame[]) {
     if (byStatus !== 0) return byStatus;
     return a.name.localeCompare(b.name, "fr", { sensitivity: "base" });
   });
+  manuals.sort((a, b) =>
+    a.name.localeCompare(b.name, "fr", { sensitivity: "base" }),
+  );
   return {
     total: titles.length,
     classified: multi + solo,
@@ -46,6 +48,7 @@ export function summarizePlayable(games: LibraryGame[]) {
     pending,
     unknown,
     remaining,
+    manuals,
   };
 }
 

@@ -24,6 +24,7 @@ import {
   groupPlayableKind,
   gamesSharingNormalizedTitle,
   stampManualGroupPlayable,
+  clearManualGroupPlayable,
   reopenUnknownGroupPlayable,
 } from "../steam/store.js";
 
@@ -797,6 +798,75 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     return { ok: true, stamped };
   });
 
+  app.post("/library/playable/clear", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = hiddenGameSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: "invalid_body" });
+    }
+
+    const owned = await db.pool.query<{
+      launcher: string;
+      external_id: string;
+      name: string;
+      group_playable_source: string | null;
+    }>(
+      `
+        SELECT ug.launcher, ug.external_id, ug.name, gm.group_playable_source
+        FROM user_games ug
+        LEFT JOIN game_meta gm
+          ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
+        WHERE ug.user_id = $1 AND ug.hidden = false
+      `,
+      [userId],
+    );
+    const target = owned.rows.find(
+      (row) =>
+        row.launcher === parsed.data.launcher &&
+        row.external_id === parsed.data.externalId,
+    );
+    if (!target) {
+      return reply.code(404).send({
+        ok: false,
+        error: "game_not_in_library",
+        message: "Jeu absent de ta bibliothèque.",
+      });
+    }
+
+    const related = gamesSharingNormalizedTitle(owned.rows, target.name);
+    if (!related.some((row) => row.group_playable_source === "manual")) {
+      return reply.code(409).send({
+        ok: false,
+        error: "not_manual",
+        message: "Pas un tampon manuel.",
+      });
+    }
+
+    const cleared = await clearManualGroupPlayable(
+      db,
+      related.map((row) => ({
+        launcher: row.launcher,
+        externalId: row.external_id,
+      })),
+    );
+    void persistMissingGroupPlayable(
+      db,
+      related.map((row) => ({
+        launcher: row.launcher,
+        externalId: row.external_id,
+        name: row.name,
+      })),
+      config,
+    ).catch((error) => {
+      request.log.warn({ err: error }, "group_playable_clear_enrich_failed");
+    });
+    return { ok: true, cleared };
+  });
+
   app.post("/library/playable/retry", async (request, reply) => {
     const userId = await requireUserId(request);
     if (!userId) {
@@ -911,6 +981,11 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
 
     const igdbConfigured = isIgdbConfigured(config);
     const byTitle = await loadGroupPlayableByTitle(db);
+    const manualTitles = new Set(
+      games.rows
+        .filter((row) => row.group_playable_source === "manual")
+        .map((row) => normalizeGameTitle(row.name)),
+    );
     const mapped = games.rows
       .filter((row) => !isJunkGameName(row.name))
       .map((row) => {
@@ -940,6 +1015,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
           year: row.year,
           groupPlayable,
           groupPlayableStatus: groupPlayableKind(playableInput),
+          groupPlayableManual: manualTitles.has(normalizeGameTitle(row.name)),
           queued: isGroupPlayableQueued(playableInput),
         };
       });
@@ -971,6 +1047,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         year: game.year,
         groupPlayable: game.groupPlayable,
         groupPlayableStatus: game.groupPlayableStatus,
+        groupPlayableManual: game.groupPlayableManual,
       })),
       groupPlayableQueued: mapped.filter((game) => game.queued).length,
       lastSync: lastSync.rows[0]

@@ -96,6 +96,7 @@ export type LibraryGame = {
   year?: number | null;
   groupPlayable?: boolean | null;
   groupPlayableStatus?: GroupPlayableStatus;
+  groupPlayableManual?: boolean;
 };
 
 export type HiddenLibraryGame = LibraryGame & {
@@ -206,6 +207,23 @@ export async function stampLibraryPlayable(
   const response = await apiFetch("/library/playable", {
     method: "POST",
     body: JSON.stringify({ launcher, externalId, playable }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    throw new Error(body?.message ?? body?.error ?? `HTTP ${response.status}`);
+  }
+}
+
+export async function clearLibraryPlayable(
+  launcher: string,
+  externalId: string,
+): Promise<void> {
+  const response = await apiFetch("/library/playable/clear", {
+    method: "POST",
+    body: JSON.stringify({ launcher, externalId }),
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {

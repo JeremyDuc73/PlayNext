@@ -20,6 +20,7 @@ export function isJunkGameName(name: string): boolean {
     n.includes("[demo]") ||
     n.includes(" - playtest") ||
     n.includes("(playtest)") ||
+    (/\blauncher\b/i.test(n) && !/\bminecraft\s+launcher\b/i.test(n)) ||
     /\bsteam(?!\s*world)/i.test(n) ||
     /\bwallpaper\b/i.test(n) ||
     /3d\s*mark/i.test(n) ||
@@ -29,6 +30,9 @@ export function isJunkGameName(name: string): boolean {
   );
 }
 
+const TITLE_NOISE =
+  /\b(goty|game of the year|game preview|early access|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows(?:\s*10)?|win10|pc|xbox|steam|epic|preview|battlemode|launcher|beta|alpha|celebration|anniversary|legendary|premium|enhanced|microsoft store)\b/g;
+
 export function normalizeGameTitle(name: string): string {
   return name
     .toLowerCase()
@@ -37,11 +41,9 @@ export function normalizeGameTitle(name: string): string {
     .replace(/™|®|©/g, "")
     .replace(/\([^)]*\)/g, " ")
     .replace(/\[[^\]]*\]/g, " ")
-    .replace(
-      /\b(goty|game of the year|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows|pc|xbox|steam|epic)\b/g,
-      " ",
-    )
+    .replace(TITLE_NOISE, " ")
     .replace(/[^a-z0-9]+/g, " ")
+    .replace(/beta$/g, "")
     .trim()
     .replace(/\s+/g, " ");
 }

@@ -49,7 +49,7 @@ Le propriétaire ne peut pas quitter sans transférer (ou supprimer le groupe).
 
 - Agrège les `user_games` des membres (`owned`, non `hidden` globalement)
 - Exclut les entrées de `group_hidden_games` **par membre**
-- Exclut les jeux solo connus (Steam, même titre Xbox/Epic, IGDB manuel, tampon profil). La biblio perso les garde. Le classement Steam reprend tout seul si un 429 a interrompu le tri.
+- Exclut les jeux solo connus (Steam, même titre Xbox/Epic, IGDB manuel, tampon profil). La biblio perso les garde. Le classement Steam reprend tout seul si un 429 a interrompu le tri. Un tampon manuel s’annule depuis le profil.
 - États utiles : qui possède / qui a installé, compteurs `X/Y`
 - Masquer ≠ supprimer de la biblio perso
 

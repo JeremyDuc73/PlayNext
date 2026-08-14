@@ -37,10 +37,13 @@ classement. Steam Store classe les AppIDs Steam **un par un**, avec pause.
 Un 429 arrête le run ; un AppID indisponible (200 + success:false) n’est plus
 rejoué en boucle. Le même titre est réutilisé pour Xbox / Epic / manuel.
 Les jeux absents de Steam sont cherchés par nom dans le Store, puis IGDB
-(`game_modes`, titre strictement identique). Le profil sépare **en attente**
+(`game_modes`). Le nom Xbox / Epic est nettoyé (parenthèses, ™, `- WINDOWS`,
+`Celebration Edition`) avant la recherche ; un titre collé (`KILLINGFLOOR2BETA`)
+matche `Killing Floor 2`. Le profil sépare **en attente**
 (pas encore interrogé) et **sans réponse** (catalogues sans mode). Un tampon
 **Multi / Solo** sur un titre restant écrit `game_meta` (source `manual`) pour
-toutes les copies du même nom : groupes et soirées en héritent. **Relancer les
+toutes les copies du même nom : groupes et soirées en héritent. **Annuler**
+remet le titre en file. **Relancer les
 sans réponse** rouvre uniquement les titres sans mode. LoL / VALORANT sont
 toujours multi.
 

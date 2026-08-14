@@ -18,6 +18,7 @@ import {
   submitCurrentVote,
   submitSelection,
   vibeLabel,
+  type DirectEveningDraft,
   type Evening,
   type EveningSummary,
   type EveningVibe,
@@ -25,6 +26,14 @@ import {
 } from "../lib/evenings";
 import type { GroupMember } from "../lib/groups";
 import { pad2 } from "../lib/format";
+import {
+  defaultEveningWhen,
+  eveningWhenToIso,
+  formatParisWhen,
+  formatParisShort,
+  type EveningWhenValue,
+} from "../lib/paris";
+import type { SteamCatalogHit } from "../lib/steam";
 import { metaMapKey, resolveGameMeta, type GameMeta } from "../lib/meta";
 import { gsap, prefersReducedMotion, staggerIn, stampIn, useGSAP } from "../lib/motion";
 import { Button } from "../ui/Button";
@@ -36,6 +45,8 @@ import { useCoverSrc } from "../lib/useCoverSrc";
 import { GamePoster } from "../ui/GamePoster";
 import { PresenceRow, PresenceStrip } from "../ui/PresenceRow";
 import { VoteBar } from "../ui/VoteBar";
+import { EveningWhenField } from "../ui/EveningWhen";
+import { SteamSearch } from "../ui/SteamSearch";
 
 type Props = {
   groupId: string;
@@ -45,6 +56,8 @@ type Props = {
   canOrganize: boolean;
   isOwner: boolean;
   onBanner: (message: string) => void;
+  directDraft?: DirectEveningDraft | null;
+  onDirectDraftConsumed?: () => void;
 };
 
 const VIBES: { value: EveningVibe; label: string }[] = [
@@ -63,6 +76,8 @@ export function EveningPanel({
   canOrganize,
   isOwner,
   onBanner,
+  directDraft = null,
+  onDirectDraftConsumed,
 }: Props) {
   const [history, setHistory] = useState<EveningSummary[]>([]);
   const [evening, setEvening] = useState<Evening | null>(null);
@@ -77,7 +92,9 @@ export function EveningPanel({
   );
   const [selectionIds, setSelectionIds] = useState<string[]>([]);
   const [meta, setMeta] = useState<Map<string, GameMeta>>(new Map());
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupMode, setSetupMode] = useState<null | "ritual" | "direct">(null);
+  const [when, setWhen] = useState<EveningWhenValue>(defaultEveningWhen);
+  const [directGame, setDirectGame] = useState<DirectEveningDraft | null>(null);
   const [skipUnreadyOpen, setSkipUnreadyOpen] = useState(false);
   const [historyConfirm, setHistoryConfirm] = useState<"all" | string | null>(
     null,
@@ -144,13 +161,32 @@ export function EveningPanel({
   }, [members]);
 
   useEffect(() => {
+    if (!directDraft) return;
+    setDirectGame(directDraft);
+    setTitle(directDraft.name);
+    setWhen(defaultEveningWhen());
+    setSetupMode("direct");
+    eveningRef.current = null;
+    selectionDirtyRef.current = false;
+    metaLoadedForRef.current = null;
+    setSelectionIds([]);
+    setMeta(new Map());
+    setEvening(null);
+    onDirectDraftConsumed?.();
+  }, [directDraft, onDirectDraftConsumed]);
+
+  useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const list = await refreshHistory();
         if (cancelled) return;
-        const open = list.find((e) => isLiveEveningStatus(e.status));
-        if (open) await loadEvening(open.id);
+        if (directDraft || setupMode) return;
+        const urgent = list.find(
+          (item) =>
+            item.kind !== "direct" && isLiveEveningStatus(item.status),
+        );
+        if (urgent) await loadEvening(urgent.id);
         else {
           eveningRef.current = null;
           selectionDirtyRef.current = false;
@@ -167,7 +203,7 @@ export function EveningPanel({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [groupId, directDraft, setupMode]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -176,13 +212,7 @@ export function EveningPanel({
         void loadEvening(current.id).catch(() => undefined);
         return;
       }
-      void refreshHistory()
-        .then((list) => {
-          const open = list.find((item) => isLiveEveningStatus(item.status));
-          if (open) return loadEvening(open.id);
-          return undefined;
-        })
-        .catch(() => undefined);
+      void refreshHistory().catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,7 +225,7 @@ export function EveningPanel({
     },
     {
       scope: rootRef,
-      dependencies: [evening?.id, evening?.status, setupOpen],
+      dependencies: [evening?.id, evening?.status, setupMode],
     },
   );
 
@@ -281,12 +311,50 @@ export function EveningPanel({
         vibe,
         requireInstalled,
         shortlistSize,
+        scheduledAt: eveningWhenToIso(when),
         participantIds: selectedParticipants.includes(currentUserId)
           ? selectedParticipants
           : [...selectedParticipants, currentUserId],
       });
       applyEvening(created);
-      setSetupOpen(false);
+      setSetupMode(null);
+      setWhen(defaultEveningWhen());
+      await refreshHistory();
+      onBanner("Lobby ouvert.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Création de soirée échouée.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCreateDirect() {
+    if (!directGame) {
+      onBanner("Choisis un jeu.");
+      return;
+    }
+    if (selectedParticipants.length < 1) {
+      onBanner("Sélectionne au moins un participant.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const created = await createEvening(groupId, {
+        kind: "direct",
+        appId: directGame.appId,
+        title: title.trim() || directGame.name,
+        scheduledAt: eveningWhenToIso(when),
+        participantIds: selectedParticipants.includes(currentUserId)
+          ? selectedParticipants
+          : [...selectedParticipants, currentUserId],
+      });
+      applyEvening(created);
+      setSetupMode(null);
+      setDirectGame(null);
+      setTitle("");
+      setWhen(defaultEveningWhen());
       await refreshHistory();
       onBanner("Lobby ouvert.");
     } catch (error) {
@@ -350,7 +418,7 @@ export function EveningPanel({
       const next = await openEveningSelection(evening.id);
       applyEvening(next);
       setSkipUnreadyOpen(false);
-      onBanner("Sélection ouverte.");
+      onBanner(evening.kind === "direct" ? "Confirmé." : "Sélection ouverte.");
     } catch (error) {
       onBanner(
         error instanceof Error ? error.message : "Lancement impossible.",
@@ -374,6 +442,7 @@ export function EveningPanel({
     !evening ||
     evening.status === "closed" ||
     evening.status === "cancelled";
+  const openList = history.filter((item) => isLiveEveningStatus(item.status));
   const pendingHistoryItem =
     historyConfirm && historyConfirm !== "all"
       ? history.find((item) => item.id === historyConfirm)
@@ -382,7 +451,7 @@ export function EveningPanel({
     <>
     <div ref={rootRef} className="grid gap-6">
       {idle ? (
-        setupOpen ? (
+        setupMode === "ritual" ? (
           <SetupForm
             title={title}
             setTitle={setTitle}
@@ -394,12 +463,42 @@ export function EveningPanel({
             setVibe={setVibe}
             requireInstalled={requireInstalled}
             setRequireInstalled={setRequireInstalled}
+            when={when}
+            setWhen={setWhen}
             members={members}
             selectedParticipants={selectedParticipants}
             toggleParticipant={toggleParticipant}
             busy={busy}
-            onAbort={() => setSetupOpen(false)}
+            onAbort={() => setSetupMode(null)}
             onLaunch={() => void onCreate()}
+          />
+        ) : setupMode === "direct" ? (
+          <DirectSetupForm
+            title={title}
+            setTitle={setTitle}
+            when={when}
+            setWhen={setWhen}
+            game={directGame}
+            onPickGame={(hit) => {
+              setDirectGame({
+                appId: hit.appId,
+                name: hit.name,
+                coverUrl: hit.coverUrl,
+                steamUrl: hit.steamUrl,
+                priceLabel: hit.priceLabel,
+              });
+              if (!title.trim()) setTitle(hit.name);
+            }}
+            onClearGame={() => setDirectGame(null)}
+            members={members}
+            selectedParticipants={selectedParticipants}
+            toggleParticipant={toggleParticipant}
+            busy={busy}
+            onAbort={() => {
+              setSetupMode(null);
+              setDirectGame(null);
+            }}
+            onLaunch={() => void onCreateDirect()}
           />
         ) : (
           <div className="grid gap-6">
@@ -408,14 +507,40 @@ export function EveningPanel({
                 <p className="pn-data mb-2">{groupName}</p>
                 <h3 className="pn-display text-4xl">Soirées</h3>
               </div>
-              <Button variant="primary" onClick={() => setSetupOpen(true)}>
-                Nouvelle soirée
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setWhen(defaultEveningWhen());
+                    setSetupMode("ritual");
+                  }}
+                >
+                  Nouvelle soirée
+                </Button>
+                <Button
+                  variant="second"
+                  onClick={() => {
+                    setWhen(defaultEveningWhen());
+                    setDirectGame(null);
+                    setTitle("");
+                    setSetupMode("direct");
+                  }}
+                >
+                  Proposer une soirée
+                </Button>
+              </div>
             </div>
-            <EmptyHint
-              title="Aucune soirée en cours"
-              body="Lance une nouvelle soirée pour choisir."
-            />
+            {openList.length > 0 ? (
+              <OpenEveningList
+                evenings={openList}
+                onOpen={(id) => void loadEvening(id)}
+              />
+            ) : (
+              <EmptyHint
+                title="Aucune soirée en cours"
+                body="Lance une nouvelle soirée pour choisir."
+              />
+            )}
             <EveningHistory
               history={history}
               isOwner={isOwner}
@@ -435,11 +560,20 @@ export function EveningPanel({
           busy={busy}
           onReady={() => void onReady()}
           onSkipUnready={() => setSkipUnreadyOpen(true)}
+          onBack={() => {
+            eveningRef.current = null;
+            setEvening(null);
+          }}
+          onConfirmDirect={() => void onOpenSelection()}
           onCancel={() =>
             void cancelEvening(evening.id)
               .then((next) => applyEvening(next))
               .then(() => refreshHistory())
-              .then(() => onBanner("Annulée."))
+              .then(() => {
+                eveningRef.current = null;
+                setEvening(null);
+                onBanner("Annulée.");
+              })
               .catch((e: Error) => onBanner(e.message))
           }
         />
@@ -558,6 +692,7 @@ export function EveningPanel({
         {eveningDisplayTitle(
           pendingHistoryItem?.title,
           pendingHistoryItem?.createdAt ?? new Date().toISOString(),
+          pendingHistoryItem?.scheduledAt,
         )}
       </ConfirmDialog>
     ) : null}
@@ -574,6 +709,8 @@ function LobbyView(props: {
   busy: boolean;
   onReady: () => void;
   onSkipUnready: () => void;
+  onConfirmDirect?: () => void;
+  onBack: () => void;
   onCancel: () => void;
 }) {
   const stampRef = useRef<HTMLSpanElement>(null);
@@ -581,10 +718,13 @@ function LobbyView(props: {
   const me = present.find((p) => p.id === props.currentUserId);
   const myReady = Boolean(me?.ready);
   const waiting = present.some((p) => !p.ready);
+  const direct = props.evening.kind === "direct";
+  const locked = props.evening.candidates[0];
   const duration =
     props.evening.durationMinutes == null
       ? "Sans limite"
       : `${props.evening.durationMinutes} min`;
+  const whenLabel = formatParisWhen(props.evening.scheduledAt);
 
   useGSAP(
     () => {
@@ -602,20 +742,44 @@ function LobbyView(props: {
             <p className="pn-data mb-2">Phase 00 · Lobby</p>
             <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">Lobby</h2>
             <p className="pn-data mt-3">
-              {props.groupName} · {vibeLabel(props.evening.vibe)} · {duration}
+              {props.groupName}
+              {" · "}
+              {whenLabel}
+              {direct ? null : ` · ${vibeLabel(props.evening.vibe)} · ${duration}`}
             </p>
           </div>
-          {props.iOrganize ? (
+          <div className="flex flex-wrap items-center gap-4">
             <button
               type="button"
               className="pn-data hover:text-paper"
               disabled={props.busy}
-              onClick={props.onCancel}
+              onClick={props.onBack}
             >
-              Annuler
+              Liste
             </button>
-          ) : null}
+            {props.iOrganize ? (
+              <button
+                type="button"
+                className="pn-data hover:text-paper"
+                disabled={props.busy}
+                onClick={props.onCancel}
+              >
+                Annuler
+              </button>
+            ) : null}
+          </div>
         </header>
+
+        {direct && locked ? (
+          <div className="max-w-[180px]">
+            <GamePoster
+              name={locked.name}
+              launcher={locked.launcher}
+              externalId={locked.externalId}
+              subtitle={locked.name}
+            />
+          </div>
+        ) : null}
 
         <PresenceRow
           people={present.map((p) => ({
@@ -624,7 +788,7 @@ function LobbyView(props: {
             avatarUrl: p.avatarUrl,
             ready: p.ready,
           }))}
-          readyLabel="Prêt"
+          readyLabel={direct ? "Je viens" : "Prêt"}
         />
 
         <div className="pn-sync w-full" aria-hidden>
@@ -645,7 +809,7 @@ function LobbyView(props: {
           <div className="flex flex-wrap items-center gap-3">
             {props.iAmParticipant && myReady ? (
               <span ref={stampRef} className="pn-stamp">
-                Prêt
+                {direct ? "Je viens" : "Prêt"}
               </span>
             ) : null}
             {props.iAmParticipant && !myReady ? (
@@ -654,7 +818,16 @@ function LobbyView(props: {
                 disabled={props.busy}
                 onClick={props.onReady}
               >
-                Je suis prêt
+                {direct ? "Je viens" : "Je suis prêt"}
+              </Button>
+            ) : null}
+            {direct && props.iOrganize && !waiting ? (
+              <Button
+                variant="primary"
+                disabled={props.busy}
+                onClick={props.onConfirmDirect}
+              >
+                Confirmer
               </Button>
             ) : null}
             {props.iOrganize && waiting ? (
@@ -663,7 +836,7 @@ function LobbyView(props: {
                 disabled={props.busy}
                 onClick={props.onSkipUnready}
               >
-                Lancer sans eux
+                {direct ? "Lancer sans eux" : "Lancer sans eux"}
               </Button>
             ) : null}
           </div>
@@ -993,6 +1166,8 @@ function SetupForm(props: {
   setVibe: (v: EveningVibe) => void;
   requireInstalled: boolean;
   setRequireInstalled: (v: boolean) => void;
+  when: EveningWhenValue;
+  setWhen: (v: EveningWhenValue) => void;
   members: GroupMember[];
   selectedParticipants: string[];
   toggleParticipant: (id: string) => void;
@@ -1015,6 +1190,7 @@ function SetupForm(props: {
         <h3 className="pn-display text-4xl">Init soirée</h3>
         <span className="pn-accent mt-3" />
       </div>
+      <EveningWhenField value={props.when} onChange={props.setWhen} />
       <div className="flex flex-wrap gap-2">
         <input
           className="min-w-[200px] flex-1 border border-rule-strong bg-ink-deep px-3 py-3 font-data text-xs tracking-[0.1em] uppercase outline-none focus:border-paper"
@@ -1132,6 +1308,131 @@ function SetupForm(props: {
   );
 }
 
+function DirectSetupForm(props: {
+  title: string;
+  setTitle: (v: string) => void;
+  when: EveningWhenValue;
+  setWhen: (v: EveningWhenValue) => void;
+  game: DirectEveningDraft | null;
+  onPickGame: (hit: SteamCatalogHit) => void;
+  onClearGame: () => void;
+  members: GroupMember[];
+  selectedParticipants: string[];
+  toggleParticipant: (id: string) => void;
+  busy: boolean;
+  onAbort: () => void;
+  onLaunch: () => void;
+}) {
+  return (
+    <div className="grid max-w-3xl gap-5 border border-rule-strong p-6">
+      <div>
+        <p className="pn-data mb-2">Soirée</p>
+        <h3 className="pn-display text-4xl">Proposer une soirée</h3>
+        <span className="pn-accent mt-3" />
+      </div>
+      <EveningWhenField value={props.when} onChange={props.setWhen} />
+      {props.game ? (
+        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-4 border border-rule-strong p-3">
+          <GamePoster
+            name={props.game.name}
+            launcher="steam"
+            externalId={props.game.appId}
+            coverUrl={props.game.coverUrl}
+          />
+          <div className="self-center">
+            <p className="font-ui text-sm font-bold uppercase tracking-[0.08em]">
+              {props.game.name}
+            </p>
+            <p className="pn-data mt-1">{props.game.priceLabel ?? "Steam"}</p>
+            <button
+              type="button"
+              className="pn-data mt-2 hover:text-paper"
+              onClick={props.onClearGame}
+            >
+              Changer
+            </button>
+          </div>
+        </div>
+      ) : (
+        <SteamSearch disabled={props.busy} onPick={props.onPickGame} />
+      )}
+      <input
+        className="border border-rule-strong bg-ink-deep px-3 py-3 font-data text-xs tracking-[0.1em] uppercase outline-none focus:border-paper"
+        placeholder="Titre"
+        value={props.title}
+        maxLength={80}
+        onChange={(event) => props.setTitle(event.target.value)}
+      />
+      <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+        {props.members.map((member) => {
+          const on = props.selectedParticipants.includes(member.id);
+          return (
+            <li key={member.id}>
+              <button
+                type="button"
+                aria-pressed={on}
+                className={
+                  on
+                    ? "border border-paper bg-ink-raise px-3 py-2 font-ui text-xs uppercase tracking-[0.1em]"
+                    : "border border-rule-strong px-3 py-2 font-ui text-xs uppercase tracking-[0.1em] text-smoke"
+                }
+                onClick={() => props.toggleParticipant(member.id)}
+              >
+                {member.displayName}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          variant="primary"
+          disabled={props.busy || !props.game}
+          onClick={props.onLaunch}
+        >
+          Lancer
+        </Button>
+        <Button variant="ghost" disabled={props.busy} onClick={props.onAbort}>
+          Annuler
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function OpenEveningList(props: {
+  evenings: EveningSummary[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <section className="border border-rule-strong p-6">
+      <div className="mb-3 border-b border-rule pb-3">
+        <p className="pn-data text-paper">Ouvertes</p>
+      </div>
+      <ul className="m-0 list-none p-0">
+        {props.evenings.map((item) => (
+          <li
+            key={item.id}
+            className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] items-center gap-4 border-b border-rule py-3 last:border-b-0"
+          >
+            <span className="truncate font-ui text-xs font-bold uppercase tracking-[0.1em] text-paper">
+              {eveningDisplayTitle(item.title, item.createdAt, item.scheduledAt)}
+            </span>
+            <span className="pn-data truncate">
+              {formatParisWhen(item.scheduledAt ?? item.createdAt)}
+              {" · "}
+              {item.kind === "direct" ? "Direct" : "Rituel"}
+            </span>
+            <Button variant="second" onClick={() => props.onOpen(item.id)}>
+              Ouvrir
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function EveningHistory({
   history,
   isOwner,
@@ -1194,7 +1495,11 @@ function EveningHistory({
             }
           >
             <span className="truncate font-ui text-xs font-bold uppercase tracking-[0.1em] text-paper">
-              {eveningDisplayTitle(item.title, item.createdAt)}
+              {eveningDisplayTitle(
+                item.title,
+                item.createdAt,
+                item.scheduledAt,
+              )}
             </span>
             <span className="truncate text-sm text-paper-2">
               {item.winnerName?.trim() || "—"}
@@ -1276,6 +1581,8 @@ function ResultView(props: {
   const m = props.meta.get(
     metaMapKey(props.winner.launcher, props.winner.externalId),
   );
+  const direct = props.evening.kind === "direct";
+  const coming = props.evening.participants.filter((p) => p.ready).length;
 
   useGSAP(
     () => {
@@ -1293,7 +1600,9 @@ function ResultView(props: {
   return (
     <div className="grid min-h-[70vh] border border-rule-strong lg:grid-cols-[0.9fr_1.1fr]">
       <div ref={coverRef} className="flex min-h-[320px] flex-col bg-ink-deep p-5">
-        <span className="pn-stamp mb-5 self-start">Ce soir</span>
+        <span className="pn-stamp mb-5 self-start">
+          {formatParisShort(props.evening.scheduledAt)}
+        </span>
         <div className="relative mx-auto w-full max-w-[420px] aspect-[3/4] bg-ink">
           <ResultCover
             name={props.winner.name}
@@ -1309,9 +1618,27 @@ function ResultView(props: {
       </div>
       <div className="flex flex-col p-6 md:p-10">
         <p className="pn-data mb-6">
-          Bulletins déposés · {pad2(props.evening.participants.length)} /{" "}
-          {pad2(props.evening.participants.length)}
+          {direct
+            ? `Je viens · ${pad2(coming)} / ${pad2(props.evening.participants.length)}`
+            : `Bulletins déposés · ${pad2(props.evening.participants.length)} / ${pad2(props.evening.participants.length)}`}
         </p>
+        {direct ? (
+          <ul className="mt-8 m-0 list-none border-t border-rule p-0">
+            {props.evening.participants
+              .filter((person) => person.present)
+              .map((person) => (
+                <li
+                  key={person.id}
+                  className="flex justify-between border-b border-rule py-3 font-data text-xs tracking-[0.14em] uppercase"
+                >
+                  <span className="text-smoke">{person.displayName}</span>
+                  <span className="text-paper">
+                    {person.ready ? "Je viens" : "—"}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        ) : (
         <ul className="mt-8 m-0 list-none border-t border-rule p-0">
           {(
             [
@@ -1334,14 +1661,17 @@ function ResultView(props: {
             </li>
           ))}
         </ul>
+        )}
         {props.iOrganize ? (
           <div className="mt-auto flex flex-wrap items-center gap-4 pt-10">
             <Button variant="primary" disabled={props.busy} onClick={props.onConfirm}>
               Confirmer
             </Button>
+            {direct ? null : (
             <Button variant="ghost" disabled={props.busy} onClick={props.onNewRound}>
               Relancer un tour
             </Button>
+            )}
             <button
               type="button"
               className="pn-data hover:text-paper"
@@ -1350,7 +1680,7 @@ function ResultView(props: {
             >
               Annuler
             </button>
-            {(props.evening.resolution?.tiedIds?.length ?? 0) > 1 ? (
+            {direct || (props.evening.resolution?.tiedIds?.length ?? 0) < 2 ? null : (
               <>
                 <Button
                   variant="ghost"
@@ -1368,7 +1698,7 @@ function ResultView(props: {
                   Tirage
                 </button>
               </>
-            ) : null}
+            )}
           </div>
         ) : (
           <p className="mt-auto border-t border-rule-strong pt-5 pn-data">

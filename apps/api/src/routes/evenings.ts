@@ -25,6 +25,8 @@ import { getMembership } from "../groups/membership.js";
 import { isManager, isOwner } from "../groups/roles.js";
 import { notifyGroupDiscord } from "../discord/notify.js";
 import { riotCoverUrl, steamLibraryPosterUrl } from "../meta/covers.js";
+import { fetchSteamCatalogApp } from "../steam/catalog.js";
+import { defaultEveningScheduledAt } from "../time/paris.js";
 
 type EveningsRoutesOptions = {
   db: Db;
@@ -40,6 +42,7 @@ const vibeSchema = z.enum([
 ]);
 
 const createEveningSchema = z.object({
+  kind: z.enum(["ritual", "direct"]).optional().default("ritual"),
   title: z.string().trim().min(1).max(80).optional(),
   durationMinutes: z.number().int().min(15).max(600).optional().nullable(),
   vibe: vibeSchema.optional().nullable(),
@@ -47,6 +50,8 @@ const createEveningSchema = z.object({
   requireInstalled: z.boolean().optional().default(false),
   shortlistSize: z.number().int().min(1).max(5).optional().default(3),
   participantIds: z.array(z.string().uuid()).min(1).max(32).optional(),
+  scheduledAt: z.string().min(16).max(40).optional(),
+  appId: z.string().regex(/^\d{1,32}$/).optional(),
 });
 
 const votesSchema = z.object({
@@ -91,6 +96,8 @@ type EveningRow = {
   revealed_at: Date | null;
   closed_at: Date | null;
   winner_candidate_id: string | null;
+  kind: "ritual" | "direct";
+  scheduled_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -472,6 +479,8 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       revealedAt: evening.revealed_at,
       closedAt: evening.closed_at,
       winnerCandidateId: evening.winner_candidate_id,
+      kind: evening.kind === "direct" ? "direct" : "ritual",
+      scheduledAt: evening.scheduled_at,
       createdAt: evening.created_at,
       updatedAt: evening.updated_at,
       allVoted,
@@ -632,6 +641,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
 
   async function maybeAdvanceLobby(evening: EveningRow): Promise<EveningRow> {
     if (evening.status !== "lobby") return evening;
+    if (evening.kind === "direct") return evening;
     const client = await db.pool.connect();
     try {
       await client.query("BEGIN");
@@ -715,6 +725,32 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       if (Number(remaining.rows[0]?.n ?? 0) === 0) {
         await client.query("ROLLBACK");
         throw new Error("lobby_empty");
+      }
+      if (current.kind === "direct") {
+        const candidate = await client.query<{ id: string }>(
+          `
+            SELECT id
+            FROM evening_candidates
+            WHERE evening_id = $1
+            ORDER BY round ASC, sort_order ASC
+            LIMIT 1
+          `,
+          [evening.id],
+        );
+        const updated = await client.query<EveningRow>(
+          `
+            UPDATE evenings
+            SET status = 'revealed',
+                revealed_at = COALESCE(revealed_at, now()),
+                winner_candidate_id = $2,
+                updated_at = now()
+            WHERE id = $1
+            RETURNING *
+          `,
+          [evening.id, candidate.rows[0]?.id ?? null],
+        );
+        await client.query("COMMIT");
+        return updated.rows[0]!;
       }
       const updated = await client.query<EveningRow>(
         `
@@ -860,21 +896,146 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         participantIds.push(userId);
       }
 
-      const active = await db.pool.query<{ id: string }>(
-        `
-          SELECT id FROM evenings
-          WHERE group_id = $1 AND status IN ('lobby', 'selection', 'voting', 'revealed')
-          LIMIT 1
-        `,
-        [request.params.groupId],
-      );
-      if (active.rowCount && active.rowCount > 0) {
-        return reply.code(409).send({
+      const scheduledAt = parsed.data.scheduledAt
+        ? new Date(parsed.data.scheduledAt)
+        : defaultEveningScheduledAt();
+      if (Number.isNaN(scheduledAt.getTime())) {
+        return reply.code(400).send({
           ok: false,
-          error: "evening_already_open",
-          message: "Une soirée est déjà en cours dans ce groupe.",
-          eveningId: active.rows[0]!.id,
+          error: "invalid_schedule",
+          message: "Horaire invalide.",
         });
+      }
+
+      const kind = parsed.data.kind;
+      if (kind === "ritual") {
+        const active = await db.pool.query<{ id: string }>(
+          `
+            SELECT id FROM evenings
+            WHERE group_id = $1
+              AND kind = 'ritual'
+              AND status IN ('lobby', 'selection', 'voting', 'revealed')
+            LIMIT 1
+          `,
+          [request.params.groupId],
+        );
+        if (active.rowCount && active.rowCount > 0) {
+          return reply.code(409).send({
+            ok: false,
+            error: "evening_already_open",
+            message: "Un rituel est déjà en cours dans ce groupe.",
+            eveningId: active.rows[0]!.id,
+          });
+        }
+      }
+
+      if (kind === "direct") {
+        if (!parsed.data.appId) {
+          return reply.code(400).send({
+            ok: false,
+            error: "invalid_body",
+            message: "Choisis un jeu Steam.",
+          });
+        }
+        const lookup = await fetchSteamCatalogApp(parsed.data.appId);
+        if (lookup.status === "retry") {
+          return reply.code(503).send({
+            ok: false,
+            error: "steam_unavailable",
+            message: "Store Steam injoignable.",
+          });
+        }
+        if (lookup.status === "miss") {
+          return reply.code(404).send({
+            ok: false,
+            error: "not_steam",
+            message: "Jeu introuvable sur le Store.",
+          });
+        }
+        const hit = lookup.hit;
+        const library = await fetchParticipantLibrary(
+          db,
+          request.params.groupId,
+          participantIds,
+        );
+        const agg =
+          library.find(
+            (game) =>
+              game.launcher === "steam" && game.externalId === hit.appId,
+          ) ??
+          library.find(
+            (game) =>
+              normalizeGameTitle(game.name) === normalizeGameTitle(hit.name),
+          );
+        const client = await db.pool.connect();
+        try {
+          await client.query("BEGIN");
+          const inserted = await client.query<EveningRow>(
+            `
+              INSERT INTO evenings (
+                group_id, created_by, status, title, duration_minutes, vibe,
+                require_owned, require_installed, shortlist_size, kind, scheduled_at
+              )
+              VALUES ($1,$2,'lobby',$3,NULL,NULL,false,false,1,'direct',$4)
+              RETURNING *
+            `,
+            [
+              request.params.groupId,
+              userId,
+              parsed.data.title ?? hit.name,
+              scheduledAt,
+            ],
+          );
+          const evening = inserted.rows[0]!;
+          for (const pid of participantIds) {
+            await client.query(
+              `
+                INSERT INTO evening_participants (evening_id, user_id)
+                VALUES ($1, $2)
+              `,
+              [evening.id, pid],
+            );
+          }
+          await client.query(
+            `
+              INSERT INTO evening_candidates (
+                evening_id, round, launcher, external_id, name, sort_order,
+                owned_count, installed_count, participant_count, reasons
+              )
+              VALUES ($1,1,'steam',$2,$3,0,$4,$5,$6,$7)
+            `,
+            [
+              evening.id,
+              hit.appId,
+              hit.name,
+              agg?.ownedCount ?? 0,
+              agg?.installedCount ?? 0,
+              participantIds.length,
+              ["direct"],
+            ],
+          );
+          await client.query("COMMIT");
+          const full = await serializeEvening(evening, userId);
+          void notifyGroupDiscord(db, config, evening.group_id, {
+            kind: "lobby",
+            playerCount: participantIds.length,
+            scheduledAt: evening.scheduled_at,
+            gameName: hit.name,
+            steamUrl: hit.steamUrl,
+            coverUrl: hit.coverUrl,
+          }).catch((error) => {
+            app.log.warn(
+              { err: error, groupId: evening.group_id },
+              "discord_notify_failed",
+            );
+          });
+          return reply.code(201).send({ ok: true, evening: full });
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
       }
 
       const library = await fetchParticipantLibrary(
@@ -919,9 +1080,9 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
           `
             INSERT INTO evenings (
               group_id, created_by, status, title, duration_minutes, vibe,
-              require_owned, require_installed, shortlist_size
+              require_owned, require_installed, shortlist_size, kind, scheduled_at
             )
-            VALUES ($1,$2,'lobby',$3,$4,$5,$6,$7,$8)
+            VALUES ($1,$2,'lobby',$3,$4,$5,$6,$7,$8,'ritual',$9)
             RETURNING *
           `,
           [
@@ -933,6 +1094,7 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
             parsed.data.requireOwned,
             parsed.data.requireInstalled,
             parsed.data.shortlistSize,
+            scheduledAt,
           ],
         );
         const evening = inserted.rows[0]!;
@@ -976,12 +1138,24 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         void notifyGroupDiscord(db, config, evening.group_id, {
           kind: "lobby",
           playerCount: participantIds.length,
+          scheduledAt: evening.scheduled_at,
         }).catch((error) => {
           app.log.warn({ err: error, groupId: evening.group_id }, "discord_notify_failed");
         });
         return reply.code(201).send({ ok: true, evening: full });
       } catch (error) {
         await client.query("ROLLBACK");
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String((error as { code?: string }).code)
+            : "";
+        if (code === "23505") {
+          return reply.code(409).send({
+            ok: false,
+            error: "evening_already_open",
+            message: "Un rituel est déjà en cours dans ce groupe.",
+          });
+        }
         throw error;
       } finally {
         client.release();
@@ -1006,14 +1180,27 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       }
 
       const result = await db.pool.query<
-        EveningRow & { winner_name: string | null }
+        EveningRow & { winner_name: string | null; game_name: string | null }
       >(
         `
-          SELECT e.*, c.name AS winner_name
+          SELECT e.*, c.name AS winner_name, first.name AS game_name
           FROM evenings e
           LEFT JOIN evening_candidates c ON c.id = e.winner_candidate_id
+          LEFT JOIN LATERAL (
+            SELECT name
+            FROM evening_candidates
+            WHERE evening_id = e.id
+            ORDER BY round ASC, sort_order ASC
+            LIMIT 1
+          ) first ON true
           WHERE e.group_id = $1
-          ORDER BY e.created_at DESC
+          ORDER BY
+            CASE
+              WHEN e.status IN ('lobby', 'selection', 'voting', 'revealed')
+              THEN 0 ELSE 1
+            END,
+            e.scheduled_at ASC NULLS LAST,
+            e.created_at DESC
           LIMIT 50
         `,
         [request.params.groupId],
@@ -1026,9 +1213,12 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
           status: row.status,
           title: row.title,
           round: row.round,
+          kind: row.kind === "direct" ? "direct" : "ritual",
+          scheduledAt: row.scheduled_at,
           createdAt: row.created_at,
           winnerCandidateId: row.winner_candidate_id,
           winnerName: row.winner_name,
+          gameName: row.game_name,
         })),
       };
     },
@@ -1102,16 +1292,18 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       status: EveningStatus;
       title: string | null;
       created_at: Date;
+      kind: string;
+      scheduled_at: Date | null;
     }>(
       `
         SELECT e.id, e.group_id, g.name AS group_name,
-               e.status, e.title, e.created_at
+               e.status, e.title, e.created_at, e.kind, e.scheduled_at
         FROM evening_participants p
         JOIN evenings e ON e.id = p.evening_id
         JOIN groups g ON g.id = e.group_id
         WHERE p.user_id = $1
           AND e.status IN ('lobby', 'selection', 'voting', 'revealed')
-        ORDER BY e.created_at DESC
+        ORDER BY e.scheduled_at ASC NULLS LAST, e.created_at DESC
       `,
       [userId],
     );
@@ -1124,6 +1316,8 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
         groupName: row.group_name,
         status: row.status,
         title: row.title,
+        kind: row.kind === "direct" ? "direct" : "ritual",
+        scheduledAt: row.scheduled_at,
         createdAt: row.created_at,
       })),
     };
@@ -1936,6 +2130,9 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       if (evening.status !== "revealed") {
         return reply.code(400).send({ ok: false, error: "not_revealed" });
       }
+      if (evening.kind === "direct") {
+        return reply.code(400).send({ ok: false, error: "direct_evening" });
+      }
 
       const snapshot = await serializeEvening(evening, userId);
       const tied =
@@ -1983,6 +2180,9 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       }
       if (evening.status !== "revealed") {
         return reply.code(400).send({ ok: false, error: "not_revealed" });
+      }
+      if (evening.kind === "direct") {
+        return reply.code(400).send({ ok: false, error: "direct_evening" });
       }
 
       const snapshot = await serializeEvening(evening, userId);
@@ -2089,6 +2289,9 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
       }
       if (evening.status !== "revealed") {
         return reply.code(400).send({ ok: false, error: "not_revealed" });
+      }
+      if (evening.kind === "direct") {
+        return reply.code(400).send({ ok: false, error: "direct_evening" });
       }
 
       const snapshot = await serializeEvening(evening, userId);

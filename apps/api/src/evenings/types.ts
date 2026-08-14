@@ -13,6 +13,8 @@ export const OPEN_EVENING_STATUSES = [
   "revealed",
 ] as const satisfies readonly EveningStatus[];
 
+export type EveningKind = "ritual" | "direct";
+
 export type EveningVibe =
   | "chill"
   | "competitive"

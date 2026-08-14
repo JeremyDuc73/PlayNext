@@ -12,10 +12,12 @@ import { getMembership } from "../groups/membership.js";
 import { isManager } from "../groups/roles.js";
 import { steamLibraryPosterUrl, steamStoreUrl } from "../meta/covers.js";
 import {
+  normalizeProposalReply,
   ownsProposedGame,
   proposalMemberStatus,
   type ProposalReplyValue,
 } from "../proposals/status.js";
+import { fetchSteamCatalogApp } from "../steam/catalog.js";
 
 type ProposalsRoutesOptions = {
   db: Db;
@@ -23,12 +25,11 @@ type ProposalsRoutesOptions = {
 };
 
 const createSchema = z.object({
-  launcher: z.literal("steam"),
-  externalId: z.string().min(1).max(32),
+  appId: z.string().regex(/^\d{1,32}$/),
 });
 
 const replySchema = z.object({
-  value: z.enum(["hot", "maybe", "later", "no"]),
+  value: z.enum(["hot", "no"]),
 });
 
 type MemberRow = {
@@ -55,6 +56,7 @@ type ProposalRow = {
   name: string;
   cover_url: string | null;
   steam_url: string;
+  price_label: string | null;
   status: "open" | "closed";
   created_at: Date;
 };
@@ -145,25 +147,25 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         name: game.name,
       }));
       const owns = ownsProposedGame(games, target);
-      const status = proposalMemberStatus({
-        owns,
-        reply: replies.get(member.user_id) ?? null,
-      });
+      const status = proposalMemberStatus(
+        replies.get(member.user_id) ?? null,
+      );
       return {
         userId: member.user_id,
         displayName: displayName(member),
         avatarUrl: discordAvatarUrl(member.discord_id, member.avatar),
+        owns,
         status,
       };
     });
 
-    const ownedCount = people.filter((person) => person.status === "owns").length;
-    const missing = people.filter((person) => person.status !== "owns");
-    const pendingCount = missing.filter(
+    const ownedCount = people.filter((person) => person.owns).length;
+    const missing = people.filter((person) => !person.owns);
+    const pendingCount = people.filter(
       (person) => person.status === "pending",
     ).length;
     const viewer = people.find((person) => person.userId === viewerId);
-    const iOwn = viewer?.status === "owns";
+    const iOwn = Boolean(viewer?.owns);
     const myReply = replies.get(viewerId) ?? null;
 
     return {
@@ -175,6 +177,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       name: proposal.name,
       coverUrl: proposal.cover_url,
       steamUrl: proposal.steam_url,
+      priceLabel: proposal.price_label,
       status: proposal.status,
       createdAt: proposal.created_at,
       ownedCount,
@@ -183,7 +186,11 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       pendingCount,
       iOwn,
       myReply,
-      canReply: proposal.status === "open" && !iOwn,
+      canReply: proposal.status === "open",
+      canCreateEvening:
+        proposal.status === "open" &&
+        pendingCount === 0 &&
+        proposal.created_by === viewerId,
       canClose:
         proposal.status === "open" &&
         (proposal.created_by === viewerId || isManager(viewerRole)),
@@ -210,7 +217,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
     );
     for (const row of result.rows) {
       const current = byProposal.get(row.proposal_id) ?? new Map();
-      current.set(row.user_id, row.value);
+      current.set(row.user_id, normalizeProposalReply(row.value));
       byProposal.set(row.proposal_id, current);
     }
     return byProposal;
@@ -231,7 +238,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       const proposals = await db.pool.query<ProposalRow>(
         `
           SELECT id, group_id, created_by, launcher, external_id, name,
-                 cover_url, steam_url, status, created_at
+                 cover_url, steam_url, price_label, status, created_at
           FROM game_proposals
           WHERE group_id = $1 AND status = 'open'
           ORDER BY created_at DESC
@@ -277,52 +284,32 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         return reply.code(400).send({ ok: false, error: "invalid_body" });
       }
 
-      const steamUrl = steamStoreUrl(parsed.data.externalId);
-      if (!steamUrl) {
-        return reply.code(400).send({
+      const lookup = await fetchSteamCatalogApp(parsed.data.appId);
+      if (lookup.status === "retry") {
+        return reply.code(503).send({
           ok: false,
-          error: "not_steam",
-          message: "Uniquement un jeu Steam.",
+          error: "steam_unavailable",
+          message: "Store Steam injoignable.",
         });
       }
-
-      const catalog = await db.pool.query<{
-        launcher: string;
-        external_id: string;
-        name: string;
-        cover_url: string | null;
-      }>(
-        `
-          SELECT ug.launcher, ug.external_id, ug.name, gm.cover_url
-          FROM group_members m
-          JOIN user_games ug ON ug.user_id = m.user_id
-          LEFT JOIN game_meta gm
-            ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
-          WHERE m.group_id = $1
-            AND ug.launcher = 'steam'
-            AND ug.external_id = $2
-            AND ug.owned = true
-            AND ug.hidden = false
-          LIMIT 1
-        `,
-        [request.params.groupId, parsed.data.externalId],
-      );
-      const game = catalog.rows[0];
-      if (!game) {
+      if (lookup.status === "miss") {
         return reply.code(404).send({
           ok: false,
-          error: "game_not_in_group",
-          message: "Jeu absent du groupe.",
+          error: "not_steam",
+          message: "Jeu introuvable sur le Store.",
         });
       }
+      const game = lookup.hit;
+      const steamUrl = steamStoreUrl(game.appId) ?? game.steamUrl;
+      const coverUrl = game.coverUrl || steamLibraryPosterUrl(game.appId);
 
       const [members, owned] = await Promise.all([
         loadMembers(request.params.groupId),
         loadOwnedGames(request.params.groupId),
       ]);
       const target = {
-        launcher: "steam",
-        externalId: game.external_id,
+        launcher: "steam" as const,
+        externalId: game.appId,
         name: game.name,
       };
       const missing = members.filter((member) => {
@@ -335,34 +322,26 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
           }));
         return !ownsProposedGame(games, target);
       });
-      if (missing.length === 0) {
-        return reply.code(409).send({
-          ok: false,
-          error: "everyone_owns",
-          message: "Tout le monde l’a.",
-        });
-      }
 
-      const coverUrl =
-        game.cover_url || steamLibraryPosterUrl(game.external_id);
       try {
         const inserted = await db.pool.query<ProposalRow>(
           `
             INSERT INTO game_proposals (
               group_id, created_by, launcher, external_id, name,
-              cover_url, steam_url, status
+              cover_url, steam_url, price_label, status
             )
-            VALUES ($1, $2, 'steam', $3, $4, $5, $6, 'open')
+            VALUES ($1, $2, 'steam', $3, $4, $5, $6, $7, 'open')
             RETURNING id, group_id, created_by, launcher, external_id, name,
-                      cover_url, steam_url, status, created_at
+                      cover_url, steam_url, price_label, status, created_at
           `,
           [
             request.params.groupId,
             userId,
-            game.external_id,
+            game.appId,
             game.name,
             coverUrl,
             steamUrl,
+            game.priceLabel,
           ],
         );
         const proposal = inserted.rows[0]!;
@@ -378,6 +357,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
           kind: "proposal",
           gameName: game.name,
           steamUrl,
+          priceLabel: game.priceLabel,
           ownedCount: view.ownedCount,
           memberCount: view.memberCount,
           missingNames: missing.map(displayName),
@@ -425,7 +405,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       const found = await db.pool.query<ProposalRow>(
         `
           SELECT id, group_id, created_by, launcher, external_id, name,
-                 cover_url, steam_url, status, created_at
+                 cover_url, steam_url, price_label, status, created_at
           FROM game_proposals
           WHERE id = $1 AND group_id = $2
         `,
@@ -447,26 +427,6 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         loadMembers(request.params.groupId),
         loadOwnedGames(request.params.groupId),
       ]);
-      const myGames = owned
-        .filter((row) => row.user_id === userId)
-        .map((row) => ({
-          launcher: row.launcher,
-          externalId: row.external_id,
-          name: row.name,
-        }));
-      if (
-        ownsProposedGame(myGames, {
-          launcher: proposal.launcher,
-          externalId: proposal.external_id,
-          name: proposal.name,
-        })
-      ) {
-        return reply.code(409).send({
-          ok: false,
-          error: "already_owns",
-          message: "Tu as déjà le jeu.",
-        });
-      }
 
       await db.pool.query(
         `
@@ -508,7 +468,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       const found = await db.pool.query<ProposalRow>(
         `
           SELECT id, group_id, created_by, launcher, external_id, name,
-                 cover_url, steam_url, status, created_at
+                 cover_url, steam_url, price_label, status, created_at
           FROM game_proposals
           WHERE id = $1 AND group_id = $2
         `,

@@ -1,19 +1,14 @@
 import { apiFetch } from "./api";
 
-export type ProposalReplyValue = "hot" | "maybe" | "later" | "no";
+export type ProposalReplyValue = "hot" | "no";
 
-export type ProposalMemberStatus =
-  | "owns"
-  | "hot"
-  | "maybe"
-  | "later"
-  | "no"
-  | "pending";
+export type ProposalMemberStatus = "hot" | "no" | "pending";
 
 export type ProposalMember = {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  owns: boolean;
   status: ProposalMemberStatus;
 };
 
@@ -26,6 +21,7 @@ export type GameProposal = {
   name: string;
   coverUrl: string | null;
   steamUrl: string;
+  priceLabel: string | null;
   status: "open" | "closed";
   ownedCount: number;
   memberCount: number;
@@ -34,6 +30,7 @@ export type GameProposal = {
   iOwn: boolean;
   myReply: ProposalReplyValue | null;
   canReply: boolean;
+  canCreateEvening: boolean;
   canClose: boolean;
   members: ProposalMember[];
 };
@@ -58,11 +55,11 @@ export async function listProposals(groupId: string): Promise<GameProposal[]> {
 
 export async function createProposal(
   groupId: string,
-  externalId: string,
+  appId: string,
 ): Promise<GameProposal> {
   const response = await apiFetch(`/groups/${groupId}/proposals`, {
     method: "POST",
-    body: JSON.stringify({ launcher: "steam", externalId }),
+    body: JSON.stringify({ appId }),
   });
   if (!response.ok) throw new Error(await readError(response));
   const data = (await response.json()) as {
@@ -105,13 +102,10 @@ export async function closeProposal(
 
 export function proposalReplyLabel(value: ProposalReplyValue): string {
   if (value === "hot") return "Chaud";
-  if (value === "maybe") return "Pourquoi pas";
-  if (value === "later") return "Plus tard";
   return "Non";
 }
 
 export function proposalStatusLabel(status: ProposalMemberStatus): string {
-  if (status === "owns") return "Possède";
   if (status === "pending") return "En attente";
   return proposalReplyLabel(status);
 }

@@ -1,30 +1,23 @@
 import { normalizeGameTitle } from "../library/filter.js";
 
-export type ProposalReplyValue = "hot" | "maybe" | "later" | "no";
+export type ProposalReplyValue = "hot" | "no";
 
-export type ProposalMemberStatus =
-  | "owns"
-  | "hot"
-  | "maybe"
-  | "later"
-  | "no"
-  | "pending";
+export type ProposalMemberStatus = "hot" | "no" | "pending";
 
-export function proposalMemberStatus(input: {
-  owns: boolean;
-  reply: ProposalReplyValue | null;
-}): ProposalMemberStatus {
-  if (input.owns) return "owns";
-  return input.reply ?? "pending";
+export function proposalMemberStatus(
+  reply: ProposalReplyValue | null,
+): ProposalMemberStatus {
+  return reply ?? "pending";
 }
 
 export function proposalMemberStatusLabel(status: ProposalMemberStatus): string {
-  if (status === "owns") return "Possède";
   if (status === "hot") return "Chaud";
-  if (status === "maybe") return "Pourquoi pas";
-  if (status === "later") return "Plus tard";
   if (status === "no") return "Non";
   return "En attente";
+}
+
+export function normalizeProposalReply(value: string): ProposalReplyValue {
+  return value === "hot" ? "hot" : "no";
 }
 
 export function ownsProposedGame(

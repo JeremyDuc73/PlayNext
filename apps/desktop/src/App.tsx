@@ -18,7 +18,7 @@ import {
   runningInDesktopShell,
   startDiscordLogin,
 } from "./lib/desktop-auth";
-import { fetchOpenEvenings } from "./lib/evenings";
+import { fetchOpenEvenings, isLiveEveningStatus } from "./lib/evenings";
 import { gsap, prefersReducedMotion, useGSAP, viewSwap } from "./lib/motion";
 import { Banner } from "./ui/Banner";
 import { BrandMark } from "./ui/BrandMark";
@@ -218,7 +218,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.4.0",
+            version: "0.4.1",
             platform: "web-preview",
           });
         }
@@ -291,11 +291,14 @@ export default function App() {
 
     async function checkOpenEvening() {
       try {
-        const open = (await fetchOpenEvenings())[0];
+        const evenings = await fetchOpenEvenings();
         if (cancelled) return;
+        const open = evenings.find(
+          (item) =>
+            item.kind !== "direct" && isLiveEveningStatus(item.status),
+        );
         if (!open) {
           seenOpenEveningId.current = null;
-          setOpenEveningGroupId(null);
           return;
         }
         setOpenEveningGroupId(open.groupId);
@@ -519,6 +522,7 @@ export default function App() {
                     pendingInviteCode={pendingInviteCode}
                     onPendingInviteConsumed={() => setPendingInviteCode(null)}
                     onBanner={notify}
+                    onRequestEvening={() => setNav("evening")}
                   />
                 )}
               </div>

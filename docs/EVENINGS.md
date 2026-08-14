@@ -1,16 +1,29 @@
 # Soirées PlayNext (P3)
 
-Choisir un jeu pour ce soir : shortlist depuis la biblio croisée, votes masqués, un veto par joueur, révélation agrégée.
+Deux parcours : **rituel** (shortlist → votes masqués → veto → résultat) et
+**direct** (un jeu Steam + horaire, tampon Je viens, pas de vote).
+Toute soirée a une date (`scheduled_at`, fuseau Europe/Paris, défaut 21:00).
 
-## Flux
+## Flux rituel
 
-1. Dans un groupe → **Nouvelle soirée** (participants, durée, ambiance, contraintes)
+1. Dans un groupe → **Nouvelle soirée** (Ce soir / autre jour, participants, durée, ambiance)
 2. **Lobby** : chaque participant tamponne **Je suis prêt**. L’orga peut **Lancer sans eux** (absents hors tour).
 3. Quand tout le monde est prêt (ou l’orga lance), chacun sélectionne 1 à N jeux dans le pool commun
 4. L’organisateur lance le vote quand toutes les sélections sont déposées
 5. Un seul jeu est affiché à la fois ; tous votent sur ce même jeu
 6. Quand tous ont voté, passage automatique au jeu suivant
 7. Résultat : **Confirmer** / revoter l’égalité / **Roulette** / nouveau tour / Annuler
+
+Un seul rituel live par groupe (`lobby|selection|voting|revealed`).
+
+## Flux direct
+
+1. Onglet Soirée → **Proposer une soirée** (recherche Store, jour/heure) — ou CTA **Créer une soirée** depuis une proposition
+2. Lobby : les participants tamponnent **Je viens**
+3. L’orga **Confirme** (tous présents) ou **Lancer sans eux**
+4. Écran résultat, un jeu. Pas de shortlist ni de votes
+
+Plusieurs soirées `direct` datées peuvent coexister. L’onglet Soirée les liste (date + titre) puis le détail.
 
 ## Contraintes shortlist
 
@@ -59,7 +72,7 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 
 | Méthode | Chemin |
 |---------|--------|
-| POST | `/groups/:groupId/evenings` |
+| POST | `/groups/:groupId/evenings` `{ kind, scheduledAt, appId? }` |
 | GET | `/groups/:groupId/evenings` |
 | DELETE | `/groups/:groupId/evenings/history` (propriétaire, terminées / annulées) |
 | GET | `/me/open-evenings` |
@@ -81,12 +94,16 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 Polling UI ~2,5 s, y compris l’écran idle et les autres onglets
 (`GET /me/open-evenings`). WebSocket plus tard.
 
-`GET /groups/:groupId/evenings` renvoie aussi `winnerName` (jeu confirmé, sinon `null`).
-Sans titre saisi, l’UI affiche **Soirée du JJ/MM/AAAA**.
+`GET /groups/:groupId/evenings` renvoie aussi `winnerName`, `kind`, `scheduledAt`, `gameName`.
+Sans titre saisi, l’UI affiche **Soirée du JJ/MM/AAAA** (date prévue).
 Le propriétaire peut effacer une entrée terminée/annulée, ou tout l’historique d’un coup
 (`DELETE …/history` ne touche pas aux soirées en cours).
 
-Statuts : `lobby` → `selection` → `voting` → `revealed` → `closed` / `cancelled`.
+`kind` : `ritual` (défaut) | `direct`.
+`scheduledAt` : ISO, interprété en Europe/Paris à l’affichage.
+
+Statuts rituel : `lobby` → `selection` → `voting` → `revealed` → `closed` / `cancelled`.
+Statuts direct : `lobby` → `revealed` → `closed` / `cancelled`.
 
 ## Tests moteur
 
@@ -99,3 +116,4 @@ npm run test:api
 - Temps réel WebSocket
 - Métadonnées durée catalogue
 - Exclusion absents journalisée fine
+- Réservation de places chiffrée

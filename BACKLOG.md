@@ -155,7 +155,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
   - [x] Nouvelle soirée (Lobby)
   - [ ] Votes terminés (sans votes individuels)
   - [x] Jeu choisi
-  - [ ] Proposition de soirée (jeu + places)
+  - [x] Proposition de soirée (jeu + horaire, Discord)
   - [x] Nouvelle proposition d’achat
   - [ ] Accord collectif → invitation soirée
   - [ ] Rappels facultatifs
@@ -176,8 +176,8 @@ Doc : `docs/EVENINGS.md`
 - [x] Durée
 - [x] Ambiance
 - [x] Sélection depuis les bibliothèques personnelles / installation optionnelle
-- [ ] Proposition directe : un membre choisit un jeu + un max de places (soirée sans shortlist / votes)
-  - [ ] Annonce Discord (salon du groupe) — plus tard
+- [x] Proposition directe : un membre choisit un jeu Steam + un horaire (soirée sans shortlist / votes)
+  - [x] Annonce Discord (salon du groupe)
   - [ ] Réservation des places par les autres membres — plus tard
 
 - [~] Préférences (récents via diversité gagnants ; oubliés / campagne / gratuit / exclusions fines plus tard)
@@ -221,15 +221,15 @@ Doc : `docs/EVENINGS.md`
 ## P4 — Découvertes & achats
 
 - [x] Zone Découvertes / propositions
-- [x] Création proposition (Steam, membres sans le jeu, Store)
+- [x] Création proposition (recherche Store Steam, prix EUR, Store)
 - [ ] Nombre min de joueurs si ciblage partiel
-- [x] Réponses : possède déjà / chaud / pourquoi pas / plus tard / non
+- [x] Réponses : Chaud / Non (tout le groupe)
 - [ ] Validation (défaut unanimité ciblés) + **réglage de groupe alternatif** (quorum / majorité) pour éviter blocages
 - [ ] Prix indicatifs (IsThereAnyDeal ou équivalent) : boutique, région, date, lien ; jamais d’achat intégré
-- [x] Proposition sans prix si pas de donnée fiable — lien Store Steam uniquement
+- [x] Prix Store Steam si dispo, sinon « — » ; lien Store
 - [ ] Notif baisse de prix opt-in
 - [~] Cycle de vie : ouverte / classée (refusée / expirée / archivée plus tard)
-- [ ] Conversion proposition validée → soirée préremplie
+- [x] Conversion proposition (tous voté) → soirée directe préremplie
 - [x] Partage Discord si autorisé
 
 ---
@@ -367,10 +367,11 @@ Quand on reporte quelque chose hors phase prévue, ajouter une ligne :
 | 2026-07-30 | Site Astro vitrine/install                    | P0/P5 → après itération desktop | Tester dans l’app d’abord                          |
 | 2026-08-13 | Lancement du jeu gagnant                      | P3 → abandonné                  | L’affichage du résultat suffit                     |
 | 2026-08-13 | Proposition soirée : Discord + réservation    | P3 → après le flux jeu + places | D’abord créer/proposer ; notif et places ensuite   |
+| 2026-08-14 | Quorum / places chiffrées / ITAD              | P4 → plus tard                  | Store Steam + soirée directe suffisent pour V1     |
 
 
 ---
 
 ## Prochaine action concrète
 
-**P4 suite** — quorum / conversion proposition → soirée, ou **P5** (installeur signé, release).
+**P5** — installeur signé, release ; ou quorum propositions.

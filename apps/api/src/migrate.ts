@@ -388,5 +388,34 @@ export async function migrate(db: Db): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (proposal_id, user_id)
     );
+
+    ALTER TABLE game_proposals
+      ADD COLUMN IF NOT EXISTS price_label TEXT;
+
+    ALTER TABLE game_proposal_replies
+      DROP CONSTRAINT IF EXISTS game_proposal_replies_value_check;
+    UPDATE game_proposal_replies
+      SET value = 'no'
+      WHERE value IN ('maybe', 'later');
+    ALTER TABLE game_proposal_replies
+      ADD CONSTRAINT game_proposal_replies_value_check
+      CHECK (value IN ('hot', 'no'));
+
+    ALTER TABLE evenings
+      ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+    ALTER TABLE evenings
+      ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'ritual';
+    UPDATE evenings
+      SET scheduled_at = created_at
+      WHERE scheduled_at IS NULL;
+    ALTER TABLE evenings
+      DROP CONSTRAINT IF EXISTS evenings_kind_check;
+    ALTER TABLE evenings
+      ADD CONSTRAINT evenings_kind_check
+      CHECK (kind IN ('ritual', 'direct'));
+    CREATE UNIQUE INDEX IF NOT EXISTS evenings_one_live_ritual_idx
+      ON evenings (group_id)
+      WHERE kind = 'ritual'
+        AND status IN ('lobby', 'selection', 'voting', 'revealed');
   `);
 }

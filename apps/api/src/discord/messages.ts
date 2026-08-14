@@ -1,10 +1,20 @@
+import { formatParisWhen } from "../time/paris.js";
+
 export type DiscordNotice =
-  | { kind: "lobby"; playerCount: number }
+  | {
+      kind: "lobby";
+      playerCount: number;
+      scheduledAt?: string | Date | null;
+      gameName?: string | null;
+      steamUrl?: string | null;
+      coverUrl?: string | null;
+    }
   | { kind: "chosen"; gameName: string; coverUrl?: string | null }
   | {
       kind: "proposal";
       gameName: string;
       steamUrl: string;
+      priceLabel?: string | null;
       ownedCount: number;
       memberCount: number;
       missingNames: string[];
@@ -48,7 +58,12 @@ export function formatDiscordNotice(
   notice: DiscordNotice,
 ): string {
   if (notice.kind === "lobby") {
-    return `Lobby ouvert · ${groupName}`;
+    const when = notice.scheduledAt
+      ? formatParisWhen(notice.scheduledAt)
+      : null;
+    const game = notice.gameName?.trim();
+    const parts = ["Lobby ouvert", game, groupName, when].filter(Boolean);
+    return parts.join(" · ");
   }
   if (notice.kind === "proposal") {
     return `Proposition · ${notice.gameName}`;
@@ -62,31 +77,67 @@ export function buildDiscordMessage(
 ): DiscordMessagePayload {
   const timestamp = new Date().toISOString();
   if (notice.kind === "lobby") {
-    return {
+    const when = notice.scheduledAt
+      ? formatParisWhen(notice.scheduledAt)
+      : null;
+    const fields: DiscordEmbed["fields"] = [
+      {
+        name: "Joueurs",
+        value: `\`${pad2(notice.playerCount)}\``,
+        inline: true,
+      },
+      {
+        name: "Statut",
+        value: "Soirée ouverte",
+        inline: true,
+      },
+    ];
+    if (when) {
+      fields.push({
+        name: "Horaire",
+        value: when,
+        inline: false,
+      });
+    }
+    if (notice.gameName) {
+      fields.push({
+        name: "Jeu",
+        value: notice.gameName,
+        inline: false,
+      });
+    }
+    const embed: DiscordEmbed = {
+      title: "Lobby",
+      description: groupName,
+      color: PLAYNEXT_RED,
+      fields,
+      footer: { text: "PlayNext" },
+      timestamp,
+    };
+    if (notice.coverUrl) {
+      embed.image = { url: notice.coverUrl };
+    }
+    const payload: DiscordMessagePayload = {
       content: formatDiscordNotice(groupName, notice),
       allowed_mentions: { parse: [] },
-      embeds: [
+      embeds: [embed],
+    };
+    if (notice.steamUrl) {
+      payload.components = [
         {
-          title: "Lobby",
-          description: groupName,
-          color: PLAYNEXT_RED,
-          fields: [
+          type: 1,
+          components: [
             {
-              name: "Joueurs",
-              value: `\`${pad2(notice.playerCount)}\``,
-              inline: true,
-            },
-            {
-              name: "Statut",
-              value: "Soirée ouverte",
-              inline: true,
+              type: 2,
+              style: 5,
+              label: "Store Steam",
+              url: notice.steamUrl,
             },
           ],
-          footer: { text: "PlayNext" },
-          timestamp,
         },
-      ],
-    };
+      ];
+    }
+    return payload;
   }
 
   if (notice.kind === "proposal") {
@@ -100,6 +151,11 @@ export function buildDiscordMessage(
       description: groupName,
       color: PLAYNEXT_RED,
       fields: [
+        {
+          name: "Prix",
+          value: notice.priceLabel?.trim() || "—",
+          inline: true,
+        },
         {
           name: "Possèdent",
           value: `\`${pad2(notice.ownedCount)} / ${pad2(notice.memberCount)}\``,

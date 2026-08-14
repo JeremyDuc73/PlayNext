@@ -165,7 +165,7 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function steamFetch(url: URL): Promise<Response> {
+export async function steamFetch(url: URL): Promise<Response> {
   return fetch(url, {
     headers: {
       "User-Agent": "PlayNext/0.1",

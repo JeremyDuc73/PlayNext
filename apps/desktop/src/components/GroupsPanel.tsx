@@ -38,6 +38,7 @@ import {
   type GameProposal,
   type ProposalReplyValue,
 } from "../lib/proposals";
+import { type DirectEveningDraft } from "../lib/evenings";
 import { pad2 } from "../lib/format";
 import { staggerIn, useGSAP } from "../lib/motion";
 import { openExternalUrl } from "../lib/desktop-auth";
@@ -48,6 +49,7 @@ import { EmptyHint } from "../ui/EmptyHint";
 import { GamePoster } from "../ui/GamePoster";
 import { PosterGrid } from "../ui/PosterGrid";
 import { SquareAvatar } from "../ui/SquareAvatar";
+import { SteamSearch } from "../ui/SteamSearch";
 
 type Props = {
   enabled: boolean;
@@ -56,6 +58,7 @@ type Props = {
   pendingInviteCode: string | null;
   onPendingInviteConsumed: () => void;
   onBanner: (message: string) => void;
+  onRequestEvening?: () => void;
   focusGroupId?: string | null;
 };
 
@@ -68,6 +71,7 @@ export function GroupsPanel({
   pendingInviteCode,
   onPendingInviteConsumed,
   onBanner,
+  onRequestEvening,
   focusGroupId = null,
 }: Props) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
@@ -80,7 +84,8 @@ export function GroupsPanel({
   const [library, setLibrary] = useState<GroupLibraryGame[]>([]);
   const [hidden, setHidden] = useState<HiddenGroupGame[]>([]);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
-  const [proposeTarget, setProposeTarget] = useState<GroupLibraryGame | null>(
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [directDraft, setDirectDraft] = useState<DirectEveningDraft | null>(
     null,
   );
   const [invites, setInvites] = useState<GroupInvite[]>([]);
@@ -115,7 +120,7 @@ export function GroupsPanel({
     setSelectedId(groupId);
     setShowAdmin(false);
     setComposer("idle");
-    setProposeTarget(null);
+    setProposeOpen(false);
     try {
       const [groupDetail, lib, hiddenGames, groupProposals] = await Promise.all([
         fetchGroup(groupId),
@@ -391,12 +396,12 @@ export function GroupsPanel({
     setProposals(groupProposals);
   }
 
-  async function onConfirmPropose() {
-    if (!selectedId || !proposeTarget) return;
+  async function onConfirmPropose(appId: string) {
+    if (!selectedId) return;
     setBusy(true);
     try {
-      await createProposal(selectedId, proposeTarget.externalId);
-      setProposeTarget(null);
+      await createProposal(selectedId, appId);
+      setProposeOpen(false);
       await refreshLibrary();
       onBanner("Proposition ouverte.");
     } catch (error) {
@@ -633,6 +638,8 @@ export function GroupsPanel({
             canOrganize={canManage}
             isOwner={myRole === "owner"}
             onBanner={onBanner}
+            directDraft={directDraft}
+            onDirectDraftConsumed={() => setDirectDraft(null)}
           />
         ) : (
           <div className="grid gap-6">
@@ -651,9 +658,16 @@ export function GroupsPanel({
                 </div>
               </div>
               <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  disabled={busy}
+                  onClick={() => setProposeOpen((open) => !open)}
+                >
+                  {proposeOpen ? "Fermer" : "Proposer un jeu"}
+                </Button>
                 {canManage ? (
                   <Button
-                    variant="primary"
+                    variant="second"
                     disabled={busy}
                     onClick={() => void onCreateInvite()}
                   >
@@ -685,6 +699,16 @@ export function GroupsPanel({
                 )}
               </div>
             </header>
+
+            {proposeOpen ? (
+              <div className="grid gap-3 border border-rule-strong p-4">
+                <p className="pn-data">Store Steam</p>
+                <SteamSearch
+                  disabled={busy}
+                  onPick={(hit) => void onConfirmPropose(hit.appId)}
+                />
+              </div>
+            ) : null}
 
             {lastInviteLink ? (
               <p className="break-all font-data text-[11px] tracking-[0.08em] text-paper-2">
@@ -895,6 +919,16 @@ export function GroupsPanel({
                 void onReplyProposal(proposalId, value)
               }
               onClose={(proposalId) => void onCloseProposal(proposalId)}
+              onCreateEvening={(proposal) => {
+                setDirectDraft({
+                  appId: proposal.externalId,
+                  name: proposal.name,
+                  coverUrl: proposal.coverUrl,
+                  steamUrl: proposal.steamUrl,
+                  priceLabel: proposal.priceLabel ?? undefined,
+                });
+                onRequestEvening?.();
+              }}
             />
 
             <div>
@@ -944,15 +978,6 @@ export function GroupsPanel({
                     const mine = game.owners.find(
                       (o) => o.userId === currentUserId,
                     );
-                    const proposed = proposals.some(
-                      (proposal) =>
-                        proposal.launcher === game.launcher &&
-                        proposal.externalId === game.externalId,
-                    );
-                    const canPropose =
-                      game.launcher === "steam" &&
-                      game.ownedCount < game.memberCount &&
-                      !proposed;
                     return (
                       <div key={game.key} role="listitem">
                         <GamePoster
@@ -963,33 +988,16 @@ export function GroupsPanel({
                           priority={index < 24}
                           subtitle={`${pad2(game.ownedCount)}/${pad2(game.memberCount)} · ${game.launcher}`}
                           footer={
-                            <>
-                              {canPropose ? (
-                                <button
-                                  type="button"
-                                  className="pn-data mt-1 mr-3 hover:text-paper"
-                                  disabled={busy}
-                                  onClick={() => setProposeTarget(game)}
-                                >
-                                  Proposer
-                                </button>
-                              ) : null}
-                              {proposed ? (
-                                <span className="pn-data mt-1 mr-3">
-                                  Proposée
-                                </span>
-                              ) : null}
-                              {mine ? (
-                                <button
-                                  type="button"
-                                  className="pn-data mt-1 hover:text-paper"
-                                  disabled={busy}
-                                  onClick={() => void onHide(game)}
-                                >
-                                  Masquer
-                                </button>
-                              ) : null}
-                            </>
+                            mine ? (
+                              <button
+                                type="button"
+                                className="pn-data mt-1 hover:text-paper"
+                                disabled={busy}
+                                onClick={() => void onHide(game)}
+                              >
+                                Masquer
+                              </button>
+                            ) : null
                           }
                         />
                       </div>
@@ -1040,21 +1048,6 @@ export function GroupsPanel({
         )}
       </div>
       </section>
-      {proposeTarget ? (
-        <ConfirmDialog
-          title="Proposer ce jeu ?"
-          confirmLabel="Proposer"
-          confirmVariant="primary"
-          busy={busy}
-          busyLabel="Ouverture…"
-          onConfirm={() => void onConfirmPropose()}
-          onCancel={() => {
-            if (!busy) setProposeTarget(null);
-          }}
-        >
-          {`${proposeTarget.name} · les joueurs sans le jeu voient le Store Steam. Message dans le salon du groupe.`}
-        </ConfirmDialog>
-      ) : null}
       {deleteOpen && detail ? (
         <ConfirmDialog
           title="Supprimer le groupe ?"

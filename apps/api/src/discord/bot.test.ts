@@ -58,9 +58,12 @@ describe("buildDiscordMessage", () => {
     const payload = buildDiscordMessage("Les Copains", {
       kind: "lobby",
       playerCount: 5,
+      scheduledAt: "2026-08-14T19:00:00.000Z",
     });
     assert.equal(payload.embeds[0]?.title, "Lobby");
     assert.equal(payload.embeds[0]?.description, "Les Copains");
+    assert.match(payload.content, /Lobby ouvert/);
+    assert.match(payload.content, /21:00/);
   });
 
   it("puts the cover on the chosen-game embed", () => {
@@ -93,6 +96,9 @@ describe("buildDiscordMessage", () => {
       payload.components?.[0]?.components[0]?.url,
       "https://store.steampowered.com/app/1145360/",
     );
-    assert.match(payload.content, /Proposition/);
+    assert.equal(
+      payload.embeds[0]?.fields?.some((field) => field.name === "Prix"),
+      true,
+    );
   });
 });

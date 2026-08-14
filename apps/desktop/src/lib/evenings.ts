@@ -14,6 +14,7 @@ export type EveningVibe =
   | "campaign"
   | "party"
   | "any";
+export type EveningKind = "ritual" | "direct";
 
 export type EveningCandidate = {
   id: string;
@@ -77,6 +78,8 @@ export type Evening = {
   allVoted: boolean;
   myVetoAvailable: boolean;
   winnerCandidateId: string | null;
+  kind: EveningKind;
+  scheduledAt: string | null;
   participants: EveningParticipant[];
   candidates: EveningCandidate[];
   resolution: {
@@ -93,9 +96,12 @@ export type EveningSummary = {
   status: EveningStatus;
   title: string | null;
   round: number;
+  kind: EveningKind;
+  scheduledAt: string | null;
   createdAt: string;
   winnerCandidateId: string | null;
   winnerName: string | null;
+  gameName: string | null;
 };
 
 export type OpenEvening = {
@@ -104,6 +110,8 @@ export type OpenEvening = {
   groupName: string;
   status: EveningStatus;
   title: string | null;
+  kind: EveningKind;
+  scheduledAt: string | null;
   createdAt: string;
 };
 
@@ -119,13 +127,26 @@ export function isLiveEveningStatus(status: EveningStatus): boolean {
 export function eveningDisplayTitle(
   title: string | null | undefined,
   createdAt: string,
+  scheduledAt?: string | null,
 ): string {
   const trimmed = title?.trim();
   if (trimmed) return trimmed;
-  return `Soirée du ${new Date(createdAt).toLocaleDateString("fr-FR")}`;
+  const when = scheduledAt ?? createdAt;
+  return `Soirée du ${new Date(when).toLocaleDateString("fr-FR", {
+    timeZone: "Europe/Paris",
+  })}`;
 }
 
+export type DirectEveningDraft = {
+  appId: string;
+  name: string;
+  coverUrl: string | null;
+  steamUrl: string;
+  priceLabel?: string;
+};
+
 export type CreateEveningInput = {
+  kind?: EveningKind;
   title?: string;
   durationMinutes?: number | null;
   vibe?: EveningVibe | null;
@@ -133,6 +154,8 @@ export type CreateEveningInput = {
   requireInstalled?: boolean;
   shortlistSize?: number;
   participantIds?: string[];
+  scheduledAt?: string;
+  appId?: string;
 };
 
 async function readError(response: Response): Promise<string> {

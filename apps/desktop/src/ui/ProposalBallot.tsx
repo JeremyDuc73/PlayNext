@@ -1,7 +1,7 @@
 import type { ProposalReplyValue } from "../lib/proposals";
 import { proposalReplyLabel } from "../lib/proposals";
 
-const OPTIONS: ProposalReplyValue[] = ["hot", "maybe", "later", "no"];
+const OPTIONS: ProposalReplyValue[] = ["hot", "no"];
 
 type Props = {
   value: ProposalReplyValue | null;

@@ -7,23 +7,16 @@ import {
 } from "./status.js";
 
 describe("proposalMemberStatus", () => {
-  it("treats owners as settled", () => {
-    assert.equal(
-      proposalMemberStatus({ owns: true, reply: "hot" }),
-      "owns",
-    );
-    assert.equal(proposalMemberStatusLabel("owns"), "Possède");
+  it("keeps owners in the vote", () => {
+    assert.equal(proposalMemberStatus("hot"), "hot");
+    assert.equal(proposalMemberStatus(null), "pending");
+    assert.equal(proposalMemberStatusLabel("pending"), "En attente");
   });
 
-  it("keeps a missing player pending until they reply", () => {
-    assert.equal(
-      proposalMemberStatus({ owns: false, reply: null }),
-      "pending",
-    );
-    assert.equal(
-      proposalMemberStatus({ owns: false, reply: "later" }),
-      "later",
-    );
+  it("maps a missing reply to pending", () => {
+    assert.equal(proposalMemberStatus(null), "pending");
+    assert.equal(proposalMemberStatus("no"), "no");
+    assert.equal(proposalMemberStatusLabel("no"), "Non");
   });
 });
 

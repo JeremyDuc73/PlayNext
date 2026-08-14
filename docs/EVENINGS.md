@@ -33,10 +33,13 @@ La propriété « jouable en groupe » vient du Steam Store (catégories multi /
 Les solo **connus** n’apparaissent ni dans la biblio groupe ni dans le pool de soirée ;
 ils restent dans la bibliothèque personnelle (filtre Multi / Solo).
 Les titres encore non classés restent visibles dans le groupe le temps du
-classement. Steam Store classe les AppIDs Steam ; le même titre est réutilisé
-pour Xbox / Epic / manuel. Les jeux absents de Steam sont cherchés par nom
-dans le Store (titre strictement identique). Les ajouts manuels IGDB utilisent
-les `game_modes`. LoL / VALORANT sont toujours multi.
+classement. Steam Store classe les AppIDs Steam **un par un**, avec pause,
+pour éviter un 429 qui fige le tri. Un 429 n’est pas gravé : le titre est
+repris au chargement suivant. Le même titre est réutilisé pour Xbox / Epic /
+manuel. Les jeux absents de Steam sont cherchés par nom dans le Store (titre
+strictement identique) ; un échec HTTP n’est pas enregistré comme « inconnu ».
+Les ajouts manuels IGDB utilisent les `game_modes`. LoL / VALORANT sont
+toujours multi.
 
 ## Scores
 

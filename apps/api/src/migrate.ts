@@ -332,6 +332,13 @@ export async function migrate(db: Db): Promise<void> {
     ALTER TABLE game_meta
       ADD COLUMN IF NOT EXISTS group_playable_source TEXT;
 
+    -- Ancien enrichissement : un 429 Store était gravé comme « inconnu ».
+    -- Sans source, le classement peut reprendre (lents, un titre à la fois).
+    UPDATE game_meta
+    SET group_playable_source = NULL
+    WHERE group_playable IS NULL
+      AND group_playable_source = 'steam_store_search';
+
     -- Nettoyage de l’ancien pipeline IGDB abandonné.
     UPDATE game_meta
     SET cover_url = NULL,

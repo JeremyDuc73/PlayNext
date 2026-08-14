@@ -729,6 +729,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
       cover_url: string | null;
       year: number | null;
       group_playable: boolean | null;
+      group_playable_source: string | null;
     }>(
       `
         SELECT ug.id, ug.launcher, ug.external_id, ug.name, ug.installed,
@@ -738,7 +739,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
                   AND gm.source <> 'igdb_manual' THEN NULL
                  ELSE gm.cover_url
                END AS cover_url,
-               gm.year, gm.group_playable
+               gm.year, gm.group_playable, gm.group_playable_source
         FROM user_games ug
         LEFT JOIN game_meta gm
           ON gm.launcher = ug.launcher AND gm.external_id = ug.external_id
@@ -768,25 +769,32 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
     const byTitle = await loadGroupPlayableByTitle(db);
     const mapped = games.rows
       .filter((row) => !isJunkGameName(row.name))
-      .map((row) => ({
-        id: row.id,
-        launcher: row.launcher,
-        externalId: row.external_id,
-        name: row.name,
-        installed: row.installed,
-        owned: row.owned,
-        launchable: row.launchable,
-        syncedAt: row.synced_at,
-        coverUrl:
-          row.cover_url ?? riotCoverUrl(row.launcher, row.external_id),
-        year: row.year,
-        groupPlayable: resolveGroupPlayable({
+      .map((row) => {
+        const groupPlayable = resolveGroupPlayable({
           name: row.name,
           launcher: row.launcher,
           stored: row.group_playable,
           byTitle: byTitle.get(normalizeGameTitle(row.name)),
-        }),
-      }));
+        });
+        return {
+          id: row.id,
+          launcher: row.launcher,
+          externalId: row.external_id,
+          name: row.name,
+          installed: row.installed,
+          owned: row.owned,
+          launchable: row.launchable,
+          syncedAt: row.synced_at,
+          coverUrl:
+            row.cover_url ?? riotCoverUrl(row.launcher, row.external_id),
+          year: row.year,
+          groupPlayable,
+          queued:
+            groupPlayable == null &&
+            row.launcher !== "riot" &&
+            !row.group_playable_source,
+        };
+      });
 
     void persistMissingGroupPlayable(
       db,
@@ -801,7 +809,20 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
 
     return {
       ok: true,
-      games: mapped,
+      games: mapped.map((game) => ({
+        id: game.id,
+        launcher: game.launcher,
+        externalId: game.externalId,
+        name: game.name,
+        installed: game.installed,
+        owned: game.owned,
+        launchable: game.launchable,
+        syncedAt: game.syncedAt,
+        coverUrl: game.coverUrl,
+        year: game.year,
+        groupPlayable: game.groupPlayable,
+      })),
+      groupPlayableQueued: mapped.filter((game) => game.queued).length,
       lastSync: lastSync.rows[0]
         ? {
             at: lastSync.rows[0].created_at,

@@ -66,6 +66,7 @@ export function LibraryHub({
   const [launcher, setLauncher] = useState<LauncherFilter>("all");
   const [installedOnly, setInstalledOnly] = useState(false);
   const [playMode, setPlayMode] = useState<"all" | "multi" | "solo">("all");
+  const [groupPlayableQueued, setGroupPlayableQueued] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualQuery, setManualQuery] = useState("");
@@ -80,19 +81,26 @@ export function LibraryHub({
     new Map(),
   );
 
-  async function refreshGames() {
+  async function refreshGames(mode: "full" | "classement" = "full") {
     try {
-      const [nextGames, nextHiddenGames] = await Promise.all([
+      if (mode === "classement") {
+        const library = await fetchMyLibrary();
+        setGames(library.games);
+        setGroupPlayableQueued(library.groupPlayableQueued);
+        return;
+      }
+      const [library, nextHiddenGames] = await Promise.all([
         fetchMyLibrary(),
         fetchMyHiddenLibrary(),
       ]);
-      setGames(nextGames);
+      setGames(library.games);
+      setGroupPlayableQueued(library.groupPlayableQueued);
       setHiddenGames(nextHiddenGames);
       try {
         localStorage.setItem(
           LIBRARY_CACHE_KEY,
           JSON.stringify({
-            games: nextGames,
+            games: library.games,
             hiddenGames: nextHiddenGames,
             savedAt: new Date().toISOString(),
           } satisfies LibraryCache),
@@ -101,7 +109,7 @@ export function LibraryHub({
         // Local storage is optional.
       }
       void resolveGameMeta(
-        nextGames.map((game) => ({
+        library.games.map((game) => ({
           launcher: game.launcher,
           externalId: game.externalId,
           name: game.name,
@@ -110,6 +118,7 @@ export function LibraryHub({
         .then(setResolvedMeta)
         .catch(() => undefined);
     } catch (error) {
+      if (mode === "classement") throw error;
       try {
         const cached = JSON.parse(
           localStorage.getItem(LIBRARY_CACHE_KEY) ?? "null",
@@ -117,6 +126,7 @@ export function LibraryHub({
         if (cached?.games && cached.hiddenGames) {
           setGames(cached.games);
           setHiddenGames(cached.hiddenGames);
+          setGroupPlayableQueued(0);
           onBanner("Dernière bibliothèque disponible hors connexion.");
           return;
         }
@@ -242,6 +252,15 @@ export function LibraryHub({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, microsoftLinkedSignal, epicLinkedSignal]);
 
+  useEffect(() => {
+    if (!enabled || groupPlayableQueued <= 0) return;
+    const timer = window.setInterval(() => {
+      void refreshGames("classement").catch(() => undefined);
+    }, 8000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, groupPlayableQueued]);
+
   const cleaned = useMemo(
     () => games.filter((g) => !isJunkGameName(g.name)),
     [games],
@@ -279,6 +298,17 @@ export function LibraryHub({
       if (g.launcher === "manual") c.manual += 1;
     }
     return c;
+  }, [cleaned]);
+
+  const ranking = useMemo(() => {
+    const titles = dedupePreferLaunchers(cleaned);
+    let classified = 0;
+    for (const game of titles) {
+      if (game.groupPlayable === true || game.groupPlayable === false) {
+        classified += 1;
+      }
+    }
+    return { classified, total: titles.length };
   }, [cleaned]);
 
   async function onSyncAll() {
@@ -541,6 +571,20 @@ export function LibraryHub({
 
       <p className="pn-data mb-4">
         {pad2(visible.length)} jeu{visible.length > 1 ? "x" : ""}
+        {ranking.classified < ranking.total ? (
+          <>
+            {" · "}
+            {pad2(ranking.classified)} / {pad2(ranking.total)} classés
+          </>
+        ) : null}
+        {groupPlayableQueued > 0 ? (
+          <>
+            {" · "}
+            <span className="inline-flex items-center gap-2">
+              Classement <span className="pn-sync w-20"><i /></span>
+            </span>
+          </>
+        ) : null}
         {busy ? (
           <>
             {" · "}

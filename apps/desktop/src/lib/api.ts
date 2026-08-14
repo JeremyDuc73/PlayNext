@@ -177,12 +177,22 @@ export async function syncRiotLibrary(
   return { synced: data.synced, installed: data.installed };
 }
 
-export async function fetchMyLibrary(): Promise<LibraryGame[]> {
+export async function fetchMyLibrary(): Promise<{
+  games: LibraryGame[];
+  groupPlayableQueued: number;
+}> {
   const response = await apiFetch("/library/me");
-  if (response.status === 401) return [];
+  if (response.status === 401) return { games: [], groupPlayableQueued: 0 };
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = (await response.json()) as { ok: boolean; games: LibraryGame[] };
-  return data.games;
+  const data = (await response.json()) as {
+    ok: boolean;
+    games: LibraryGame[];
+    groupPlayableQueued?: number;
+  };
+  return {
+    games: data.games,
+    groupPlayableQueued: data.groupPlayableQueued ?? 0,
+  };
 }
 
 export async function fetchMyHiddenLibrary(): Promise<HiddenLibraryGame[]> {

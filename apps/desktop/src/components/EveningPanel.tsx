@@ -58,6 +58,8 @@ type Props = {
   onBanner: (message: string) => void;
   directDraft?: DirectEveningDraft | null;
   onDirectDraftConsumed?: () => void;
+  openEveningId?: string | null;
+  onOpenEveningConsumed?: () => void;
 };
 
 const VIBES: { value: EveningVibe; label: string }[] = [
@@ -78,6 +80,8 @@ export function EveningPanel({
   onBanner,
   directDraft = null,
   onDirectDraftConsumed,
+  openEveningId = null,
+  onOpenEveningConsumed,
 }: Props) {
   const [history, setHistory] = useState<EveningSummary[]>([]);
   const [evening, setEvening] = useState<Evening | null>(null);
@@ -103,6 +107,7 @@ export function EveningPanel({
   const eveningRef = useRef<Evening | null>(null);
   const selectionDirtyRef = useRef(false);
   const metaLoadedForRef = useRef<string | null>(null);
+  const skipHistoryAutoloadRef = useRef(Boolean(openEveningId));
 
   function applyEvening(next: Evening): void {
     const previous = eveningRef.current;
@@ -176,12 +181,37 @@ export function EveningPanel({
   }, [directDraft, onDirectDraftConsumed]);
 
   useEffect(() => {
+    if (!openEveningId) return;
+    skipHistoryAutoloadRef.current = true;
+    let cancelled = false;
+    void loadEvening(openEveningId)
+      .then(() => {
+        if (!cancelled) onOpenEveningConsumed?.();
+      })
+      .catch((error: Error) => {
+        if (!cancelled) {
+          onBanner(error.message);
+          onOpenEveningConsumed?.();
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openEveningId]);
+
+  useEffect(() => {
+    skipHistoryAutoloadRef.current = Boolean(openEveningId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
+
+  useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const list = await refreshHistory();
         if (cancelled) return;
-        if (directDraft || setupMode) return;
+        if (directDraft || setupMode || skipHistoryAutoloadRef.current) return;
         const urgent = list.find(
           (item) =>
             item.kind !== "direct" && isLiveEveningStatus(item.status),
@@ -526,7 +556,7 @@ export function EveningPanel({
                     setSetupMode("direct");
                   }}
                 >
-                  Proposer une soirée
+                  Proposer un jeu
                 </Button>
               </div>
             </div>
@@ -1327,7 +1357,7 @@ function DirectSetupForm(props: {
     <div className="grid max-w-3xl gap-5 border border-rule-strong p-6">
       <div>
         <p className="pn-data mb-2">Soirée</p>
-        <h3 className="pn-display text-4xl">Proposer une soirée</h3>
+        <h3 className="pn-display text-4xl">Proposer un jeu</h3>
         <span className="pn-accent mt-3" />
       </div>
       <EveningWhenField value={props.when} onChange={props.setWhen} />

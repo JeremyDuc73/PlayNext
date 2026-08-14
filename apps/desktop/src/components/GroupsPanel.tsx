@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EveningPanel } from "./EveningPanel";
+import { CalendarPanel } from "./CalendarPanel";
 import { ProposalsPanel } from "./ProposalsPanel";
 import {
   createGroup,
@@ -53,7 +54,7 @@ import { SteamSearch } from "../ui/SteamSearch";
 
 type Props = {
   enabled: boolean;
-  focus: "group" | "evening";
+  focus: "group" | "evening" | "calendar";
   currentUserId: string;
   pendingInviteCode: string | null;
   onPendingInviteConsumed: () => void;
@@ -88,6 +89,7 @@ export function GroupsPanel({
   const [directDraft, setDirectDraft] = useState<DirectEveningDraft | null>(
     null,
   );
+  const [openEveningId, setOpenEveningId] = useState<string | null>(null);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [newName, setNewName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -118,6 +120,7 @@ export function GroupsPanel({
 
   async function openGroup(groupId: string) {
     setSelectedId(groupId);
+    setOpenEveningId(null);
     setShowAdmin(false);
     setComposer("idle");
     setProposeOpen(false);
@@ -443,10 +446,10 @@ export function GroupsPanel({
       setProposals((current) =>
         current.filter((proposal) => proposal.id !== proposalId),
       );
-      onBanner("Proposition classée.");
+      onBanner("Proposition annulée.");
     } catch (error) {
       onBanner(
-        error instanceof Error ? error.message : "Classement impossible.",
+        error instanceof Error ? error.message : "Annulation impossible.",
       );
     } finally {
       setBusy(false);
@@ -640,6 +643,18 @@ export function GroupsPanel({
             onBanner={onBanner}
             directDraft={directDraft}
             onDirectDraftConsumed={() => setDirectDraft(null)}
+            openEveningId={openEveningId}
+            onOpenEveningConsumed={() => setOpenEveningId(null)}
+          />
+        ) : focus === "calendar" ? (
+          <CalendarPanel
+            groupId={detail.group.id}
+            groupName={detail.group.name}
+            onBanner={onBanner}
+            onOpenEvening={(eveningId) => {
+              setOpenEveningId(eveningId);
+              onRequestEvening?.();
+            }}
           />
         ) : (
           <div className="grid gap-6">

@@ -12,6 +12,8 @@ Parcours cœur sans bot Discord : créer un groupe, inviter par lien, croiser le
 
 Le propriétaire ne peut pas quitter sans transférer (ou supprimer le groupe).
 
+Onglet **Calendrier** (entre Soirée et Groupe) : soirées datées du groupe sélectionné. Rituel dès le vote ou une fois validée ; directe dès que le jeu est posé. Voir `docs/EVENINGS.md`.
+
 ## API (authentifiée)
 
 | Méthode | Chemin | Description |
@@ -37,7 +39,7 @@ Le propriétaire ne peut pas quitter sans transférer (ou supprimer le groupe).
 | GET | `/groups/:id/proposals` | Propositions Steam ouvertes |
 | POST | `/groups/:id/proposals` | Proposer un jeu Steam |
 | POST | `/groups/:id/proposals/:id/reply` | Répondre (sans le jeu) |
-| POST | `/groups/:id/proposals/:id/close` | Classer |
+| POST | `/groups/:id/proposals/:id/close` | Annuler |
 | GET | `/groups/:id/discord` | Salon lié (admin+) |
 | PUT | `/groups/:id/discord` | `{ channelId }` — lier un salon |
 | DELETE | `/groups/:id/discord` | Délier |

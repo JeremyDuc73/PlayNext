@@ -63,16 +63,18 @@ type HealthResponse = {
   database: "up" | "down";
 };
 
-type NavId = "evening" | "group" | "library" | "profile";
+type NavId = "evening" | "calendar" | "group" | "library" | "profile";
 
 const TABS: { id: NavId; label: string }[] = [
   { id: "evening", label: "Soirée" },
+  { id: "calendar", label: "Calendrier" },
   { id: "group", label: "Groupe" },
   { id: "library", label: "Bibliothèque" },
 ];
 
 const RAIL_COPY: Record<NavId, string> = {
   evening: "Choisir un jeu",
+  calendar: "Agenda du groupe",
   group: "Groupe",
   library: "Bibliothèque partagée",
   profile: "Profil",
@@ -218,7 +220,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.4.1",
+            version: "0.4.2",
             platform: "web-preview",
           });
         }
@@ -305,7 +307,7 @@ export default function App() {
         if (seenOpenEveningId.current === open.id) return;
         seenOpenEveningId.current = open.id;
         setNav((current) => {
-          if (current === "evening") return current;
+          if (current === "evening" || current === "calendar") return current;
           if (open.status === "lobby") notify("Lobby ouvert.");
           else if (open.status === "selection") notify("Sélection en cours.");
           else if (open.status === "voting") notify("Vote en cours.");
@@ -516,7 +518,13 @@ export default function App() {
                 ) : (
                   <GroupsPanel
                     enabled
-                    focus={nav === "evening" ? "evening" : "group"}
+                    focus={
+                      nav === "evening"
+                        ? "evening"
+                        : nav === "calendar"
+                          ? "calendar"
+                          : "group"
+                    }
                     currentUserId={user.id}
                     focusGroupId={openEveningGroupId}
                     pendingInviteCode={pendingInviteCode}

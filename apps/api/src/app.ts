@@ -80,6 +80,7 @@ export async function buildApp(config: Env, db: Db) {
       groupProposals: "GET /groups/:groupId/proposals",
       steamSearch: "GET /steam/search?q=",
       eveningHistory: "DELETE /groups/:groupId/evenings/history",
+      groupCalendar: "GET /groups/:groupId/calendar",
       evening: "GET /evenings/:eveningId",
       deleteEvening: "DELETE /evenings/:eveningId",
       openEvenings: "GET /me/open-evenings",

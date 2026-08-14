@@ -20,6 +20,7 @@ import {
   lobbyDropUserIds,
 } from "../evenings/lobby.js";
 import { buildShortlist } from "../evenings/shortlist.js";
+import { isOnGroupCalendar } from "../evenings/calendar.js";
 import type { EveningStatus, VoteValue } from "../evenings/types.js";
 import { getMembership } from "../groups/membership.js";
 import { isManager, isOwner } from "../groups/roles.js";
@@ -1220,6 +1221,76 @@ export const eveningsRoutes: FastifyPluginAsync<EveningsRoutesOptions> = async (
           winnerName: row.winner_name,
           gameName: row.game_name,
         })),
+      };
+    },
+  );
+
+  app.get<{ Params: { groupId: string } }>(
+    "/groups/:groupId/calendar",
+    async (request, reply) => {
+      const userId = await requireUserId(request);
+      if (!userId) {
+        return reply.code(401).send({ ok: false, error: "unauthenticated" });
+      }
+      const membership = await getMembership(
+        db,
+        request.params.groupId,
+        userId,
+      );
+      if (!membership) {
+        return reply.code(404).send({ ok: false, error: "group_not_found" });
+      }
+
+      const result = await db.pool.query<
+        EveningRow & { winner_name: string | null; game_name: string | null }
+      >(
+        `
+          SELECT e.*, c.name AS winner_name, first.name AS game_name
+          FROM evenings e
+          LEFT JOIN evening_candidates c ON c.id = e.winner_candidate_id
+          LEFT JOIN LATERAL (
+            SELECT name
+            FROM evening_candidates
+            WHERE evening_id = e.id
+            ORDER BY round ASC, sort_order ASC
+            LIMIT 1
+          ) first ON true
+          WHERE e.group_id = $1
+            AND e.status <> 'cancelled'
+            AND (
+              (
+                e.kind = 'direct'
+                AND e.status IN ('lobby', 'revealed', 'closed')
+              )
+              OR (
+                COALESCE(e.kind, 'ritual') = 'ritual'
+                AND e.status IN ('voting', 'revealed', 'closed')
+              )
+            )
+          ORDER BY e.scheduled_at ASC NULLS LAST, e.created_at ASC
+          LIMIT 300
+        `,
+        [request.params.groupId],
+      );
+
+      return {
+        ok: true,
+        evenings: result.rows
+          .filter((row) =>
+            isOnGroupCalendar({ kind: row.kind, status: row.status }),
+          )
+          .map((row) => ({
+            id: row.id,
+            status: row.status,
+            title: row.title,
+            round: row.round,
+            kind: row.kind === "direct" ? "direct" : "ritual",
+            scheduledAt: row.scheduled_at,
+            createdAt: row.created_at,
+            winnerCandidateId: row.winner_candidate_id,
+            winnerName: row.winner_name,
+            gameName: row.game_name,
+          })),
       };
     },
   );

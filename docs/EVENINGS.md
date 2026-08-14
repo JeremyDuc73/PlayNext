@@ -18,12 +18,23 @@ Un seul rituel live par groupe (`lobby|selection|voting|revealed`).
 
 ## Flux direct
 
-1. Onglet Soirée → **Proposer une soirée** (recherche Store, jour/heure) — ou CTA **Créer une soirée** depuis une proposition
+1. Onglet Soirée → **Proposer un jeu** (recherche Store, jour/heure) — ou CTA **Créer une soirée** depuis une proposition
 2. Lobby : les participants tamponnent **Je viens**
 3. L’orga **Confirme** (tous présents) ou **Lancer sans eux**
 4. Écran résultat, un jeu. Pas de shortlist ni de votes
 
 Plusieurs soirées `direct` datées peuvent coexister. L’onglet Soirée les liste (date + titre) puis le détail.
+
+## Calendrier
+
+Onglet **Calendrier** (entre Soirée et Groupe). Une soirée n’y apparaît que si :
+
+- rituel : **vote en cours** (`voting`) ou **validée** (`revealed` / `closed`)
+- directe : dès que le jeu est posé (`lobby` / `revealed` / `closed`)
+
+Lobby / sélection d’un rituel : hors calendrier. Annulée : hors calendrier.
+
+`GET /groups/:groupId/calendar`
 
 ## Contraintes shortlist
 
@@ -74,6 +85,7 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 |---------|--------|
 | POST | `/groups/:groupId/evenings` `{ kind, scheduledAt, appId? }` |
 | GET | `/groups/:groupId/evenings` |
+| GET | `/groups/:groupId/calendar` |
 | DELETE | `/groups/:groupId/evenings/history` (propriétaire, terminées / annulées) |
 | GET | `/me/open-evenings` |
 | GET | `/evenings/:id` |
@@ -91,7 +103,7 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 | POST | `/evenings/:id/cancel` |
 | DELETE | `/evenings/:id` (propriétaire, terminée / annulée) |
 
-Polling UI ~2,5 s, y compris l’écran idle et les autres onglets
+Polling UI ~2,5 s (soirée) ; calendrier ~8 s.
 (`GET /me/open-evenings`). WebSocket plus tard.
 
 `GET /groups/:groupId/evenings` renvoie aussi `winnerName`, `kind`, `scheduledAt`, `gameName`.

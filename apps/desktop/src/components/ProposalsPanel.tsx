@@ -84,7 +84,7 @@ export function ProposalsPanel({
                           disabled={busy}
                           onClick={() => onClose(proposal.id)}
                         >
-                          Classer
+                          Annuler
                         </Button>
                       ) : null}
                     </div>

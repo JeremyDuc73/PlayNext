@@ -239,6 +239,7 @@ Doc : `docs/EVENINGS.md`
 ### Historique & mémoire de groupe
 
 - [x] Historique soirées — nom, jeu choisi, suppression (propriétaire)
+- [x] Calendrier de groupe — vote en cours, soirée validée, soirée directe
 
 - [ ] Notes / souvenirs / captures
 - [ ] Jeux les plus joués / délaissés

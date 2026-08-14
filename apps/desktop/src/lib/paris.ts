@@ -115,3 +115,98 @@ export function eveningWhenToIso(value: EveningWhenValue): string {
   const ymd = value.dayMode === "tonight" ? parisYmd() : value.date;
   return parisLocalToUtc(ymd, value.time).toISOString();
 }
+
+export function parisYearMonth(instant = new Date()): {
+  year: number;
+  month: number;
+} {
+  const ymd = parisYmd(instant);
+  return {
+    year: Number(ymd.slice(0, 4)),
+    month: Number(ymd.slice(5, 7)),
+  };
+}
+
+export function shiftYearMonth(
+  year: number,
+  month: number,
+  delta: number,
+): { year: number; month: number } {
+  const index = year * 12 + (month - 1) + delta;
+  return {
+    year: Math.floor(index / 12),
+    month: (index % 12) + 1,
+  };
+}
+
+export function formatParisMonthTitle(year: number, month: number): string {
+  const instant = parisLocalToUtc(
+    `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-01`,
+    "12:00",
+  );
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: PARIS,
+    month: "long",
+    year: "numeric",
+  }).format(instant);
+}
+
+export type ParisMonthCell = {
+  ymd: string;
+  day: number;
+  inMonth: boolean;
+};
+
+function padMonth(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function parisWeekdayMon0(ymd: string): number {
+  const instant = parisLocalToUtc(ymd, "12:00");
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone: PARIS,
+    weekday: "short",
+  }).format(instant);
+  const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const index = order.indexOf(label);
+  return index >= 0 ? index : 0;
+}
+
+export function parisMonthCells(year: number, month: number): ParisMonthCell[] {
+  const days = daysInMonth(year, month);
+  const first = `${year}-${padMonth(month)}-01`;
+  const lead = parisWeekdayMon0(first);
+  const prev = shiftYearMonth(year, month, -1);
+  const prevDays = daysInMonth(prev.year, prev.month);
+  const cells: ParisMonthCell[] = [];
+  for (let i = lead; i > 0; i -= 1) {
+    const day = prevDays - i + 1;
+    cells.push({
+      ymd: `${prev.year}-${padMonth(prev.month)}-${padMonth(day)}`,
+      day,
+      inMonth: false,
+    });
+  }
+  for (let day = 1; day <= days; day += 1) {
+    cells.push({
+      ymd: `${year}-${padMonth(month)}-${padMonth(day)}`,
+      day,
+      inMonth: true,
+    });
+  }
+  const next = shiftYearMonth(year, month, 1);
+  let trailing = 1;
+  while (cells.length < 42) {
+    cells.push({
+      ymd: `${next.year}-${padMonth(next.month)}-${padMonth(trailing)}`,
+      day: trailing,
+      inMonth: false,
+    });
+    trailing += 1;
+  }
+  return cells;
+}

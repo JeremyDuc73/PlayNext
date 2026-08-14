@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EveningPanel } from "./EveningPanel";
+import { ProposalsPanel } from "./ProposalsPanel";
 import {
   createGroup,
   createInvite,
@@ -29,6 +30,14 @@ import {
   type GroupSummary,
   type HiddenGroupGame,
 } from "../lib/groups";
+import {
+  closeProposal,
+  createProposal,
+  listProposals,
+  replyProposal,
+  type GameProposal,
+  type ProposalReplyValue,
+} from "../lib/proposals";
 import { pad2 } from "../lib/format";
 import { staggerIn, useGSAP } from "../lib/motion";
 import { openExternalUrl } from "../lib/desktop-auth";
@@ -70,6 +79,10 @@ export function GroupsPanel({
   } | null>(null);
   const [library, setLibrary] = useState<GroupLibraryGame[]>([]);
   const [hidden, setHidden] = useState<HiddenGroupGame[]>([]);
+  const [proposals, setProposals] = useState<GameProposal[]>([]);
+  const [proposeTarget, setProposeTarget] = useState<GroupLibraryGame | null>(
+    null,
+  );
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [newName, setNewName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -102,16 +115,19 @@ export function GroupsPanel({
     setSelectedId(groupId);
     setShowAdmin(false);
     setComposer("idle");
+    setProposeTarget(null);
     try {
-      const [groupDetail, lib, hiddenGames] = await Promise.all([
+      const [groupDetail, lib, hiddenGames, groupProposals] = await Promise.all([
         fetchGroup(groupId),
         fetchGroupLibrary(groupId),
         fetchMyHiddenGames(groupId),
+        listProposals(groupId),
       ]);
       setDetail(groupDetail);
       setRenameValue(groupDetail.group.name);
       setLibrary(lib.games);
       setHidden(hiddenGames);
+      setProposals(groupProposals);
       if (
         groupDetail.group.myRole === "owner" ||
         groupDetail.group.myRole === "admin"
@@ -160,6 +176,17 @@ export function GroupsPanel({
     void openGroup(focusGroupId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, focusGroupId]);
+
+  useEffect(() => {
+    if (!enabled || !selectedId || focus !== "group") return;
+    if (proposals.length === 0) return;
+    const timer = window.setInterval(() => {
+      void listProposals(selectedId)
+        .then(setProposals)
+        .catch(() => undefined);
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [enabled, selectedId, focus, proposals.length]);
 
   useEffect(() => {
     const role = detail?.group.myRole;
@@ -354,12 +381,71 @@ export function GroupsPanel({
 
   async function refreshLibrary() {
     if (!selectedId) return;
-    const [lib, hiddenGames] = await Promise.all([
+    const [lib, hiddenGames, groupProposals] = await Promise.all([
       fetchGroupLibrary(selectedId),
       fetchMyHiddenGames(selectedId),
+      listProposals(selectedId),
     ]);
     setLibrary(lib.games);
     setHidden(hiddenGames);
+    setProposals(groupProposals);
+  }
+
+  async function onConfirmPropose() {
+    if (!selectedId || !proposeTarget) return;
+    setBusy(true);
+    try {
+      await createProposal(selectedId, proposeTarget.externalId);
+      setProposeTarget(null);
+      await refreshLibrary();
+      onBanner("Proposition ouverte.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Proposition impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onReplyProposal(
+    proposalId: string,
+    value: ProposalReplyValue,
+  ) {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      const next = await replyProposal(selectedId, proposalId, value);
+      setProposals((current) =>
+        current.map((proposal) =>
+          proposal.id === next.id ? next : proposal,
+        ),
+      );
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Réponse impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onCloseProposal(proposalId: string) {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      await closeProposal(selectedId, proposalId);
+      setProposals((current) =>
+        current.filter((proposal) => proposal.id !== proposalId),
+      );
+      onBanner("Proposition classée.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Classement impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onHide(game: GroupLibraryGame) {
@@ -802,6 +888,15 @@ export function GroupsPanel({
               </div>
             ) : null}
 
+            <ProposalsPanel
+              proposals={proposals}
+              busy={busy}
+              onReply={(proposalId, value) =>
+                void onReplyProposal(proposalId, value)
+              }
+              onClose={(proposalId) => void onCloseProposal(proposalId)}
+            />
+
             <div>
               <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
                 <h3 className="pn-display text-2xl">Jeux du groupe</h3>
@@ -849,6 +944,15 @@ export function GroupsPanel({
                     const mine = game.owners.find(
                       (o) => o.userId === currentUserId,
                     );
+                    const proposed = proposals.some(
+                      (proposal) =>
+                        proposal.launcher === game.launcher &&
+                        proposal.externalId === game.externalId,
+                    );
+                    const canPropose =
+                      game.launcher === "steam" &&
+                      game.ownedCount < game.memberCount &&
+                      !proposed;
                     return (
                       <div key={game.key} role="listitem">
                         <GamePoster
@@ -859,16 +963,33 @@ export function GroupsPanel({
                           priority={index < 24}
                           subtitle={`${pad2(game.ownedCount)}/${pad2(game.memberCount)} · ${game.launcher}`}
                           footer={
-                            mine ? (
-                              <button
-                                type="button"
-                                className="pn-data mt-1 hover:text-paper"
-                                disabled={busy}
-                                onClick={() => void onHide(game)}
-                              >
-                                Masquer
-                              </button>
-                            ) : null
+                            <>
+                              {canPropose ? (
+                                <button
+                                  type="button"
+                                  className="pn-data mt-1 mr-3 hover:text-paper"
+                                  disabled={busy}
+                                  onClick={() => setProposeTarget(game)}
+                                >
+                                  Proposer
+                                </button>
+                              ) : null}
+                              {proposed ? (
+                                <span className="pn-data mt-1 mr-3">
+                                  Proposée
+                                </span>
+                              ) : null}
+                              {mine ? (
+                                <button
+                                  type="button"
+                                  className="pn-data mt-1 hover:text-paper"
+                                  disabled={busy}
+                                  onClick={() => void onHide(game)}
+                                >
+                                  Masquer
+                                </button>
+                              ) : null}
+                            </>
                           }
                         />
                       </div>
@@ -919,6 +1040,21 @@ export function GroupsPanel({
         )}
       </div>
       </section>
+      {proposeTarget ? (
+        <ConfirmDialog
+          title="Proposer ce jeu ?"
+          confirmLabel="Proposer"
+          confirmVariant="primary"
+          busy={busy}
+          busyLabel="Ouverture…"
+          onConfirm={() => void onConfirmPropose()}
+          onCancel={() => {
+            if (!busy) setProposeTarget(null);
+          }}
+        >
+          {`${proposeTarget.name} · les joueurs sans le jeu voient le Store Steam. Message dans le salon du groupe.`}
+        </ConfirmDialog>
+      ) : null}
       {deleteOpen && detail ? (
         <ConfirmDialog
           title="Supprimer le groupe ?"

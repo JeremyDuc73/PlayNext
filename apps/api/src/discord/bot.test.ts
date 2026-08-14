@@ -37,6 +37,20 @@ describe("formatDiscordNotice", () => {
       "Jeu choisi · Hades",
     );
   });
+
+  it("formats a Steam proposal", () => {
+    assert.equal(
+      formatDiscordNotice("Les Copains", {
+        kind: "proposal",
+        gameName: "Hades",
+        steamUrl: "https://store.steampowered.com/app/1145360/",
+        ownedCount: 2,
+        memberCount: 5,
+        missingNames: ["Ada", "Bob"],
+      }),
+      "Proposition · Hades",
+    );
+  });
 });
 
 describe("buildDiscordMessage", () => {
@@ -58,5 +72,27 @@ describe("buildDiscordMessage", () => {
     assert.equal(payload.embeds[0]?.title, "Hades");
     assert.equal(payload.embeds[0]?.image?.url, "https://example.com/hades.jpg");
     assert.match(payload.content, /Jeu choisi/);
+  });
+
+  it("puts the Steam store on a proposal embed", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "proposal",
+      gameName: "Hades",
+      steamUrl: "https://store.steampowered.com/app/1145360/",
+      ownedCount: 2,
+      memberCount: 5,
+      missingNames: ["Ada", "Bob"],
+      coverUrl: "https://example.com/hades.jpg",
+    });
+    assert.equal(payload.embeds[0]?.title, "Hades");
+    assert.equal(
+      payload.embeds[0]?.url,
+      "https://store.steampowered.com/app/1145360/",
+    );
+    assert.equal(
+      payload.components?.[0]?.components[0]?.url,
+      "https://store.steampowered.com/app/1145360/",
+    );
+    assert.match(payload.content, /Proposition/);
   });
 });

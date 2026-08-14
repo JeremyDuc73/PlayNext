@@ -13,6 +13,7 @@ import { healthRoutes } from "./routes/health.js";
 import { libraryRoutes } from "./routes/library.js";
 import { manualLibraryRoutes } from "./routes/manual-library.js";
 import { metaRoutes } from "./routes/meta.js";
+import { proposalsRoutes } from "./routes/proposals.js";
 
 export async function buildApp(config: Env, db: Db) {
   const app = Fastify({
@@ -47,6 +48,7 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(libraryRoutes, { db, config });
   await app.register(manualLibraryRoutes, { db, config });
   await app.register(groupsRoutes, { db, config });
+  await app.register(proposalsRoutes, { db, config });
   await app.register(eveningsRoutes, { db, config });
   await app.register(metaRoutes, { db });
 
@@ -73,6 +75,7 @@ export async function buildApp(config: Env, db: Db) {
       groupDiscord: "GET /groups/:groupId/discord",
       joinInvite: "POST /invites/:code/join",
       createEvening: "POST /groups/:groupId/evenings",
+      groupProposals: "GET /groups/:groupId/proposals",
       eveningHistory: "DELETE /groups/:groupId/evenings/history",
       evening: "GET /evenings/:eveningId",
       deleteEvening: "DELETE /evenings/:eveningId",

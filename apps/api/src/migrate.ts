@@ -358,5 +358,35 @@ export async function migrate(db: Db): Promise<void> {
        );
 
     CREATE INDEX IF NOT EXISTS game_meta_igdb_id_idx ON game_meta(igdb_id);
+
+    CREATE TABLE IF NOT EXISTS game_proposals (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      launcher TEXT NOT NULL CHECK (launcher = 'steam'),
+      external_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      cover_url TEXT,
+      steam_url TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      closed_at TIMESTAMPTZ
+    );
+
+    CREATE INDEX IF NOT EXISTS game_proposals_group_idx
+      ON game_proposals(group_id, created_at DESC);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS game_proposals_open_game_idx
+      ON game_proposals(group_id, launcher, external_id)
+      WHERE status = 'open';
+
+    CREATE TABLE IF NOT EXISTS game_proposal_replies (
+      proposal_id UUID NOT NULL REFERENCES game_proposals(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      value TEXT NOT NULL CHECK (value IN ('hot', 'maybe', 'later', 'no')),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (proposal_id, user_id)
+    );
   `);
 }

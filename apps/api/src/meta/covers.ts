@@ -37,3 +37,9 @@ export function steamCoverFallbackUrls(appId: string): string[] {
     `${base}/header.jpg`,
   ];
 }
+
+export function steamStoreUrl(appId: string): string | null {
+  const id = appId.replace(/[^\d]/g, "");
+  if (!id) return null;
+  return `https://store.steampowered.com/app/${id}/`;
+}

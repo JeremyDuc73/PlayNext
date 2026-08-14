@@ -218,7 +218,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.3.6",
+            version: "0.4.0",
             platform: "web-preview",
           });
         }

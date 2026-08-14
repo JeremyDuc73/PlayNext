@@ -205,7 +205,8 @@
   }
   .pn-ballot > button:hover { @apply bg-paper text-ink-deep; }
   .pn-ballot > button[aria-pressed="true"] { @apply bg-paper text-ink-deep; }
-  .pn-ballot > button[data-veto] { @apply flex-none w-[158px] border-r-0 border-l border-paper text-veto; }
+  .pn-ballot > button:last-child { @apply border-r-0; }
+  .pn-ballot > button[data-veto] { @apply flex-none w-[158px] border-l border-paper text-veto; }
   .pn-ballot > button[data-veto]:hover,
   .pn-ballot > button[data-veto][aria-pressed="true"] { @apply bg-veto text-ink-deep; }
 

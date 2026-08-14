@@ -156,7 +156,7 @@ Ne pas brûler les étapes : chaque palier doit être **démontrable** avant d�
   - [ ] Votes terminés (sans votes individuels)
   - [x] Jeu choisi
   - [ ] Proposition de soirée (jeu + places)
-  - [ ] Nouvelle proposition d’achat
+  - [x] Nouvelle proposition d’achat
   - [ ] Accord collectif → invitation soirée
   - [ ] Rappels facultatifs
 
@@ -220,17 +220,17 @@ Doc : `docs/EVENINGS.md`
 
 ## P4 — Découvertes & achats
 
-- [ ] Zone Découvertes / propositions
-- [ ] Création proposition (catalogue, membres ciblés, message, plateforme, prix, date)
+- [x] Zone Découvertes / propositions
+- [x] Création proposition (Steam, membres sans le jeu, Store)
 - [ ] Nombre min de joueurs si ciblage partiel
-- [ ] Réponses : possède déjà / chaud / pourquoi pas / pas maintenant / pas intéressé
+- [x] Réponses : possède déjà / chaud / pourquoi pas / plus tard / non
 - [ ] Validation (défaut unanimité ciblés) + **réglage de groupe alternatif** (quorum / majorité) pour éviter blocages
 - [ ] Prix indicatifs (IsThereAnyDeal ou équivalent) : boutique, région, date, lien ; jamais d’achat intégré
-- [ ] Proposition sans prix si pas de donnée fiable
+- [x] Proposition sans prix si pas de donnée fiable — lien Store Steam uniquement
 - [ ] Notif baisse de prix opt-in
-- [ ] Cycle de vie : ouverte / en attente / validée / refusée / expirée / archivée
+- [~] Cycle de vie : ouverte / classée (refusée / expirée / archivée plus tard)
 - [ ] Conversion proposition validée → soirée préremplie
-- [ ] Partage Discord si autorisé
+- [x] Partage Discord si autorisé
 
 ---
 
@@ -249,9 +249,7 @@ Doc : `docs/EVENINGS.md`
 - [~] Accueil (groupes, trouver un jeu, dernière soirée, sync, propositions)
 
 - [x] Bibliothèque personnelle
-- [x] Bibliothèque groupe
-- [x] Création soirée / salle de vote / résultat
-- [ ] Propositions d’achat
+- [x] Propositions d’achat — Steam, groupe, Store Discord
 - [ ] Paramètres (Discord, scan, auto-start, confidentialité, notifs, MAJ)
 - [ ] Mode compact + mode présentation grand écran
 - [ ] Respect réduction des animations Windows
@@ -375,5 +373,4 @@ Quand on reporte quelque chose hors phase prévue, ajouter une ligne :
 
 ## Prochaine action concrète
 
-**P4 — Achats collectifs** — propositions dans le groupe, réponses, quorum.
-Le bot Discord pourra ensuite notifier les propositions.
+**P4 suite** — quorum / conversion proposition → soirée, ou **P5** (installeur signé, release).

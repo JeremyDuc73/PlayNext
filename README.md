@@ -84,6 +84,7 @@ npm run dev:desktop
 | `POST /evenings/:id/open-selection` | Orga : lancer sans les absents |
 | `GET /groups/:id/discord` | Salon Discord lié |
 | `PUT /groups/:id/discord` | Lier un salon Discord |
+| `GET /groups/:id/proposals` | Propositions Steam du groupe |
 | `POST /library/manual/search` | Recherche manuelle IGDB |
 | `POST /library/manual` | Ajout d’un jeu catalogue à la bibliothèque |
 | `DELETE /library/manual/:externalId` | Suppression d’un jeu ajouté manuellement |

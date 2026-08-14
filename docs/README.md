@@ -2,6 +2,7 @@
 
 ## Produit
 
+- [`PROPOSALS.md`](./PROPOSALS.md) — propositions Steam, possession, Store ;
 - [`EVENINGS.md`](./EVENINGS.md) — lobby, sélection personnelle, vote séquentiel,
   veto, résultat ;
 - [`GROUPS.md`](./GROUPS.md) — groupes, invitations, rôles et bibliothèque

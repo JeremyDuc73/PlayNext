@@ -34,6 +34,10 @@ Le propriétaire ne peut pas quitter sans transférer (ou supprimer le groupe).
 | POST | `/groups/:id/library/hide` | Masquer mon jeu pour le groupe |
 | POST | `/groups/:id/library/unhide` | Réafficher |
 | GET | `/groups/:id/library/hidden` | Mes jeux masqués |
+| GET | `/groups/:id/proposals` | Propositions Steam ouvertes |
+| POST | `/groups/:id/proposals` | Proposer un jeu Steam |
+| POST | `/groups/:id/proposals/:id/reply` | Répondre (sans le jeu) |
+| POST | `/groups/:id/proposals/:id/close` | Classer |
 | GET | `/groups/:id/discord` | Salon lié (admin+) |
 | PUT | `/groups/:id/discord` | `{ channelId }` — lier un salon |
 | DELETE | `/groups/:id/discord` | Délier |
@@ -77,3 +81,4 @@ Tu es « Buddy Dev » avec quelques jeux sample pour croiser la biblio.
 - Image upload (URL optionnelle côté API seulement)
 - Préférences collectives soirée
 - Ouverture automatique des invitations web dans l’application installée
+- Conversion proposition validée → soirée

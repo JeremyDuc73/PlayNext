@@ -1,7 +1,8 @@
 # Bot Discord PlayNext
 
-Le bot n’importe aucun membre. Il poste deux messages dans un salon lié :
-**Lobby ouvert** et **Jeu choisi** (embed + jaquette si dispo).
+Le bot n’importe aucun membre. Il poste dans un salon lié :
+**Lobby ouvert**, **Jeu choisi**, **Proposition Steam** (embed + jaquette
+si dispo, lien Store).
 
 Même application Discord que l’OAuth de connexion. Pas de gateway, pas
 d’intents privilégiés.
@@ -37,5 +38,6 @@ Embed vermillon, pied « PlayNext ». Notification courte + carte :
 
 - Lobby : groupe, nombre de joueurs, « Soirée ouverte »
 - Jeu choisi : titre du jeu, groupe, jaquette si connue
+- Proposition : titre, qui possède / qui n’a pas, bouton Store Steam
 
 Pas de votes individuels. Si Discord est down, la soirée continue.

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   groupPlayableFromSteamCategories,
+  isGroupPlayableQueued,
   shouldStopSteamEnrichment,
   steamTitleSearchWrite,
+  takeRoundRobin,
 } from "./store.js";
 
 describe("groupPlayableFromSteamCategories", () => {
@@ -26,34 +28,58 @@ describe("groupPlayableFromSteamCategories", () => {
 
 describe("shouldStopSteamEnrichment", () => {
   it("stops on 429 or 403", () => {
+    assert.equal(shouldStopSteamEnrichment({ httpStatus: 429 }), true);
+    assert.equal(shouldStopSteamEnrichment({ httpStatus: 403 }), true);
+  });
+
+  it("does not stop on a single unavailable app", () => {
+    assert.equal(shouldStopSteamEnrichment({ httpStatus: 200 }), false);
+    assert.equal(shouldStopSteamEnrichment({}), false);
+  });
+});
+
+describe("isGroupPlayableQueued", () => {
+  it("keeps store misses in the queue for IGDB", () => {
     assert.equal(
-      shouldStopSteamEnrichment({ consecutiveRetries: 1, httpStatus: 429 }),
-      true,
-    );
-    assert.equal(
-      shouldStopSteamEnrichment({ consecutiveRetries: 1, httpStatus: 403 }),
+      isGroupPlayableQueued({
+        launcher: "xbox",
+        groupPlayable: null,
+        source: "steam_store_search_miss",
+      }),
       true,
     );
   });
 
-  it("stops after three consecutive retries", () => {
+  it("drops titles already settled by IGDB", () => {
     assert.equal(
-      shouldStopSteamEnrichment({ consecutiveRetries: 2 }),
+      isGroupPlayableQueued({
+        launcher: "xbox",
+        groupPlayable: null,
+        source: "igdb_miss",
+      }),
       false,
     );
-    assert.equal(
-      shouldStopSteamEnrichment({ consecutiveRetries: 3 }),
-      true,
-    );
+  });
+});
+
+describe("takeRoundRobin", () => {
+  it("advances past the head of the list", () => {
+    assert.deepEqual(takeRoundRobin(["a", "b", "c", "d"], 2, 2), {
+      slice: ["c", "d"],
+      nextOffset: 4,
+    });
+    assert.deepEqual(takeRoundRobin(["a", "b", "c", "d"], 3, 2), {
+      slice: ["d", "a"],
+      nextOffset: 5,
+    });
   });
 });
 
 describe("steamTitleSearchWrite", () => {
   it("does not persist a failed or rate-limited search", () => {
-    assert.deepEqual(
-      steamTitleSearchWrite({ status: "retry" }, null),
-      { write: false },
-    );
+    assert.deepEqual(steamTitleSearchWrite({ status: "retry" }, null), {
+      write: false,
+    });
   });
 
   it("persists a store miss only after a successful search", () => {
@@ -74,6 +100,20 @@ describe("steamTitleSearchWrite", () => {
     );
   });
 
+  it("persists an unavailable matched app so the queue can move", () => {
+    assert.deepEqual(
+      steamTitleSearchWrite(
+        { status: "match", appId: "123" },
+        { status: "retry", httpStatus: 200 },
+      ),
+      {
+        write: true,
+        playable: null,
+        source: "steam_store_search",
+      },
+    );
+  });
+
   it("persists a classified match", () => {
     assert.deepEqual(
       steamTitleSearchWrite(
@@ -86,5 +126,5 @@ describe("steamTitleSearchWrite", () => {
         source: "steam_store_search",
       },
     );
-    });
+  });
 });

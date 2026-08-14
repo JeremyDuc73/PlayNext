@@ -17,7 +17,7 @@ import { getValidEpicAccessToken } from "../epic/tokens.js";
 import { fetchEpicLibrary, mergeEpicLibrary } from "../epic/library.js";
 import { filterJunkGames, isJunkGameName, normalizeGameTitle, resolveGroupPlayable } from "../library/filter.js";
 import { riotCoverUrl } from "../meta/covers.js";
-import { persistMissingGroupPlayable, loadGroupPlayableByTitle } from "../steam/store.js";
+import { persistMissingGroupPlayable, loadGroupPlayableByTitle, isGroupPlayableQueued } from "../steam/store.js";
 
 type LibraryRoutesOptions = {
   db: Db;
@@ -556,6 +556,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         externalId: game.externalId,
         name: game.name,
       })),
+      config,
     ).catch((error) => {
       request.log.warn({ err: error }, "steam_group_playable_enrich_failed");
     });
@@ -789,10 +790,11 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
             row.cover_url ?? riotCoverUrl(row.launcher, row.external_id),
           year: row.year,
           groupPlayable,
-          queued:
-            groupPlayable == null &&
-            row.launcher !== "riot" &&
-            !row.group_playable_source,
+          queued: isGroupPlayableQueued({
+            launcher: row.launcher,
+            groupPlayable,
+            source: row.group_playable_source,
+          }),
         };
       });
 
@@ -803,6 +805,7 @@ export const libraryRoutes: FastifyPluginAsync<LibraryRoutesOptions> = async (
         externalId: game.externalId,
         name: game.name,
       })),
+      config,
     ).catch((error) => {
       request.log.warn({ err: error }, "group_playable_enrich_failed");
     });

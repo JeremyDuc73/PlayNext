@@ -1165,6 +1165,7 @@ export const groupsRoutes: FastifyPluginAsync<GroupsRoutesOptions> = async (
           externalId: row.external_id,
           name: row.name,
         })),
+        config,
       ).catch((error) => {
         request.log.warn({ err: error }, "group_playable_enrich_failed");
       });

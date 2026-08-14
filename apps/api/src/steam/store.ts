@@ -1,4 +1,7 @@
 import type { Db } from "../db.js";
+import type { Env } from "../config.js";
+import { isIgdbConfigured } from "../config.js";
+import { lookupIgdbGroupPlayable } from "../meta/igdb-manual.js";
 import { mergeGroupPlayable, normalizeGameTitle } from "../library/filter.js";
 
 export type GroupPlayable = boolean | null;
@@ -6,8 +9,11 @@ export type GroupPlayable = boolean | null;
 /** Un run classe peu de titres : Steam 429 si on burst. Le suivant reprend. */
 const STEAM_DETAILS_PER_RUN = 8;
 const STEAM_SEARCH_PER_RUN = 5;
+const IGDB_PER_RUN = 5;
 const STEAM_GAP_MS = 1100;
-const STEAM_RETRY_STOP = 3;
+const STEAM_FETCH_MS = 5000;
+
+const TERMINAL_PLAYABLE_SOURCES = new Set(["igdb", "igdb_miss", "riot"]);
 
 type StoreApp = {
   success?: boolean;
@@ -25,7 +31,7 @@ export type SteamDetailsLookup =
   | { status: "retry"; httpStatus?: number };
 
 export type SteamSearchLookup =
-  | { status: "retry" }
+  | { status: "retry"; httpStatus?: number }
   | { status: "miss" }
   | { status: "match"; appId: string };
 
@@ -61,11 +67,37 @@ export function groupPlayableFromSteamCategories(
 }
 
 export function shouldStopSteamEnrichment(input: {
-  consecutiveRetries: number;
   httpStatus?: number;
 }): boolean {
-  if (input.httpStatus === 429 || input.httpStatus === 403) return true;
-  return input.consecutiveRetries >= STEAM_RETRY_STOP;
+  return input.httpStatus === 429 || input.httpStatus === 403;
+}
+
+export function isGroupPlayableQueued(input: {
+  launcher: string;
+  groupPlayable: boolean | null;
+  source?: string | null;
+}): boolean {
+  if (input.groupPlayable != null) return false;
+  if (input.launcher === "riot") return false;
+  if (input.source && TERMINAL_PLAYABLE_SOURCES.has(input.source)) return false;
+  return true;
+}
+
+export function takeRoundRobin<T>(
+  items: T[],
+  offset: number,
+  limit: number,
+): { slice: T[]; nextOffset: number } {
+  if (items.length === 0 || limit <= 0) {
+    return { slice: [], nextOffset: 0 };
+  }
+  const start = ((offset % items.length) + items.length) % items.length;
+  const count = Math.min(limit, items.length);
+  const slice: T[] = [];
+  for (let i = 0; i < count; i += 1) {
+    slice.push(items[(start + i) % items.length]);
+  }
+  return { slice, nextOffset: start + count };
 }
 
 /** Ne grave un inconnu que sur une recherche Store aboutie, jamais sur un 429. */
@@ -81,7 +113,16 @@ export function steamTitleSearchWrite(
       source: "steam_store_search_miss",
     };
   }
-  if (!details || details.status === "retry") return { write: false };
+  if (!details || details.status === "retry") {
+    if (details?.status === "retry" && details.httpStatus === 200) {
+      return {
+        write: true,
+        playable: null,
+        source: "steam_store_search",
+      };
+    }
+    return { write: false };
+  }
   return {
     write: true,
     playable: details.playable,
@@ -94,6 +135,13 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function steamFetch(url: URL): Promise<Response> {
+  return fetch(url, {
+    headers: { "User-Agent": "PlayNext/0.1" },
+    signal: AbortSignal.timeout(STEAM_FETCH_MS),
+  });
+}
+
 async function fetchSteamAppDetails(id: string): Promise<SteamDetailsLookup> {
   try {
     const url = new URL("https://store.steampowered.com/api/appdetails");
@@ -101,16 +149,14 @@ async function fetchSteamAppDetails(id: string): Promise<SteamDetailsLookup> {
     url.searchParams.set("l", "english");
     url.searchParams.set("cc", "US");
 
-    const response = await fetch(url, {
-      headers: { "User-Agent": "PlayNext/0.1" },
-    });
+    const response = await steamFetch(url);
     if (!response.ok) {
       return { status: "retry", httpStatus: response.status };
     }
 
     const data = (await response.json()) as Record<string, StoreApp>;
     const app = data[id];
-    // Steam renvoie souvent 200 + success:false quand il rate-limit.
+    // AppID absent du Store (pas un 429 : on libère la file).
     if (!app?.success) return { status: "retry", httpStatus: 200 };
 
     const labels = (app.data?.categories ?? [])
@@ -138,23 +184,15 @@ export async function fetchSteamGroupPlayable(
   const result = new Map<string, GroupPlayable>();
   if (ids.length === 0) return result;
 
-  let consecutiveRetries = 0;
   for (let i = 0; i < ids.length; i += 1) {
     if (i > 0) await wait(STEAM_GAP_MS);
     const id = ids[i];
     const lookup = await fetchSteamAppDetails(id);
     if (lookup.status === "classified") {
       result.set(id, lookup.playable);
-      consecutiveRetries = 0;
       continue;
     }
-    consecutiveRetries += 1;
-    if (
-      shouldStopSteamEnrichment({
-        consecutiveRetries,
-        httpStatus: lookup.httpStatus,
-      })
-    ) {
+    if (shouldStopSteamEnrichment({ httpStatus: lookup.httpStatus })) {
       break;
     }
   }
@@ -183,7 +221,7 @@ async function upsertGroupPlayable(
         group_playable = EXCLUDED.group_playable,
         group_playable_source = EXCLUDED.group_playable_source,
         fetched_at = now()
-      WHERE game_meta.group_playable_source IS NULL
+      WHERE game_meta.group_playable IS NULL
     `,
     [
       input.launcher,
@@ -194,6 +232,10 @@ async function upsertGroupPlayable(
     ],
   );
 }
+
+let steamScanOffset = 0;
+let titleScanOffset = 0;
+let igdbScanOffset = 0;
 
 export async function persistMissingSteamGroupPlayable(
   db: Db,
@@ -218,13 +260,16 @@ export async function persistMissingSteamGroupPlayable(
     [ids],
   );
   const already = new Set(known.rows.map((row) => row.external_id));
-  const missing = ids
-    .filter((id) => !already.has(id))
-    .slice(0, STEAM_DETAILS_PER_RUN);
+  const pending = ids.filter((id) => !already.has(id));
+  const { slice: missing, nextOffset } = takeRoundRobin(
+    pending,
+    steamScanOffset,
+    STEAM_DETAILS_PER_RUN,
+  );
   if (missing.length === 0) return 0;
 
   let written = 0;
-  let consecutiveRetries = 0;
+  let hitRateLimit = false;
   for (let i = 0; i < missing.length; i += 1) {
     if (i > 0) await wait(STEAM_GAP_MS);
     const id = missing[i];
@@ -238,19 +283,25 @@ export async function persistMissingSteamGroupPlayable(
         source: "steam_store",
       });
       written += 1;
-      consecutiveRetries = 0;
       continue;
     }
-    consecutiveRetries += 1;
-    if (
-      shouldStopSteamEnrichment({
-        consecutiveRetries,
-        httpStatus: lookup.httpStatus,
-      })
-    ) {
+    if (shouldStopSteamEnrichment({ httpStatus: lookup.httpStatus })) {
+      hitRateLimit = true;
       break;
     }
+    // 200 + success:false : l’AppID n’est pas au Store. On libère la file.
+    if (lookup.httpStatus === 200) {
+      await upsertGroupPlayable(db, {
+        launcher: "steam",
+        externalId: id,
+        name: unique.get(id) ?? id,
+        playable: null,
+        source: "steam_store",
+      });
+      written += 1;
+    }
   }
+  if (!hitRateLimit) steamScanOffset = nextOffset;
   return written;
 }
 
@@ -294,7 +345,7 @@ async function loadKnownGroupPlayableKeys(
       FROM game_meta gm
       JOIN unnest($1::text[], $2::text[]) AS x(launcher, external_id)
         ON gm.launcher = x.launcher AND gm.external_id = x.external_id
-      WHERE gm.group_playable_source IS NOT NULL
+      WHERE gm.group_playable IS NOT NULL
     `,
     [
       games.map((game) => game.launcher),
@@ -342,10 +393,15 @@ async function searchSteamAppId(name: string): Promise<SteamSearchLookup> {
     url.searchParams.set("term", name);
     url.searchParams.set("l", "english");
     url.searchParams.set("cc", "US");
-    const response = await fetch(url, {
-      headers: { "User-Agent": "PlayNext/0.1" },
-    });
-    if (!response.ok) return { status: "retry" };
+    const response = await steamFetch(url);
+    if (!response.ok) {
+      return {
+        status: "retry",
+        ...(response.status === 429 || response.status === 403
+          ? { httpStatus: response.status }
+          : {}),
+      };
+    }
     const data = (await response.json()) as StoreSearch;
     const wanted = normalizeGameTitle(name);
     if (!wanted) return { status: "miss" };
@@ -380,28 +436,42 @@ async function persistMissingGroupPlayableBySteamTitle(
   if (unique.size === 0) return 0;
 
   const already = await loadKnownGroupPlayableKeys(db, [...unique.values()]);
-  const missing = [...unique.values()]
-    .filter((game) => !already.has(`${game.launcher}:${game.externalId}`))
-    .slice(0, STEAM_SEARCH_PER_RUN);
+  const pending = [...unique.values()].filter(
+    (game) => !already.has(`${game.launcher}:${game.externalId}`),
+  );
+  const { slice: missing, nextOffset } = takeRoundRobin(
+    pending,
+    titleScanOffset,
+    STEAM_SEARCH_PER_RUN,
+  );
   if (missing.length === 0) return 0;
 
   let written = 0;
-  let consecutiveRetries = 0;
+  let hitRateLimit = false;
   for (let i = 0; i < missing.length; i += 1) {
     if (i > 0) await wait(STEAM_GAP_MS);
     const game = missing[i];
     const lookup = await searchSteamAppId(game.name);
+    if (shouldStopSteamEnrichment({ httpStatus: lookup.status === "retry" ? lookup.httpStatus : undefined })) {
+      hitRateLimit = true;
+      break;
+    }
     let details: SteamDetailsLookup | null = null;
     if (lookup.status === "match") {
       await wait(STEAM_GAP_MS);
       details = await fetchSteamAppDetails(lookup.appId);
+      if (
+        shouldStopSteamEnrichment({
+          httpStatus:
+            details.status === "retry" ? details.httpStatus : undefined,
+        })
+      ) {
+        hitRateLimit = true;
+        break;
+      }
     }
     const decision = steamTitleSearchWrite(lookup, details);
-    if (!decision.write) {
-      consecutiveRetries += 1;
-      if (shouldStopSteamEnrichment({ consecutiveRetries })) break;
-      continue;
-    }
+    if (!decision.write) continue;
     await upsertGroupPlayable(db, {
       launcher: game.launcher,
       externalId: game.externalId,
@@ -410,8 +480,90 @@ async function persistMissingGroupPlayableBySteamTitle(
       source: decision.source,
     });
     written += 1;
-    consecutiveRetries = 0;
   }
+  if (!hitRateLimit) titleScanOffset = nextOffset;
+  return written;
+}
+
+async function persistUnknownViaIgdb(
+  db: Db,
+  games: Array<{ launcher: string; externalId: string; name: string }>,
+  config: Env,
+): Promise<number> {
+  if (!isIgdbConfigured(config)) return 0;
+  const unique = new Map<
+    string,
+    { launcher: string; externalId: string; name: string }
+  >();
+  for (const game of games) {
+    if (game.launcher === "riot") continue;
+    const key = `${game.launcher}:${game.externalId}`;
+    if (!unique.has(key)) unique.set(key, game);
+  }
+  if (unique.size === 0) return 0;
+
+  const rows = await db.pool.query<{
+    launcher: string;
+    external_id: string;
+    group_playable: boolean | null;
+    group_playable_source: string | null;
+  }>(
+    `
+      SELECT gm.launcher, gm.external_id, gm.group_playable, gm.group_playable_source
+      FROM game_meta gm
+      JOIN unnest($1::text[], $2::text[]) AS x(launcher, external_id)
+        ON gm.launcher = x.launcher AND gm.external_id = x.external_id
+    `,
+    [
+      [...unique.values()].map((game) => game.launcher),
+      [...unique.values()].map((game) => game.externalId),
+    ],
+  );
+  const byKey = new Map(
+    rows.rows.map((row) => [`${row.launcher}:${row.external_id}`, row]),
+  );
+  const pending = [...unique.values()].filter((game) => {
+    const row = byKey.get(`${game.launcher}:${game.externalId}`);
+    if (
+      !isGroupPlayableQueued({
+        launcher: game.launcher,
+        groupPlayable: row?.group_playable ?? null,
+        source: row?.group_playable_source,
+      })
+    ) {
+      return false;
+    }
+    // Steam sans source : l’AppID Store n’a pas encore été interrogé.
+    if (game.launcher === "steam" && !row?.group_playable_source) return false;
+    return true;
+  });
+  const { slice: missing, nextOffset } = takeRoundRobin(
+    pending,
+    igdbScanOffset,
+    IGDB_PER_RUN,
+  );
+  if (missing.length === 0) return 0;
+
+  let written = 0;
+  let hitRetry = false;
+  for (let i = 0; i < missing.length; i += 1) {
+    if (i > 0) await wait(STEAM_GAP_MS);
+    const game = missing[i];
+    const lookup = await lookupIgdbGroupPlayable(config, game.name);
+    if (lookup.status === "retry") {
+      hitRetry = true;
+      break;
+    }
+    await upsertGroupPlayable(db, {
+      launcher: game.launcher,
+      externalId: game.externalId,
+      name: game.name,
+      playable: lookup.status === "classified" ? lookup.playable : null,
+      source: lookup.status === "classified" ? "igdb" : "igdb_miss",
+    });
+    written += 1;
+  }
+  if (!hitRetry) igdbScanOffset = nextOffset;
   return written;
 }
 
@@ -420,6 +572,7 @@ let enriching: Promise<void> | null = null;
 export async function persistMissingGroupPlayable(
   db: Db,
   games: Array<{ launcher: string; externalId: string; name: string }>,
+  config?: Env,
 ): Promise<void> {
   if (enriching) return enriching;
   enriching = (async () => {
@@ -429,6 +582,7 @@ export async function persistMissingGroupPlayable(
     );
     await copyGroupPlayableByTitle(db, games);
     await persistMissingGroupPlayableBySteamTitle(db, games);
+    if (config) await persistUnknownViaIgdb(db, games, config);
   })().finally(() => {
     enriching = null;
   });

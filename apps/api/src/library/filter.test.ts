@@ -31,6 +31,13 @@ describe("isJunkGameName", () => {
     assert.equal(isJunkGameName("Discord"), true);
     assert.equal(isJunkGameName("RPG Maker XP"), true);
     assert.equal(isJunkGameName("Epic Games Launcher"), true);
+    assert.equal(isJunkGameName("Minecraft for Windows"), true);
+    assert.equal(isJunkGameName("Minecraft for Windows 10"), true);
+    assert.equal(isJunkGameName("SUPER PEOPLE Testing Grounds"), true);
+    assert.equal(isJunkGameName("Snap Attack"), true);
+    assert.equal(isJunkGameName("Knockout City™ Cross-Play Beta"), true);
+    assert.equal(isJunkGameName("Tiny Troopers 2: Special Ops"), true);
+    assert.equal(isJunkGameName("Trackmania Starter Access"), true);
   });
 
   it("keeps normal titles", () => {
@@ -42,6 +49,9 @@ describe("isJunkGameName", () => {
     assert.equal(isJunkGameName("VALORANT"), false);
     assert.equal(isJunkGameName("Minecraft"), false);
     assert.equal(isJunkGameName("Minecraft Launcher"), false);
+    assert.equal(isJunkGameName("Minecraft Dungeons"), false);
+    assert.equal(isJunkGameName("Knockout City"), false);
+    assert.equal(isJunkGameName("Trackmania"), false);
   });
 });
 

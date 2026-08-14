@@ -23,12 +23,16 @@ export function isJunkGameName(name: string): boolean {
     n.includes(" - playtest") ||
     n.includes("(playtest)") ||
     (/\blauncher\b/i.test(n) && !/\bminecraft\s+launcher\b/i.test(n)) ||
+    (/\bminecraft\b/i.test(n) &&
+      !/\blauncher\b/i.test(n) &&
+      /\b(for\s+windows|windows\s*10)\b/i.test(n)) ||
     /\bsteam(?!\s*world)/i.test(n) ||
     /\bwallpaper\b/i.test(n) ||
     /3d\s*mark/i.test(n) ||
     /\baim\s*labs?\b/i.test(n) ||
     /\bdiscord\b/i.test(n) ||
-    /\brpg\s*maker\s*xp\b/i.test(n)
+    /\brpg\s*maker\s*xp\b/i.test(n) ||
+    HIDDEN_TITLES.has(normalizeGameTitle(name))
   );
 }
 
@@ -50,6 +54,15 @@ export function normalizeGameTitle(name: string): string {
     .trim()
     .replace(/\s+/g, " ");
 }
+
+/** Titres masqués (doublons store, bêtas, accès limité). */
+const HIDDEN_TITLES = new Set([
+  "super people testing grounds",
+  "snap attack",
+  "knockout city cross play",
+  "tiny troopers 2 special ops",
+  "trackmania starter access",
+]);
 
 /** Terme envoyé à Steam / IGDB : sans parenthèses ni suffixe Windows. */
 export function catalogSearchTerm(name: string): string {

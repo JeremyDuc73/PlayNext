@@ -35,7 +35,7 @@ export function isJunkGameName(name: string): boolean {
 }
 
 const TITLE_NOISE =
-  /\b(goty|game of the year|game preview|early access|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows(?:\s*10)?|win10|pc|xbox|steam|epic|preview|battlemode|launcher|beta|alpha|celebration|anniversary|legendary|premium|enhanced|microsoft store)\b/g;
+  /\b(digital standard edition|digital deluxe edition|digital edition|digital standard|goty|game of the year|game preview|early access|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows(?:\s*10)?|win10|pc|xbox|steam|epic|preview|battlemode|launcher|beta|alpha|celebration|anniversary|legendary|premium|enhanced|microsoft store)\b/g;
 
 export function normalizeGameTitle(name: string): string {
   return name
@@ -58,6 +58,7 @@ const HIDDEN_TITLES = new Set([
   "knockout city cross play",
   "tiny troopers 2 special ops",
   "trackmania starter access",
+  "dragon mania legends",
 ]);
 
 export function dedupePreferLaunchers<

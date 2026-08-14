@@ -38,6 +38,7 @@ describe("isJunkGameName", () => {
     assert.equal(isJunkGameName("Knockout City™ Cross-Play Beta"), true);
     assert.equal(isJunkGameName("Tiny Troopers 2: Special Ops"), true);
     assert.equal(isJunkGameName("Trackmania Starter Access"), true);
+    assert.equal(isJunkGameName("Dragon Mania Legends"), true);
   });
 
   it("keeps normal titles", () => {
@@ -64,6 +65,7 @@ describe("groupPlayableOverride", () => {
   it("keeps Riot titles in groups", () => {
     assert.equal(groupPlayableOverride("League of Legends"), true);
     assert.equal(groupPlayableOverride("VALORANT"), true);
+    assert.equal(groupPlayableOverride("MONOPOLY POKER"), true);
   });
 });
 
@@ -160,6 +162,12 @@ describe("normalizeGameTitle", () => {
       "lightyear frontier",
     );
     assert.equal(normalizeGameTitle("Minecraft Launcher"), "minecraft");
+    assert.equal(
+      normalizeGameTitle(
+        "CALL OF DUTY: MODERN WARFARE - DIGITAL STANDARD EDITION",
+      ),
+      "call of duty modern warfare",
+    );
   });
 });
 
@@ -176,6 +184,12 @@ describe("catalogSearchTerm", () => {
     assert.equal(
       catalogSearchTerm("DOOM ETERNAL (BATTLEMODE - PC)"),
       "doom eternal",
+    );
+    assert.equal(
+      catalogSearchTerm(
+        "CALL OF DUTY: MODERN WARFARE - DIGITAL STANDARD EDITION",
+      ),
+      "call of duty modern warfare",
     );
   });
 });
@@ -196,6 +210,13 @@ describe("titlesMatchForCatalog", () => {
     );
     assert.equal(
       titlesMatchForCatalog("Minecraft Launcher", "Minecraft"),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        "CALL OF DUTY: MODERN WARFARE - DIGITAL STANDARD EDITION",
+        "Call of Duty®: Modern Warfare®",
+      ),
       true,
     );
   });

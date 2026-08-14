@@ -38,7 +38,7 @@ export function isJunkGameName(name: string): boolean {
 
 /** Normalize title for cross-launcher duplicate detection and catalogue match. */
 const TITLE_NOISE =
-  /\b(goty|game of the year|game preview|early access|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows(?:\s*10)?|win10|pc|xbox|steam|epic|preview|battlemode|launcher|beta|alpha|celebration|anniversary|legendary|premium|enhanced|microsoft store)\b/g;
+  /\b(digital standard edition|digital deluxe edition|digital edition|digital standard|goty|game of the year|game preview|early access|deluxe|definitive|ultimate|gold|standard|edition|remastered|remake|hd|complete|collection|bundle|windows(?:\s*10)?|win10|pc|xbox|steam|epic|preview|battlemode|launcher|beta|alpha|celebration|anniversary|legendary|premium|enhanced|microsoft store)\b/g;
 
 export function normalizeGameTitle(name: string): string {
   return name
@@ -62,6 +62,7 @@ const HIDDEN_TITLES = new Set([
   "knockout city cross play",
   "tiny troopers 2 special ops",
   "trackmania starter access",
+  "dragon mania legends",
 ]);
 
 /** Terme envoyé à Steam / IGDB : sans parenthèses ni suffixe Windows. */
@@ -73,7 +74,7 @@ export function catalogSearchTerm(name: string): string {
   const parts = raw.split(/\s+[-–—]\s+/);
   if (parts.length > 1) {
     const tail = normalizeGameTitle(parts.slice(1).join(" "));
-    if (!tail || /^(windows|pc|xbox|steam|epic|win10)$/.test(tail)) {
+    if (!tail || /^(windows|pc|xbox|steam|epic|win10|digital)$/.test(tail)) {
       raw = parts[0] ?? raw;
     }
   }
@@ -173,7 +174,11 @@ export function filterJunkGames<T extends { name: string }>(games: T[]): T[] {
  */
 const GROUP_INCOMPATIBLE_TITLES = new Set(["elden ring"]);
 
-const GROUP_PLAYABLE_TITLES = new Set(["league of legends", "valorant"]);
+const GROUP_PLAYABLE_TITLES = new Set([
+  "league of legends",
+  "valorant",
+  "monopoly poker",
+]);
 
 export function groupPlayableOverride(name: string): boolean | null {
   const key = normalizeGameTitle(name);

@@ -24,6 +24,7 @@ type StoreApp = {
   success?: boolean;
   data?: {
     categories?: Array<{ description?: string }>;
+    genres?: Array<{ description?: string }>;
   };
 };
 
@@ -56,17 +57,25 @@ function hasGroupMode(labels: string[]): boolean {
   );
 }
 
+function hasGroupGenre(labels: string[]): boolean {
+  return labels.some((label) => /massively multiplayer/i.test(label));
+}
+
 function hasSinglePlayerMode(labels: string[]): boolean {
   return labels.some((label) => /single-player|singleplayer/i.test(label));
 }
 
 export function groupPlayableFromSteamCategories(
   labels: string[],
+  genres: string[] = [],
 ): GroupPlayable {
   const normalized = labels
     .map((label) => label.trim().toLowerCase())
     .filter(Boolean);
-  if (hasGroupMode(normalized)) return true;
+  const genreLabels = genres
+    .map((label) => label.trim().toLowerCase())
+    .filter(Boolean);
+  if (hasGroupMode(normalized) || hasGroupGenre(genreLabels)) return true;
   if (hasSinglePlayerMode(normalized)) return false;
   return null;
 }
@@ -158,7 +167,12 @@ function wait(ms: number): Promise<void> {
 
 async function steamFetch(url: URL): Promise<Response> {
   return fetch(url, {
-    headers: { "User-Agent": "PlayNext/0.1" },
+    headers: {
+      "User-Agent": "PlayNext/0.1",
+      // Store : jeux 18+ / casino (ex. Monopoly Poker) renvoient sinon success:false.
+      Cookie:
+        "birthtime=568022401; lastagecheckage=1-January-1988; mature_content=1; wants_mature_content=1",
+    },
     signal: AbortSignal.timeout(STEAM_FETCH_MS),
   });
 }
@@ -183,9 +197,12 @@ async function fetchSteamAppDetails(id: string): Promise<SteamDetailsLookup> {
     const labels = (app.data?.categories ?? [])
       .map((category) => category.description ?? "")
       .filter(Boolean);
+    const genres = (app.data?.genres ?? [])
+      .map((genre) => genre.description ?? "")
+      .filter(Boolean);
     return {
       status: "classified",
-      playable: groupPlayableFromSteamCategories(labels),
+      playable: groupPlayableFromSteamCategories(labels, genres),
     };
   } catch {
     return { status: "retry" };

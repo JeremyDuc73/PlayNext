@@ -134,11 +134,12 @@ export async function lookupIgdbGroupPlayable(
     id: number;
     name?: string;
     game_modes?: number[];
+    multiplayer_modes?: unknown[];
   };
   const rows = await post<Raw>(
     config,
     `search "${escapeSearch(value.slice(0, 100))}";\n` +
-      "fields name, game_modes;\n" +
+      "fields name, game_modes, multiplayer_modes;\n" +
       "where version_parent = null;\n" +
       "limit 8;",
   );
@@ -150,7 +151,11 @@ export async function lookupIgdbGroupPlayable(
     (row) => row.name ?? "",
   );
   if (!match) return { status: "miss" };
-  const playable = groupPlayableFromIgdbModes(match.game_modes);
+  const playable =
+    groupPlayableFromIgdbModes(match.game_modes) ??
+    (Array.isArray(match.multiplayer_modes) && match.multiplayer_modes.length > 0
+      ? true
+      : null);
   if (playable == null) return { status: "miss" };
   return { status: "classified", playable };
 }

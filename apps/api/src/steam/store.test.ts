@@ -17,6 +17,10 @@ describe("groupPlayableFromSteamCategories", () => {
       true,
     );
     assert.equal(groupPlayableFromSteamCategories(["Online Co-op"]), true);
+    assert.equal(
+      groupPlayableFromSteamCategories([], ["Massively Multiplayer"]),
+      true,
+    );
   });
 
   it("treats single-player-only as solo", () => {

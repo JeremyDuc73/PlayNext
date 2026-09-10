@@ -53,9 +53,9 @@ export function SelectionView(props: SelectionViewProps) {
         <div className="mx-auto grid max-w-7xl content-start gap-6">
           <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
             <div>
-              <p className="pn-data mb-2">Phase 01 · Sélection</p>
+              <p className="pn-data mb-2">Étape 1 · Tes préférences</p>
               <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">
-                Choisis tes jeux
+                À quoi t’as envie de jouer ?
               </h2>
               <p className="pn-data mt-2">
                 {pad2(selectedCount)} / {pad2(props.evening.shortlistSize)} max
@@ -75,7 +75,7 @@ export function SelectionView(props: SelectionViewProps) {
 
           <section className="border-2 border-paper bg-ink-deep p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule pb-3">
-              <p className="pn-data text-paper">Ta sélection</p>
+              <p className="pn-data text-paper">Tes choix pour le vote</p>
               <p className="pn-data">
                 {pad2(selectedCandidates.length)} /{" "}
                 {pad2(props.evening.shortlistSize)}
@@ -113,7 +113,7 @@ export function SelectionView(props: SelectionViewProps) {
                 })}
               </ol>
             ) : (
-              <p className="pn-data pt-4">Aucun jeu choisi</p>
+              <p className="pn-data pt-4">Choisis tes jeux préférés ci-dessous</p>
             )}
           </section>
 
@@ -207,11 +207,11 @@ export function SelectionView(props: SelectionViewProps) {
                 onClick={props.onSubmit}
               >
                 {props.selectionSubmitted
-                  ? "Mettre à jour"
-                  : "Valider ma sélection"}
+                  ? "Modifier mes choix"
+                  : "Valider mes choix"}
               </Button>
             ) : (
-              <p className="pn-data">Hors tour</p>
+              <p className="pn-data">Spectateur</p>
             )}
             {props.iOrganize && props.evening.selectionComplete ? (
               <Button
@@ -219,7 +219,7 @@ export function SelectionView(props: SelectionViewProps) {
                 disabled={props.busy}
                 onClick={props.onStart}
               >
-                Lancer les votes
+                Lancer le vote !
               </Button>
             ) : null}
           </div>

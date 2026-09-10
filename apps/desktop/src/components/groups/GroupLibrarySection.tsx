@@ -88,7 +88,7 @@ export function GroupLibrarySection({
       {filtered.length === 0 ? (
         <EmptyHint
           title={query ? "Aucun résultat" : "Rien ici"}
-          body={query ? `Aucun jeu ne correspond à « ${query} ».` : "Scannez vos bibliothèques."}
+          body={query ? `Aucun jeu ne correspond à « ${query} ».` : "Synchronisez vos bibliothèques dans l’onglet Bibliothèque pour voir vos jeux en commun !"}
         />
       ) : (
         <PosterGrid

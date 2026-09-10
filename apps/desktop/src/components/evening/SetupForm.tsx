@@ -48,7 +48,7 @@ export function SetupForm(props: SetupFormProps) {
     <div className="grid max-w-3xl gap-5 border border-rule-strong p-6">
       <div>
         <p className="pn-data mb-2">Soirée</p>
-        <h3 className="pn-display text-4xl">Init soirée</h3>
+        <h3 className="pn-display text-4xl">Préparer la soirée</h3>
         <span className="pn-accent mt-3" />
       </div>
       <EveningWhenField value={props.when} onChange={props.setWhen} />
@@ -159,7 +159,7 @@ export function SetupForm(props: SetupFormProps) {
       </ul>
       <div className="flex flex-wrap gap-3">
         <Button variant="primary" disabled={props.busy} onClick={props.onLaunch}>
-          Lancer
+          Lancer le lobby
         </Button>
         <Button variant="ghost" disabled={props.busy} onClick={props.onAbort}>
           Annuler

@@ -391,64 +391,70 @@ export function LibraryHub({
         </p>
       </header>
 
-      <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-rule-strong pb-4">
-        {(
-          [
-            ["all", "Tous"],
-            ["steam", "Steam"],
-            ["xbox", "Xbox"],
-            ["epic", "Epic"],
-            ["riot", "Riot"],
-            ["manual", "Manuel"],
-          ] as const
-        ).map(([key, label]) => (
+      <div className="mb-5 flex flex-wrap items-center gap-3 border-b border-rule-strong pb-4">
+        <div className="flex flex-wrap items-center gap-1 border border-rule-strong p-1">
+          {(
+            [
+              ["all", "Tous"],
+              ["steam", "Steam"],
+              ["xbox", "Xbox"],
+              ["epic", "Epic"],
+              ["riot", "Riot"],
+              ["manual", "Manuel"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={
+                launcher === key
+                  ? "bg-paper px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-ink-deep"
+                  : "px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-smoke hover:text-paper"
+              }
+              onClick={() => setLauncher(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <span className="hidden h-5 w-px bg-rule-strong sm:inline-block" aria-hidden />
+
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            key={key}
             type="button"
             className={
-              launcher === key
-                ? "bg-paper px-3 py-2 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-ink-deep"
-                : "px-3 py-2 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-smoke hover:text-paper"
+              installedOnly
+                ? "border border-paper bg-paper px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-ink-deep"
+                : "border border-rule px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-smoke hover:border-paper hover:text-paper"
             }
-            onClick={() => setLauncher(key)}
+            onClick={() => setInstalledOnly((v) => !v)}
           >
-            {label}
+            Installés
           </button>
-        ))}
-        <span className="mx-2 h-4 w-px bg-rule-strong" aria-hidden />
-        <button
-          type="button"
-          className={
-            installedOnly
-              ? "pn-data text-paper"
-              : "pn-data hover:text-paper"
-          }
-          onClick={() => setInstalledOnly((v) => !v)}
-        >
-          Installés
-        </button>
-        <button
-          type="button"
-          className={
-            playMode === "multi"
-              ? "pn-data text-paper"
-              : "pn-data hover:text-paper"
-          }
-          onClick={() => setPlayMode((v) => (v === "multi" ? "all" : "multi"))}
-        >
-          Multi
-        </button>
-        <button
-          type="button"
-          className={
-            playMode === "solo"
-              ? "pn-data text-paper"
-              : "pn-data hover:text-paper"
-          }
-          onClick={() => setPlayMode((v) => (v === "solo" ? "all" : "solo"))}
-        >
-          Solo
-        </button>
+          <button
+            type="button"
+            className={
+              playMode === "multi"
+                ? "border border-paper bg-paper px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-ink-deep"
+                : "border border-rule px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-smoke hover:border-paper hover:text-paper"
+            }
+            onClick={() => setPlayMode((v) => (v === "multi" ? "all" : "multi"))}
+          >
+            Multi
+          </button>
+          <button
+            type="button"
+            className={
+              playMode === "solo"
+                ? "border border-paper bg-paper px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-ink-deep"
+                : "border border-rule px-3 py-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-smoke hover:border-paper hover:text-paper"
+            }
+            onClick={() => setPlayMode((v) => (v === "solo" ? "all" : "solo"))}
+          >
+            Solo
+          </button>
+        </div>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button
             variant="second"

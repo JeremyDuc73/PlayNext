@@ -424,14 +424,14 @@ export function ProfilePanel({
       <section className="border border-rule-strong p-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="pn-data mb-1">Guide de démarrage</p>
-            <h3 className="pn-display text-2xl">Protocole d’accueil</h3>
+            <p className="pn-data mb-1">Besoin d’un rappel ?</p>
+            <h3 className="pn-display text-2xl">Comment ça marche ?</h3>
             <p className="mt-2 max-w-xl text-sm text-paper-2">
-              Revoir les règles du rituel décisionnel, le fonctionnement du vote secret, du veto et des bibliothèques locales.
+              Revois en 30 secondes comment voter avec tes potes, poser un veto et trouver à quoi jouer sans prise de tête.
             </p>
           </div>
           <Button variant="second" onClick={openOnboarding}>
-            Revoir le protocole
+            Revoir le guide
           </Button>
         </div>
       </section>

@@ -18,135 +18,135 @@ type Step = {
 const STEPS: Step[] = [
   {
     id: "ritual",
-    badge: "ARTICLE 01 · RITUEL",
-    title: "Le rituel décisionnel",
-    subtitle: "DÉCIDER ENSEMBLE, SANS DÉBAT INTERMINABLE SUR DISCORD.",
+    badge: "ÉTAPE 01 · COMMENT ÇA MARCHE",
+    title: "Savoir enfin à quoi jouer",
+    subtitle: "FINIE LA GALÈRE DU CHOIX, SANS DÉBAT INTERMINABLE SUR DISCORD.",
     articles: [
       {
         code: "01",
-        headline: "Sélection secrète",
+        headline: "Ta shortlist secrète",
         detail:
-          "Chaque joueur sélectionne confidentiellement 1 à 5 jeux parmi les titres partagés par le groupe.",
+          "Chacun pioche discrètement 1 à 5 jeux parmi les titres que vous avez tous en commun.",
       },
       {
         code: "02",
-        headline: "Bulletins synchronisés",
+        headline: "Vote en direct",
         detail:
-          "Le groupe vote simultanément sur chaque jeu (Chaud / Pourquoi pas / Pass) sans voir les votes d'autrui.",
+          "Tout le monde vote en même temps (Chaud / Pourquoi pas / Pass) sans voir ce que votent les autres.",
       },
       {
         code: "03",
-        headline: "Droit de veto souverain",
+        headline: "Le joker veto",
         detail:
-          "Un veto par joueur et par soirée. Si un joueur applique son veto, le jeu est éliminé sans appel.",
+          "Un jeu te sort par les yeux ? Pose ton veto : le titre est dégagé direct pour la soirée, sans négociation.",
       },
       {
         code: "04",
-        headline: "Dépouillement immédiat",
+        headline: "Le grand gagnant",
         detail:
-          "Le titre recueillant le meilleur score est proclamé. En cas d’égalité parfaite, la roulette tranche.",
+          "Le jeu qui met tout le monde d'accord l'emporte direct. Et en cas d’égalité parfaite, la roulette tranche !",
       },
     ],
-    stamp: "CE SOIR, ON DÉCIDE",
+    stamp: "CE SOIR, ON JOUE",
   },
   {
     id: "libraries",
-    badge: "ARTICLE 02 · BIBLIOTHÈQUES",
-    title: "Scan local & souveraineté",
-    subtitle: "DÉTECTION DIRECTE EN LOCAL, AUCUN CHEMIN DIVULGUÉ.",
+    badge: "ÉTAPE 02 · TES JEUX",
+    title: "Toutes tes bibliothèques réunies",
+    subtitle: "STEAM, XBOX, EPIC ET RIOT CONNECTÉS EN 2 SECONDES.",
     articles: [
       {
         code: "01",
-        headline: "Connecteurs automatiques",
+        headline: "Zéro prise de tête",
         detail:
-          "Détection native des installations et catalogues Steam, Xbox / PC Game Pass, Epic Games et Riot.",
+          "L'application détecte directement les jeux installés sur ton PC sans aucune configuration manuelle.",
       },
       {
         code: "02",
-        headline: "Confidentialité totale",
+        headline: "100% privé",
         detail:
-          "Vos chemins de disques ne quittent jamais votre machine. Seuls les identifiants de jeux sont synchronisés.",
+          "Tes fichiers et dossiers personnels ne quittent jamais ton PC. Seuls les noms de tes jeux sont partagés.",
       },
       {
         code: "03",
-        headline: "Filtrage Steam Family",
+        headline: "Steam Family intelligent",
         detail:
-          "Le partage familial est détecté : seuls les jeux disposant de licences individuelles distinctes sont retenus.",
+          "Le partage familial est bien géré : pas de faux espoir sur un jeu si vous ne pouvez pas y jouer ensemble.",
       },
       {
         code: "04",
-        headline: "Filtre solo / groupe",
+        headline: "Que du multi",
         detail:
-          "Les jeux strictement solo sont écartés des votes de groupe. Vous pouvez aussi masquer un titre pour un groupe précis.",
+          "Les jeux purement solo sont écartés d'office pour ne pas polluer les soirées entre potes.",
       },
     ],
-    stamp: "DONNÉES LOCALES",
+    stamp: "SYNCHRO FACILE",
   },
   {
     id: "groups",
-    badge: "ARTICLE 03 · CERCLES",
-    title: "Groupes & propositions",
-    subtitle: "UN CERCLE D’AMIS, UN CATALOGUE COMMUN.",
+    badge: "ÉTAPE 03 · TON GROUPE",
+    title: "Ton cercle de potes",
+    subtitle: "UN CODE RAPIDE, ET TOUTE L'ÉQUIPE EST LÀ.",
     articles: [
       {
         code: "01",
-        headline: "Invitation en un clic",
+        headline: "Invite ta bande",
         detail:
-          "Créez votre groupe et partagez le code d'invitation à 9 caractères ou le lien direct playnext://.",
+          "Partage un simple code à 9 lettres ou un lien direct pour que tes potes rejoignent ton groupe en un clic.",
       },
       {
         code: "02",
-        headline: "Catalogue partagé",
+        headline: "Vos jeux en commun",
         detail:
-          "Accédez instantanément à la liste des jeux que tout le cercle possède en commun (possession croisée).",
+          "Découvre instantanément la liste exacte des jeux que tout le monde possède déjà pour jouer ensemble.",
       },
       {
         code: "03",
-        headline: "Propositions Steam",
+        headline: "Envie d'un nouveau jeu ?",
         detail:
-          "Envie d'un nouveau titre ? Proposez-le depuis le Store Steam. Le groupe vote Chaud ou Non avant achat.",
+          "Propose un jeu Steam au groupe. Tout le monde vote Chaud ou Non avant de passer à la caisse.",
       },
       {
         code: "04",
-        headline: "Conversion directe",
+        headline: "Du vote à la partie",
         detail:
-          "Si le cercle valide la proposition, une soirée directe est créée en un clic avec le jeu verrouillé.",
+          "Si tout le monde est chaud, la soirée est créée automatiquement avec le jeu déjà verrouillé.",
       },
     ],
-    stamp: "CERCLE SOUVERAIN",
+    stamp: "ENTRE POTES",
   },
   {
     id: "agenda",
-    badge: "ARTICLE 04 · AGENDA",
-    title: "Soirées & notifications",
-    subtitle: "PLANIFIER OU DÉCIDER SUR-LE-CHAMP.",
+    badge: "ÉTAPE 04 · LES SOIRÉES",
+    title: "Organiser vos soirées",
+    subtitle: "POUR CE SOIR OU POUR LE WEEK-END PROCHAIN.",
     articles: [
       {
         code: "01",
-        headline: "Soirée instantanée",
+        headline: "Partie improvisée",
         detail:
-          "Lancez un rituel sur-le-champ avec les membres présents qui confirment leur présence au lobby.",
+          "Envie de jouer là maintenant ? Lancez le lobby, chacun confirme qu'il est devant son écran et c'est parti.",
       },
       {
         code: "02",
-        headline: "Calendrier de groupe",
+        headline: "Calendrier du groupe",
         detail:
-          "Consultez l'agenda du mois (fuseau Europe/Paris) pour retrouver les sessions planifiées et confirmées.",
+          "Planifiez vos prochaines sessions à l'avance pour être sûrs de bloquer la date ensemble.",
       },
       {
         code: "03",
-        headline: "Temps réel natif",
+        headline: "En direct live",
         detail:
-          "Flux d'événements en direct (SSE) : chaque présence et chaque vote déposé s'actualise instantanément.",
+          "Tout est synchronisé en temps réel : dès qu'un pote clique sur prêt ou dépose son vote, ça bouge sous tes yeux.",
       },
       {
         code: "04",
-        headline: "Relais Discord",
+        headline: "Notifs sur Discord",
         detail:
-          "Liez votre salon Discord pour annoncer l'ouverture du lobby et publier automatiquement la jaquette gagnante.",
+          "Connecte ton salon Discord : le bot annonce le début des votes et affiche fièrement la jaquette gagnante !",
       },
     ],
-    stamp: "PROTOCOLE PRÊT",
+    stamp: "PRÊT À JOUER",
   },
 ];
 
@@ -263,7 +263,7 @@ export function OnboardingModal({ isOpen, onClose }: Props) {
             className="pn-data text-smoke hover:text-paper"
             onClick={handleComplete}
           >
-            Passer l’introduction
+            Passer
           </button>
 
           <div className="flex items-center gap-3">
@@ -281,7 +281,7 @@ export function OnboardingModal({ isOpen, onClose }: Props) {
                 variant="primary"
                 onClick={handleComplete}
               >
-                Prendre part au rituel
+                C'est parti, on joue !
               </Button>
             ) : (
               <Button

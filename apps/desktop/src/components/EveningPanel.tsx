@@ -599,8 +599,8 @@ export function EveningPanel({
               />
             ) : (
               <EmptyHint
-                title="Aucune soirée en cours"
-                body="Lance une nouvelle soirée pour choisir."
+                title="Pas de soirée prévue"
+                body="Lance une session pour trouver à quoi jouer avec ta bande !"
               />
             )}
             <EveningHistory

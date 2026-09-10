@@ -60,8 +60,8 @@ describe("buildDiscordMessage", () => {
       playerCount: 5,
       scheduledAt: "2026-08-14T19:00:00.000Z",
     });
-    assert.equal(payload.embeds[0]?.title, "Lobby");
-    assert.equal(payload.embeds[0]?.description, "Les Copains");
+    assert.equal(payload.embeds[0]?.title, "SOIRÉE JEU EN VUE !");
+    assert.match(payload.embeds[0]?.description ?? "", /Les Copains/);
     assert.match(payload.content, /Lobby ouvert/);
     assert.match(payload.content, /21:00/);
   });
@@ -108,7 +108,7 @@ describe("buildDiscordMessage", () => {
       guildName: "Serveur Discord",
       channelName: "annonces-jeux",
     });
-    assert.match(payload.embeds[0]?.title ?? "", /SALON D’ANNONCES LIÉ/);
+    assert.match(payload.embeds[0]?.title ?? "", /LE BOT PLAYNEXT EST PRÊT !/);
     assert.match(payload.embeds[0]?.description ?? "", /#annonces-jeux/);
     assert.equal(payload.components?.[0]?.components[0]?.label, "Télécharger PlayNext ↗");
   });
@@ -120,10 +120,10 @@ describe("buildDiscordMessage", () => {
       candidateCount: 3,
       candidateNames: ["Deep Rock Galactic", "Valheim", "Terraria"],
     });
-    assert.match(payload.embeds[0]?.title ?? "", /LE VOTE EST OUVERT/);
+    assert.match(payload.embeds[0]?.title ?? "", /C’EST L’HEURE DE VOTER !/);
     assert.match(payload.content, /Vote ouvert/);
     assert.equal(
-      payload.embeds[0]?.fields?.some((f) => f.name === "Sélection retenue"),
+      payload.embeds[0]?.fields?.some((f) => f.name === "Jeux en lice"),
       true,
     );
   });
@@ -136,7 +136,7 @@ describe("buildDiscordMessage", () => {
       memberCount: 4,
       priceLabel: "24,99 €",
     });
-    assert.match(payload.embeds[0]?.title ?? "", /PROPOSITION VALIDÉE/);
+    assert.match(payload.embeds[0]?.title ?? "", /TOUT LE MONDE EST CHAUD POUR ABIOTIC FACTOR !/);
     assert.match(payload.content, /Proposition validée/);
   });
 
@@ -156,11 +156,11 @@ describe("buildDiscordMessage", () => {
     assert.equal(payload.embeds[0]?.title, "Abiotic Factor");
     assert.equal(payload.embeds[0]?.image?.url, "https://example.com/cover.jpg");
     assert.equal(
-      payload.embeds[0]?.fields?.some((f) => f.name === "Dépouillement"),
+      payload.embeds[0]?.fields?.some((f) => f.name === "Les votes"),
       true,
     );
     assert.equal(
-      payload.embeds[0]?.fields?.some((f) => f.name === "Départage"),
+      payload.embeds[0]?.fields?.some((f) => f.name === "Égalité départagée"),
       true,
     );
     assert.equal(payload.components?.[0]?.components[0]?.url, "https://store.steampowered.com/app/427410/");

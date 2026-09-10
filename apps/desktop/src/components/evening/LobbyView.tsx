@@ -47,7 +47,7 @@ export function LobbyView(props: LobbyViewProps) {
         <div className="mx-auto grid max-w-3xl content-start gap-8">
           <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
             <div>
-              <p className="pn-data mb-2">Phase 00 · Lobby</p>
+              <p className="pn-data mb-2">Lobby · En attente des joueurs</p>
               <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">Lobby</h2>
               <p className="pn-data mt-3">
                 {props.groupName}
@@ -110,9 +110,9 @@ export function LobbyView(props: LobbyViewProps) {
           <p className="pn-data">
             {props.iAmParticipant
               ? myReady
-                ? "En attente des autres"
-                : "Présence requise"
-              : "Hors tour"}
+                ? "T'es prêt ! En attente des potes..."
+                : "Confirme que tu es là pour participer"
+              : "Spectateur"}
           </p>
           <div className="flex flex-wrap items-center gap-3">
             {props.iAmParticipant && myReady ? (

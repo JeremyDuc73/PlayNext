@@ -27,7 +27,7 @@ export function SequentialVoteView(props: SequentialVoteViewProps) {
       <div className="mx-auto grid min-h-full max-w-6xl content-start gap-6">
         <header className="flex flex-wrap items-end justify-between gap-5 border-b border-rule-strong pb-5">
           <div>
-            <p className="pn-data mb-2">Phase 02 · Vote simultané</p>
+            <p className="pn-data mb-2">Étape 2 · Le vote</p>
             <h2 className="pn-display text-[clamp(2.5rem,6vw,5rem)]">
               Jeu {pad2(index + 1)} / {pad2(props.evening.candidates.length)}
             </h2>
@@ -62,7 +62,7 @@ export function SequentialVoteView(props: SequentialVoteViewProps) {
           </div>
           <div className="grid gap-5 border-t border-rule-strong pt-5 lg:border-t-0 lg:border-l lg:pl-8">
             <p className="pn-data">
-              Discussion vocale · tout le monde vote le même jeu
+              En vocal avec ta bande · Votez en même temps
             </p>
             {props.iAmParticipant ? (
               <>
@@ -77,13 +77,13 @@ export function SequentialVoteView(props: SequentialVoteViewProps) {
                 />
                 <p className="pn-data">
                   {candidate.myVote
-                    ? "Vote enregistré · attente des autres"
-                    : "Choisis ton avis"}
+                    ? "Vote enregistré ! On attend les potes..."
+                    : "T’es chaud pour ce jeu ?"}
                 </p>
               </>
             ) : (
               <p className="pn-data border border-rule-strong px-4 py-4">
-                Hors tour · {pad2(props.evening.currentVotes)} /{" "}
+                Spectateur · {pad2(props.evening.currentVotes)} /{" "}
                 {pad2(props.evening.currentVotesTotal)} votes
               </p>
             )}

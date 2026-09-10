@@ -57,6 +57,8 @@ export type DiscordNotice =
     };
 
 const PLAYNEXT_VERMILLON = 0xe2402c;
+const PLAYNEXT_ICON_URL =
+  "https://raw.githubusercontent.com/JeremyDuc73/PlayNext/main/apps/desktop/src-tauri/icons/128x128.png";
 
 function pad2(n: number): string {
   return String(Math.max(0, Math.floor(n))).padStart(2, "0");
@@ -159,9 +161,9 @@ export function buildDiscordMessage(
   webUrl: string = "https://playnext.jeremyduc.dev",
 ): DiscordMessagePayload {
   const timestamp = new Date().toISOString();
-  const brandIcon = `${webUrl.replace(/\/+$/, "")}/playnext.svg`;
+  const brandIcon = PLAYNEXT_ICON_URL;
   const defaultFooter = {
-    text: "PlayNext · Ce soir, on décide.",
+    text: "PlayNext · Savoir à quoi jouer, sans débat interminable.",
     icon_url: brandIcon,
   };
   const author = {
@@ -173,21 +175,21 @@ export function buildDiscordMessage(
   // 1. SALON LIÉ
   if (notice.kind === "linked") {
     const embed: DiscordEmbed = {
-      title: "SALON D’ANNONCES LIÉ",
-      description: `Le salon **#${notice.channelName ?? "général"}** recevra désormais les annonces officielles du groupe **${groupName}**.\n\n*« Ce soir, on décide. »*`,
+      title: "LE BOT PLAYNEXT EST PRÊT !",
+      description: `Le salon **#${notice.channelName ?? "général"}** recevra désormais les annonces de soirée du groupe **${groupName}** !\n\n*Finie la galère du choix, sans débat interminable sur Discord.*`,
       color: PLAYNEXT_VERMILLON,
       author,
       fields: [
         {
-          name: "Fonctionnalités actives",
+          name: "Au programme",
           value:
-            "• **Lobby ouvert** : annonce des sessions & horaires\n• **Dépouillement** : début des votes secrets\n• **Proclamation** : jaquette et résultat final\n• **Propositions** : sondages d'achats Steam",
+            "• **Lobbys de soirée** : date, heure et qui est chaud\n• **Lancement des votes** : votes secrets en direct\n• **Le grand gagnant** : jaquette et jeu retenu\n• **Propositions Steam** : sondez le groupe avant d’acheter",
           inline: false,
         },
         {
           name: "Comment participer ?",
           value:
-            "Installez l'application PlayNext, connectez-vous avec Discord et rejoignez le groupe via votre code d'accès.",
+            "Lancez l’application PlayNext, connectez-vous avec Discord et rejoignez le groupe avec votre code d’accès !",
           inline: false,
         },
       ],
@@ -222,12 +224,12 @@ export function buildDiscordMessage(
     const fields: DiscordEmbed["fields"] = [
       {
         name: "Format",
-        value: direct ? "`⚡ Soirée directe`" : "`🎲 Rituel de vote`",
+        value: direct ? "`⚡ Soirée directe`" : "`🎲 Vote entre potes`",
         inline: true,
       },
       {
-        name: "Présence requise",
-        value: `\`${pad2(notice.playerCount)}\` participants`,
+        name: "Joueurs attendus",
+        value: `\`${pad2(notice.playerCount)}\` joueurs`,
         inline: true,
       },
     ];
@@ -265,13 +267,15 @@ export function buildDiscordMessage(
 
     fields.push({
       name: "Consigne",
-      value: "Rejoignez le lobby dans PlayNext et confirmez votre présence pour participer.",
+      value: "Rejoins le lobby dans PlayNext et confirme que t’es prêt !",
       inline: false,
     });
 
     const embed: DiscordEmbed = {
-      title: notice.gameName ? `Soirée · ${notice.gameName}` : "Lobby",
-      description: groupName,
+      title: notice.gameName ? `SOIRÉE : ${notice.gameName.toUpperCase()}` : "SOIRÉE JEU EN VUE !",
+      description: direct
+        ? `Une soirée directe est prévue pour **${groupName}** !`
+        : `Une session se prépare pour **${groupName}** !`,
       color: PLAYNEXT_VERMILLON,
       author,
       fields,
@@ -315,8 +319,8 @@ export function buildDiscordMessage(
   if (notice.kind === "voting") {
     const fields: DiscordEmbed["fields"] = [
       {
-        name: "Sélection retenue",
-        value: `\`${pad2(notice.candidateCount)}\` jeux en lice`,
+        name: "Jeux en lice",
+        value: `\`${pad2(notice.candidateCount)}\` jeux`,
         inline: true,
       },
       {
@@ -325,9 +329,9 @@ export function buildDiscordMessage(
         inline: true,
       },
       {
-        name: "Règles du rituel",
+        name: "Comment voter ?",
         value:
-          "• **1 veto par joueur** : éliminatoire d’office\n• **Bulletins simultanés** : Chaud / Pourquoi pas / Pass\n• **Dépouillement automatique** dès le dernier bulletin déposé",
+          "• **Chaud / Pourquoi pas / Pass** : votez en même temps sur chaque jeu\n• **1 joker veto** par joueur : pour écarter un jeu direct\n• **Résultat en direct** : le jeu gagnant est annoncé dès le dernier vote !",
         inline: false,
       },
     ];
@@ -344,8 +348,8 @@ export function buildDiscordMessage(
     }
 
     const embed: DiscordEmbed = {
-      title: "LE VOTE EST OUVERT",
-      description: `Toutes les sélections ont été déposées pour le groupe **${groupName}**. Rendez-vous dans l'application pour déposer vos bulletins !`,
+      title: "C’EST L’HEURE DE VOTER !",
+      description: `Tout le monde a choisi ses jeux pour le groupe **${groupName}**. Rendez-vous dans l’app pour voter !`,
       color: PLAYNEXT_VERMILLON,
       author,
       fields,
@@ -378,7 +382,7 @@ export function buildDiscordMessage(
     const missing =
       notice.missingNames.length > 0
         ? notice.missingNames.join(" · ").slice(0, 1024)
-        : "Tout le monde possède le jeu !";
+        : "Tout le monde possède déjà le jeu !";
 
     const fields: DiscordEmbed["fields"] = [
       {
@@ -409,7 +413,7 @@ export function buildDiscordMessage(
       },
       {
         name: "Vote du groupe",
-        value: "Votez **Chaud** ou **Non** dans PlayNext pour valider ou écarter cette proposition.",
+        value: "Votez **Chaud** ou **Non** dans PlayNext pour savoir si on se le prend !",
         inline: false,
       },
     );
@@ -417,7 +421,9 @@ export function buildDiscordMessage(
     const embed: DiscordEmbed = {
       title: notice.gameName,
       url: notice.steamUrl,
-      description: groupName,
+      description: notice.proposerName
+        ? `**${notice.proposerName}** propose un nouveau jeu pour le groupe **${groupName}** !`
+        : `Nouvelle proposition de jeu pour **${groupName}** !`,
       color: PLAYNEXT_VERMILLON,
       author,
       fields,
@@ -458,9 +464,9 @@ export function buildDiscordMessage(
   // 5. PROPOSITION VALIDÉE
   if (notice.kind === "proposal_approved") {
     const embed: DiscordEmbed = {
-      title: `PROPOSITION VALIDÉE : ${notice.gameName.toUpperCase()}`,
+      title: `TOUT LE MONDE EST CHAUD POUR ${notice.gameName.toUpperCase()} ! 🎉`,
       url: notice.steamUrl,
-      description: `Tous les membres du groupe **${groupName}** sont chauds pour jouer à **${notice.gameName}** ! 🎉`,
+      description: `Unanimité sur **${notice.gameName}** dans le groupe **${groupName}** !`,
       color: PLAYNEXT_VERMILLON,
       author,
       fields: [
@@ -475,8 +481,8 @@ export function buildDiscordMessage(
           inline: true,
         },
         {
-          name: "Prêt pour la soirée",
-          value: "La proposition est validée. Le créateur peut lancer la soirée directe en un clic dans PlayNext.",
+          name: "Prêt pour la partie",
+          value: "Tout le monde est d'accord ! Vous pouvez lancer la soirée directe en un clic dans PlayNext.",
           inline: false,
         },
       ],
@@ -528,15 +534,15 @@ export function buildDiscordMessage(
 
   if (notice.playerCount) {
     fields.push({
-      name: "Participants",
-      value: `\`${pad2(notice.playerCount)}\` joueurs confirmés`,
+      name: "Joueurs confirmés",
+      value: `\`${pad2(notice.playerCount)}\` joueurs`,
       inline: true,
     });
   }
 
   if (notice.eveningKind === "ritual" && (notice.hotVotes != null || notice.maybeVotes != null)) {
     fields.push({
-      name: "Dépouillement",
+      name: "Les votes",
       value: `🔥 \`${pad2(notice.hotVotes ?? 0)}\` Chaud · 👍 \`${pad2(notice.maybeVotes ?? 0)}\` Pourquoi pas`,
       inline: true,
     });
@@ -550,7 +556,7 @@ export function buildDiscordMessage(
 
   if (notice.usedRoulette) {
     fields.push({
-      name: "Départage",
+      name: "Égalité départagée",
       value: "🎲 Roulette (tirage au sort sur égalité parfaite)",
       inline: false,
     });
@@ -558,7 +564,7 @@ export function buildDiscordMessage(
 
   const embed: DiscordEmbed = {
     title: notice.gameName,
-    description: `Jeu retenu · ${groupName}`,
+    description: `Et le jeu de ce soir pour **${groupName}** est...`,
     color: PLAYNEXT_VERMILLON,
     author,
     fields: fields.length > 0 ? fields : undefined,

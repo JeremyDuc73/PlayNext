@@ -100,7 +100,7 @@ export function registerGroupEveningsRoutes(
           return reply.code(409).send({
             ok: false,
             error: "evening_already_open",
-            message: "Un rituel est déjà en cours dans ce groupe.",
+            message: "Une soirée avec vote est déjà en cours dans ce groupe.",
             eveningId: active.rows[0]!.id,
           });
         }
@@ -337,7 +337,7 @@ export function registerGroupEveningsRoutes(
           return reply.code(409).send({
             ok: false,
             error: "evening_already_open",
-            message: "Un rituel est déjà en cours dans ce groupe.",
+            message: "Une soirée avec vote est déjà en cours dans ce groupe.",
           });
         }
         throw error;

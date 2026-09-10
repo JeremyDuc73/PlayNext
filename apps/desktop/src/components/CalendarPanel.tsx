@@ -155,17 +155,17 @@ export function CalendarPanel({
           </h2>
           <span className="pn-accent mt-3" />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => go(-1)}
             aria-label="Mois précédent"
             title="Mois précédent"
-            className="flex h-9 w-9 items-center justify-center border border-rule-strong bg-ink-deep font-data text-base font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-2px] active:translate-y-[-2px]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center border border-rule-strong bg-ink-deep font-data text-base font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-2px] active:translate-y-[-2px]"
           >
             ←
           </button>
-          <p className="pn-display text-xl sm:text-2xl uppercase tracking-[-0.02em] text-paper min-w-[200px] text-center">
+          <p className="pn-display w-[260px] sm:w-[320px] shrink-0 text-center text-xl sm:text-2xl uppercase tracking-[-0.02em] text-paper select-none">
             {monthTitle}
           </p>
           <button
@@ -173,7 +173,7 @@ export function CalendarPanel({
             onClick={() => go(1)}
             aria-label="Mois suivant"
             title="Mois suivant"
-            className="flex h-9 w-9 items-center justify-center border border-rule-strong bg-ink-deep font-data text-base font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-2px] active:translate-y-[-2px]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center border border-rule-strong bg-ink-deep font-data text-base font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-2px] active:translate-y-[-2px]"
           >
             →
           </button>
@@ -249,8 +249,8 @@ export function CalendarPanel({
 
       {selected.length === 0 ? (
         <EmptyHint
-          title="Rien ce jour"
-          body="Vote en cours, soirée confirmée, ou soirée directe."
+          title="Aucune session ce jour"
+          body="Pas de soirée prévue à cette date."
         />
       ) : (
         <ul className="m-0 list-none border border-rule-strong p-0">

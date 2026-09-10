@@ -681,7 +681,7 @@ export function GroupsPanel({
                   <div>
                     <h3 className="pn-display text-2xl">Propositions Steam</h3>
                     <p className="pn-data mt-1 text-smoke">
-                      Sonde le groupe avant d’acheter un jeu ou de lancer une soirée.
+                      Trouvez vos prochains jeux ensemble et votez avant d’acheter.
                     </p>
                   </div>
                   <Button
@@ -708,8 +708,8 @@ export function GroupsPanel({
 
                 {proposals.length === 0 && !proposeOpen ? (
                   <EmptyHint
-                    title="Aucune proposition"
-                    body="Aucune proposition en cours. Propose un jeu Steam pour sonder le groupe."
+                    title="Pas de proposition"
+                    body="Aucune proposition en cours. Propose un jeu Steam à ta bande !"
                   />
                 ) : (
                   <ProposalsPanel

@@ -96,7 +96,7 @@ export function GroupSidebar({
       {loading ? (
         <p className="p-4 pn-data">Chargement…</p>
       ) : groups.length === 0 ? (
-        <p className="p-4 pn-data">Aucun groupe</p>
+        <p className="p-4 pn-data">Pas encore de groupe</p>
       ) : (
         <ul className="m-0 list-none p-0">
           {groups.map((group) => (
@@ -124,7 +124,7 @@ export function GroupSidebar({
       )}
 
       <div className="mt-auto border-t border-rule-strong p-4">
-        <p className="pn-data mb-2">En commun</p>
+        <p className="pn-data mb-2">Jeux en commun</p>
         <p className="pn-display text-2xl">{pad2(sharedCount)}</p>
       </div>
     </aside>

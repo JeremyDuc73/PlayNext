@@ -107,15 +107,15 @@ export function ResultView(props: ResultViewProps) {
           />
         </div>
         <div className="mt-3 border-t border-rule pt-3">
-          <p className="pn-data">Résultat</p>
+          <p className="pn-data">Le grand gagnant !</p>
           <p className="pn-display mt-2 text-3xl">{props.winner.name}</p>
         </div>
       </div>
       <div className="flex flex-col p-6 md:p-10">
         <p className="pn-data mb-6">
           {direct
-            ? `Je viens · ${pad2(coming)} / ${pad2(props.evening.participants.length)}`
-            : `Bulletins déposés · ${pad2(props.evening.participants.length)} / ${pad2(props.evening.participants.length)}`}
+            ? `Présents · ${pad2(coming)} / ${pad2(props.evening.participants.length)}`
+            : `Tous les votes sont tombés ! · ${pad2(props.evening.participants.length)} / ${pad2(props.evening.participants.length)}`}
         </p>
         {direct ? (
           <ul className="mt-8 m-0 list-none border-t border-rule p-0">

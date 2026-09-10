@@ -5,6 +5,8 @@ import { Button } from "../../ui/Button";
 export type OpenEveningListProps = {
   evenings: EveningSummary[];
   onOpen: (id: string) => void;
+  canOrganize?: boolean;
+  onCancel?: (id: string) => void;
 };
 
 export function OpenEveningList(props: OpenEveningListProps) {
@@ -35,9 +37,20 @@ export function OpenEveningList(props: OpenEveningListProps) {
                       ? "Direct"
                       : "Lobby"}
             </span>
-            <Button variant="second" onClick={() => props.onOpen(item.id)}>
-              Ouvrir
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="second" onClick={() => props.onOpen(item.id)}>
+                Ouvrir
+              </Button>
+              {props.canOrganize && props.onCancel ? (
+                <button
+                  type="button"
+                  className="pn-data text-smoke hover:text-veto"
+                  onClick={() => props.onCancel!(item.id)}
+                >
+                  Annuler
+                </button>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>

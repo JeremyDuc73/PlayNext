@@ -1,7 +1,10 @@
 ---
 import "../styles/global.css";
 
-const { title = "PlayNext — Choisir ensemble", description = "PlayNext aide un groupe d’amis à choisir un jeu à partir de leurs bibliothèques." } = Astro.props;
+const {
+  title = "PlayNext — Savoir à quoi jouer",
+  description = "PlayNext aide votre bande d’amis à choisir un jeu sans débat interminable sur Discord.",
+} = Astro.props;
 const pathname = Astro.url.pathname;
 ---
 
@@ -18,7 +21,7 @@ const pathname = Astro.url.pathname;
   <body>
     <div class="site-shell">
       <aside class="rail" aria-hidden="true">
-        <span>CHOISIR ENSEMBLE</span>
+        <span>SAVOIR À QUOI JOUER</span>
       </aside>
       <div class="page">
         <header class="topbar">
@@ -29,9 +32,9 @@ const pathname = Astro.url.pathname;
           <nav class="nav" aria-label="Navigation principale">
             <a href="/" aria-current={pathname === "/" ? "page" : undefined}>Accueil</a>
             <a href="/download" aria-current={pathname === "/download" ? "page" : undefined}>Télécharger</a>
-            <a href="/docs" aria-current={pathname === "/docs" ? "page" : undefined}>Fonctionnement</a>
+            <a href="/docs" aria-current={pathname === "/docs" ? "page" : undefined}>Comment ça marche</a>
           </nav>
-          <span class="top-status">Windows · Application</span>
+          <span class="top-status">Windows · Gratuit & Open Source</span>
         </header>
 
         <main>
@@ -39,10 +42,10 @@ const pathname = Astro.url.pathname;
         </main>
 
         <footer class="footer">
-          <span>PlayNext · Choisir ensemble.</span>
+          <span>PlayNext · Savoir à quoi jouer, sans débat interminable.</span>
           <nav aria-label="Navigation secondaire">
             <a href="/download">Télécharger</a>
-            <a href="/docs">Fonctionnement</a>
+            <a href="/docs">Comment ça marche</a>
             <a href="/legal">Mentions</a>
             <a href="https://github.com/JeremyDuc73/PlayNext">GitHub</a>
           </nav>

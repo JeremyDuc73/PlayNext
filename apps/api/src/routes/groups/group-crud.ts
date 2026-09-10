@@ -29,13 +29,16 @@ export function registerGroupCrudRoutes(
       name: string;
       image_url: string | null;
       owner_id: string;
+      proposal_rule: string | null;
+      proposal_threshold: number | null;
       created_at: Date;
       updated_at: Date;
       my_role: GroupRole;
       member_count: string;
     }>(
       `
-        SELECT g.id, g.name, g.image_url, g.owner_id, g.created_at, g.updated_at,
+        SELECT g.id, g.name, g.image_url, g.owner_id, g.proposal_rule, g.proposal_threshold,
+               g.created_at, g.updated_at,
                mine.role AS my_role,
                COUNT(all_m.user_id)::text AS member_count
         FROM group_members mine
@@ -202,7 +205,9 @@ export function registerGroupCrudRoutes(
       }
       if (
         parsed.data.name === undefined &&
-        parsed.data.imageUrl === undefined
+        parsed.data.imageUrl === undefined &&
+        parsed.data.proposalRule === undefined &&
+        parsed.data.proposalThreshold === undefined
       ) {
         return reply.code(400).send({ ok: false, error: "nothing_to_update" });
       }
@@ -217,22 +222,26 @@ export function registerGroupCrudRoutes(
         parsed.data.imageUrl === undefined
           ? current.image_url
           : normalizeImageUrl(parsed.data.imageUrl);
+      const nextRule = parsed.data.proposalRule ?? current.proposal_rule ?? "unanimous";
+      const nextThreshold = parsed.data.proposalThreshold ?? current.proposal_threshold ?? 3;
 
       const updated = await db.pool.query<{
         id: string;
         name: string;
         image_url: string | null;
         owner_id: string;
+        proposal_rule: string;
+        proposal_threshold: number;
         created_at: Date;
         updated_at: Date;
       }>(
         `
           UPDATE groups
-          SET name = $2, image_url = $3, updated_at = now()
+          SET name = $2, image_url = $3, proposal_rule = $4, proposal_threshold = $5, updated_at = now()
           WHERE id = $1
-          RETURNING id, name, image_url, owner_id, created_at, updated_at
+          RETURNING id, name, image_url, owner_id, proposal_rule, proposal_threshold, created_at, updated_at
         `,
-        [request.params.groupId, nextName, nextImage],
+        [request.params.groupId, nextName, nextImage, nextRule, nextThreshold],
       );
 
       return {

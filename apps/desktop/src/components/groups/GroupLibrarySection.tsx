@@ -7,6 +7,7 @@ import { pad2 } from "../../lib/format";
 import { EmptyHint } from "../../ui/EmptyHint";
 import { GamePoster } from "../../ui/GamePoster";
 import { PosterGrid } from "../../ui/PosterGrid";
+import { useAppStore } from "../../stores/useAppStore";
 
 export type LibraryFilter = "all" | "shared" | "installed";
 
@@ -33,6 +34,7 @@ export function GroupLibrarySection({
   onUnhide,
   busy,
 }: GroupLibrarySectionProps) {
+  const openGameDetails = useAppStore((s) => s.openGameDetails);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -109,13 +111,25 @@ export function GroupLibrarySection({
                   coverUrl={game.coverUrl}
                   priority={index < 24}
                   subtitle={`${pad2(game.ownedCount)}/${pad2(game.memberCount)} · ${game.launcher}`}
+                  onClick={() =>
+                    openGameDetails({
+                      launcher: game.launcher,
+                      externalId: game.externalId,
+                      name: game.name,
+                      coverUrl: game.coverUrl,
+                      owners: game.owners,
+                    })
+                  }
                   footer={
                     mine ? (
                       <button
                         type="button"
                         className="pn-data mt-1 hover:text-paper"
                         disabled={busy}
-                        onClick={() => onHide(game)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onHide(game);
+                        }}
                       >
                         Masquer
                       </button>
@@ -147,14 +161,22 @@ export function GroupLibrarySection({
                   name={game.name}
                   launcher={game.launcher}
                   externalId={game.externalId}
+                  onClick={() =>
+                    openGameDetails({
+                      launcher: game.launcher,
+                      externalId: game.externalId,
+                      name: game.name,
+                    })
+                  }
                   footer={
                     <button
                       type="button"
                       className="pn-data mt-1 hover:text-paper"
                       disabled={busy}
-                      onClick={() =>
-                        void onUnhide(game.launcher, game.externalId)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onUnhide(game.launcher, game.externalId);
+                      }}
                     >
                       Réafficher
                     </button>

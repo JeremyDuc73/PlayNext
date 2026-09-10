@@ -524,3 +524,39 @@ export async function syncEpicLibrary(
     ownedCount: data.ownedCount ?? 0,
   };
 }
+
+export type FullGameDetails = {
+  launcher: string;
+  externalId: string;
+  name: string;
+  summary: string | null;
+  description: string | null;
+  headerUrl: string | null;
+  coverUrl: string | null;
+  steamUrl: string | null;
+  priceLabel: string | null;
+  developers: string[];
+  publishers: string[];
+  releaseDate: string | null;
+  categories: string[];
+  genres: string[];
+  screenshots: string[];
+  groupPlayable: boolean | null;
+};
+
+export async function fetchGameDetails(params: {
+  launcher: string;
+  externalId: string;
+  name?: string | null;
+}): Promise<FullGameDetails | null> {
+  const query = new URLSearchParams({
+    launcher: params.launcher,
+    externalId: params.externalId,
+  });
+  if (params.name) query.set("name", params.name);
+
+  const response = await apiFetch(`/meta/game-details?${query.toString()}`);
+  if (!response.ok) return null;
+  const data = (await response.json()) as { ok: boolean; details: FullGameDetails };
+  return data.details;
+}

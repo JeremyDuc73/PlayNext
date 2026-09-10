@@ -7,53 +7,98 @@ const downloadUrl =
 
 <Base
   title="Télécharger PlayNext — Windows"
-  description="Télécharger PlayNext pour Windows."
+  description="Téléchargez gratuitement PlayNext pour Windows 10 et 11. Connectez vos bibliothèques et choisissez vos jeux entre potes."
 >
   <section class="section">
-    <div class="prose">
-      <p class="eyebrow">Application Windows</p>
+    <div class="prose page-intro">
+      <p class="eyebrow">Application Windows gratuite & open source</p>
       <span class="accent"></span>
       <h1>Installer PlayNext.</h1>
       <p>
-        Téléchargez l’installateur, ouvrez-le, puis connectez-vous avec Discord
-        pour rejoindre ou créer un groupe.
+        Téléchargez l’installateur pour Windows, ouvrez-le, puis connectez-vous avec Discord
+        pour rejoindre ou créer votre premier groupe en quelques secondes.
       </p>
       <div class="actions">
-        <a class="button" href={downloadUrl}>Télécharger l’installateur</a>
+        <a class="button" href={downloadUrl}>Télécharger pour Windows (.exe)</a>
         <a
           class="button secondary"
           href="https://github.com/JeremyDuc73/PlayNext/releases"
         >
-          Voir les versions
+          Voir les versions sur GitHub
         </a>
       </div>
+      <p class="mono" style="margin-top: 18px;">
+        Windows 10 / Windows 11 (64-bit) · ~15 Mo · Sans droits administrateur requis
+      </p>
+    </div>
+  </section>
+
+  <!-- Encart d'aide SmartScreen -->
+  <section class="section">
+    <div class="smartscreen-notice">
+      <div class="smartscreen-header">
+        <div>
+          <span class="smartscreen-badge">Aide à l'installation</span>
+          <h3 style="margin-top: 10px;">Écran bleu de protection Windows ?</h3>
+        </div>
+      </div>
+
+      <p style="color: var(--paper-2); line-height: 1.6; margin: 0; font-size: 15px;">
+        À la première ouverture, Windows peut afficher son écran bleu de protection SmartScreen
+        (<em>« Windows a protégé votre ordinateur »</em>).
+        C'est le <strong>comportement standard</strong> de Windows pour tout logiciel indépendant récemment publié sans certificat d’entreprise payant.
+        L'application est <strong>100% saine, gratuite et open source</strong>.
+      </p>
+
+      <div class="smartscreen-steps">
+        <div class="smartscreen-step">
+          <span class="smartscreen-step-num">ÉTAPE 01</span>
+          <strong>Informations complémentaires</strong>
+          <p>
+            Sur l'écran bleu Windows SmartScreen, cliquez sur le lien texte
+            <em>« Informations complémentaires »</em> situé sous le paragraphe d'avertissement.
+          </p>
+        </div>
+        <div class="smartscreen-step">
+          <span class="smartscreen-step-num">ÉTAPE 02</span>
+          <strong>Exécuter quand même</strong>
+          <p>
+            Le bouton <em>« Exécuter quand même »</em> apparaît alors en bas à droite :
+            cliquez dessus pour lancer l'application en toute sécurité.
+          </p>
+        </div>
+      </div>
+
+      <p class="mono" style="margin: 0; color: var(--smoke);">
+        ✓ À faire une seule fois à l'installation · Les prochaines mises à jour se feront automatiquement en tâche de fond.
+      </p>
     </div>
   </section>
 
   <section class="section">
     <div class="section-heading">
-      <h2>Avant de commencer</h2>
-      <p>Quelques informations utiles, rien de plus.</p>
+      <div>
+        <p class="eyebrow mb-1">Informations</p>
+        <h2>Spécifications & Transparence</h2>
+      </div>
+      <p>Une application légère, respectueuse de vos ressources et de votre machine.</p>
     </div>
     <div class="manifesto">
       <div>
         <strong>Système</strong>
-        <p>Windows 10 ou Windows 11.</p>
+        <p>Compatible Windows 10 et Windows 11 (architecture 64-bit standard).</p>
       </div>
       <div>
-        <strong>Connexion</strong>
-        <p>Une connexion internet est nécessaire pour Discord et la synchronisation.</p>
+        <strong>Installation légère</strong>
+        <p>L’application s'installe directement dans votre dossier utilisateur sans toucher aux fichiers système.</p>
       </div>
       <div>
-        <strong>Installation</strong>
-        <p>L’application s’installe pour votre utilisateur, sans privilèges administrateur.</p>
+        <strong>Connexion Discord</strong>
+        <p>Connexion rapide et sécurisée en un clic pour retrouver vos amis sans créer de nouveau compte.</p>
       </div>
       <div>
-        <strong>Signature</strong>
-        <p>
-          Les versions publiques sont signées avec l’aide de
-          <a href="https://signpath.org/">SignPath Foundation</a>.
-        </p>
+        <strong>Open source & Libre</strong>
+        <p>Code source auditable sous licence MIT, garanti sans publicité, sans mineur ni revente de données.</p>
       </div>
     </div>
   </section>
@@ -62,11 +107,11 @@ const downloadUrl =
     <div class="download-box">
       <div>
         <p class="eyebrow">Projet public</p>
-        <h3>Une question sur une version ?</h3>
-        <p>Consultez les notes de version et les problèmes connus sur GitHub.</p>
+        <h3>Une question ou une idée ?</h3>
+        <p>Consultez les notes de version, posez vos questions ou signalez un bug sur GitHub.</p>
       </div>
       <a class="button secondary" href="https://github.com/JeremyDuc73/PlayNext">
-        Ouvrir GitHub
+        Ouvrir le dépôt GitHub ↗
       </a>
     </div>
   </section>

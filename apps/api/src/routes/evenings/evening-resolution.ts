@@ -463,8 +463,12 @@ export function registerEveningResolutionRoutes(
       if (!(await canOrganize(db, evening, userId))) {
         return reply.code(403).send({ ok: false, error: "forbidden" });
       }
-      if (evening.status === "closed" || evening.status === "cancelled") {
-        return reply.code(400).send({ ok: false, error: "already_finished" });
+      if (evening.status === "cancelled") {
+        return reply.code(400).send({
+          ok: false,
+          error: "already_cancelled",
+          message: "Soirée déjà annulée.",
+        });
       }
 
       const updated = await db.pool.query<EveningRow>(

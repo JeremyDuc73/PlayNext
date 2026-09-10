@@ -224,7 +224,7 @@ Doc : `docs/EVENINGS.md`
 - [x] Création proposition (recherche Store Steam, prix EUR, Store)
 - [ ] Nombre min de joueurs si ciblage partiel
 - [x] Réponses : Chaud / Non (tout le groupe)
-- [ ] Validation (défaut unanimité ciblés) + **réglage de groupe alternatif** (quorum / majorité) pour éviter blocages
+- [x] Validation (défaut unanimité) + **réglage de groupe alternatif** (quorum / majorité / seuil fixe de potes chauds) pour éviter blocages
 - [ ] Prix indicatifs (IsThereAnyDeal ou équivalent) : boutique, région, date, lien ; jamais d’achat intégré
 - [x] Prix Store Steam si dispo, sinon « — » ; lien Store
 - [ ] Notif baisse de prix opt-in
@@ -248,8 +248,8 @@ Doc : `docs/EVENINGS.md`
 ### UX écrans restants
 
 - [~] Accueil (groupes, trouver un jeu, dernière soirée, sync, propositions)
-
 - [x] Bibliothèque personnelle
+- [x] Fiche détaillée de jeu en français (Store Steam FR, captures HD, modes multi/coop, développeurs, possesseurs du groupe)
 - [x] Propositions d’achat — Steam, groupe, Store Discord
 - [ ] Paramètres (Discord, scan, auto-start, confidentialité, notifs, MAJ)
 - [ ] Mode compact + mode présentation grand écran

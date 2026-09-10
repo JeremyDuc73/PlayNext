@@ -2,6 +2,8 @@ import { apiFetch } from "./api";
 
 export type GroupRole = "owner" | "admin" | "member";
 
+export type ProposalApprovalRule = "unanimous" | "majority" | "count";
+
 export type GroupSummary = {
   id: string;
   name: string;
@@ -9,6 +11,8 @@ export type GroupSummary = {
   ownerId: string;
   memberCount?: number;
   myRole?: GroupRole;
+  proposalRule?: ProposalApprovalRule;
+  proposalThreshold?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -126,9 +130,21 @@ export async function renameGroup(
   groupId: string,
   name: string,
 ): Promise<GroupSummary> {
+  return updateGroupSettings(groupId, { name });
+}
+
+export async function updateGroupSettings(
+  groupId: string,
+  input: {
+    name?: string;
+    imageUrl?: string | null;
+    proposalRule?: ProposalApprovalRule;
+    proposalThreshold?: number;
+  },
+): Promise<GroupSummary> {
   const response = await apiFetch(`/groups/${groupId}`, {
     method: "PATCH",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
   if (!response.ok) throw new Error(await readError(response));
   const data = (await response.json()) as {

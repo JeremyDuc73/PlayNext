@@ -36,6 +36,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EmptyHint } from "../ui/EmptyHint";
 import { GamePoster } from "../ui/GamePoster";
 import { PosterGrid } from "../ui/PosterGrid";
+import { useAppStore } from "../stores/useAppStore";
 
 type Props = {
   enabled: boolean;
@@ -59,6 +60,7 @@ export function LibraryHub({
   epicLinkedSignal = 0,
   onBanner,
 }: Props) {
+  const openGameDetails = useAppStore((s) => s.openGameDetails);
   const isDesktop = runningInDesktopShell();
   const [games, setGames] = useState<LibraryGame[]>([]);
   const [hiddenGames, setHiddenGames] = useState<HiddenLibraryGame[]>([]);
@@ -626,6 +628,14 @@ export function LibraryHub({
                   subtitle={`${game.launcher}${
                     game.installed ? " · installé" : ""
                   }`}
+                  onClick={() =>
+                    openGameDetails({
+                      launcher: game.launcher,
+                      externalId: game.externalId,
+                      name: game.name,
+                      coverUrl: meta?.coverUrl ?? game.coverUrl,
+                    })
+                  }
                   footer={
                     <button
                       type="button"
@@ -635,11 +645,14 @@ export function LibraryHub({
                           : "pn-data mt-1 hover:text-paper"
                       }
                       disabled={Boolean(busy)}
-                      onClick={() =>
-                        game.launcher === "manual"
-                          ? setManualDeleteTarget(game)
-                          : void onHideGame(game)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (game.launcher === "manual") {
+                          setManualDeleteTarget(game);
+                        } else {
+                          void onHideGame(game);
+                        }
+                      }}
                     >
                       {game.launcher === "manual" ? "Supprimer" : "Masquer"}
                     </button>
@@ -665,12 +678,23 @@ export function LibraryHub({
                   externalId={game.externalId}
                   coverUrl={game.coverUrl}
                   subtitle={game.launcher}
+                  onClick={() =>
+                    openGameDetails({
+                      launcher: game.launcher,
+                      externalId: game.externalId,
+                      name: game.name,
+                      coverUrl: game.coverUrl,
+                    })
+                  }
                   footer={
                     <button
                       type="button"
                       className="pn-data mt-1 hover:text-paper"
                       disabled={Boolean(busy)}
-                      onClick={() => void onUnhideGame(game)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onUnhideGame(game);
+                      }}
                     >
                       Réafficher
                     </button>

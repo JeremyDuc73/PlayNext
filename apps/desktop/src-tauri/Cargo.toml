@@ -1,6 +1,6 @@
 [package]
 name = "playnext"
-version = "0.5.1"
+version = "0.6.0"
 description = "PlayNext desktop app"
 authors = ["PlayNext"]
 edition = "2021"

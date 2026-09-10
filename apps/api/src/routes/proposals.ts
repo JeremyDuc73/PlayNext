@@ -12,9 +12,11 @@ import { getMembership } from "../groups/membership.js";
 import { isManager } from "../groups/roles.js";
 import { steamLibraryPosterUrl, steamStoreUrl } from "../meta/covers.js";
 import {
+  evaluateProposalApproval,
   normalizeProposalReply,
   ownsProposedGame,
   proposalMemberStatus,
+  type ProposalApprovalRule,
   type ProposalReplyValue,
 } from "../proposals/status.js";
 import { fetchSteamCatalogApp } from "../steam/catalog.js";
@@ -120,6 +122,24 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
     return row.global_name?.trim() || row.username;
   }
 
+  async function loadGroupPolicy(groupId: string): Promise<{
+    rule: ProposalApprovalRule;
+    threshold: number;
+  }> {
+    const res = await db.pool.query<{
+      proposal_rule: string | null;
+      proposal_threshold: number | null;
+    }>(
+      `SELECT proposal_rule, proposal_threshold FROM groups WHERE id = $1`,
+      [groupId],
+    );
+    const row = res.rows[0];
+    return {
+      rule: (row?.proposal_rule as ProposalApprovalRule) ?? "unanimous",
+      threshold: row?.proposal_threshold ? Number(row.proposal_threshold) : 3,
+    };
+  }
+
   function serializeProposal(
     proposal: ProposalRow,
     members: MemberRow[],
@@ -127,6 +147,10 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
     replies: Map<string, ProposalReplyValue>,
     viewerId: string,
     viewerRole: "owner" | "admin" | "member",
+    policy: { rule: ProposalApprovalRule; threshold: number } = {
+      rule: "unanimous",
+      threshold: 3,
+    },
   ) {
     const target = {
       launcher: proposal.launcher,
@@ -166,8 +190,14 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
     const pendingCount = people.filter(
       (person) => person.status === "pending",
     ).length;
-    const approved = pendingCount === 0 && noCount === 0 && hotCount > 0;
-    const rejected = pendingCount === 0 && noCount > 0;
+    const approval = evaluateProposalApproval({
+      rule: policy.rule,
+      threshold: policy.threshold,
+      memberCount: people.length,
+      hotCount,
+      noCount,
+      pendingCount,
+    });
 
     const viewer = people.find((person) => person.userId === viewerId);
     const iOwn = Boolean(viewer?.owns);
@@ -191,15 +221,18 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       pendingCount,
       hotCount,
       noCount,
-      approved,
-      rejected,
+      approved: approval.approved,
+      rejected: approval.rejected,
+      proposalRule: approval.rule,
+      proposalThreshold: policy.threshold,
+      targetHotCount: approval.targetHotCount,
       iOwn,
       myReply,
       canReply: proposal.status === "open",
       canCreateEvening:
         proposal.status === "open" &&
-        approved &&
-        proposal.created_by === viewerId,
+        approval.approved &&
+        (proposal.created_by === viewerId || isManager(viewerRole)),
       canClose:
         proposal.status === "open" &&
         (proposal.created_by === viewerId || isManager(viewerRole)),
@@ -254,10 +287,11 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         `,
         [request.params.groupId],
       );
-      const [members, owned, replies] = await Promise.all([
+      const [members, owned, replies, policy] = await Promise.all([
         loadMembers(request.params.groupId),
         loadOwnedGames(request.params.groupId),
         loadReplies(proposals.rows.map((row) => row.id)),
+        loadGroupPolicy(request.params.groupId),
       ]);
 
       return {
@@ -270,6 +304,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
             replies.get(row.id) ?? new Map(),
             userId,
             membership.role,
+            policy,
           ),
         ),
       };
@@ -312,9 +347,10 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       const steamUrl = steamStoreUrl(game.appId) ?? game.steamUrl;
       const coverUrl = game.coverUrl || steamLibraryPosterUrl(game.appId);
 
-      const [members, owned] = await Promise.all([
+      const [members, owned, policy] = await Promise.all([
         loadMembers(request.params.groupId),
         loadOwnedGames(request.params.groupId),
+        loadGroupPolicy(request.params.groupId),
       ]);
       const target = {
         launcher: "steam" as const,
@@ -361,6 +397,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
           new Map(),
           userId,
           membership.role,
+          policy,
         );
         const proposer = members.find((m) => m.user_id === userId);
         const proposerName = proposer ? displayName(proposer) : null;
@@ -435,16 +472,23 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         });
       }
 
-      const [members, owned] = await Promise.all([
+      const [members, owned, policy] = await Promise.all([
         loadMembers(request.params.groupId),
         loadOwnedGames(request.params.groupId),
+        loadGroupPolicy(request.params.groupId),
       ]);
 
       const prevReplies = await loadReplies([proposal.id]);
       const prevRepliesMap = prevReplies.get(proposal.id) ?? new Map();
-      const prevWasApproved =
-        members.length > 0 &&
-        members.every((m) => prevRepliesMap.get(m.user_id) === "hot");
+      const prevApproval = evaluateProposalApproval({
+        rule: policy.rule,
+        threshold: policy.threshold,
+        memberCount: members.length,
+        hotCount: [...prevRepliesMap.values()].filter((v) => v === "hot").length,
+        noCount: [...prevRepliesMap.values()].filter((v) => v === "no").length,
+        pendingCount: members.length - prevRepliesMap.size,
+      });
+      const prevWasApproved = prevApproval.approved;
 
       await db.pool.query(
         `
@@ -464,6 +508,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         replies.get(proposal.id) ?? new Map(),
         userId,
         membership.role,
+        policy,
       );
 
       if (view.approved && !prevWasApproved) {
@@ -473,6 +518,8 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
           steamUrl: proposal.steam_url,
           priceLabel: proposal.price_label,
           memberCount: members.length,
+          hotCount: view.hotCount,
+          targetHotCount: view.targetHotCount,
           coverUrl: proposal.cover_url,
         }).catch((err) => {
           request.log.warn({ err }, "discord_proposal_approved_notify_failed");

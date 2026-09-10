@@ -100,6 +100,7 @@ export function EveningPanel({
   const [when, setWhen] = useState<EveningWhenValue>(defaultEveningWhen);
   const [directGame, setDirectGame] = useState<DirectEveningDraft | null>(null);
   const [skipUnreadyOpen, setSkipUnreadyOpen] = useState(false);
+  const [cancelEveningId, setCancelEveningId] = useState<string | null>(null);
   const [historyConfirm, setHistoryConfirm] = useState<"all" | string | null>(
     null,
   );
@@ -456,6 +457,26 @@ export function EveningPanel({
     }
   }
 
+  async function onCancelEveningAction(id: string) {
+    setBusy(true);
+    try {
+      await cancelEvening(id);
+      await refreshHistory();
+      setCancelEveningId(null);
+      if (evening?.id === id) {
+        eveningRef.current = null;
+        setEvening(null);
+      }
+      onBanner("Soirée annulée.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Annulation impossible.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onReady() {
     if (!evening) return;
     setBusy(true);
@@ -596,6 +617,8 @@ export function EveningPanel({
               <OpenEveningList
                 evenings={openList}
                 onOpen={(id) => void loadEvening(id)}
+                canOrganize={canOrganize || isOwner}
+                onCancel={(id) => setCancelEveningId(id)}
               />
             ) : (
               <EmptyHint
@@ -655,7 +678,11 @@ export function EveningPanel({
             void cancelEvening(evening.id)
               .then((next) => applyEvening(next))
               .then(() => refreshHistory())
-              .then(() => onBanner("Annulée."))
+              .then(() => {
+                eveningRef.current = null;
+                setEvening(null);
+                onBanner("Soirée annulée.");
+              })
               .catch((e: Error) => onBanner(e.message))
           }
         />
@@ -671,7 +698,11 @@ export function EveningPanel({
             void cancelEvening(evening.id)
               .then((next) => applyEvening(next))
               .then(() => refreshHistory())
-              .then(() => onBanner("Annulée."))
+              .then(() => {
+                eveningRef.current = null;
+                setEvening(null);
+                onBanner("Soirée annulée.");
+              })
               .catch((e: Error) => onBanner(e.message))
           }
         />
@@ -712,12 +743,31 @@ export function EveningPanel({
             void cancelEvening(evening.id)
               .then((next) => applyEvening(next))
               .then(() => refreshHistory())
-              .then(() => onBanner("Annulée."))
+              .then(() => {
+                eveningRef.current = null;
+                setEvening(null);
+                onBanner("Soirée annulée.");
+              })
               .catch((e: Error) => onBanner(e.message))
           }
         />
       ) : null}
     </div>
+    {cancelEveningId ? (
+      <ConfirmDialog
+        title="Annuler la soirée ?"
+        confirmLabel="Annuler la soirée"
+        confirmVariant="veto"
+        busy={busy}
+        busyLabel="Annulation…"
+        onConfirm={() => void onCancelEveningAction(cancelEveningId)}
+        onCancel={() => {
+          if (!busy) setCancelEveningId(null);
+        }}
+      >
+        La soirée sera annulée et retirée de la liste des soirées prévues.
+      </ConfirmDialog>
+    ) : null}
     {skipUnreadyOpen && evening ? (
       <ConfirmDialog
         title="Lancer sans eux"

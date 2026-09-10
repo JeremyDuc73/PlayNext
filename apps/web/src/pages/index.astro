@@ -6,24 +6,25 @@ const downloadUrl =
 ---
 
 <Base
-  title="PlayNext — Choisir ensemble"
-  description="PlayNext aide un groupe d’amis à choisir un jeu à partir de leurs bibliothèques."
+  title="PlayNext — Savoir enfin à quoi jouer"
+  description="Finie la galère du choix sur Discord. PlayNext rassemble vos jeux Steam, Xbox, Epic et Riot, trouve vos jeux en commun et organise le vote."
 >
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">Application Windows pour groupes</p>
+      <p class="eyebrow">Application Windows pour jouer entre potes</p>
       <span class="accent"></span>
       <h1>Choisir un jeu sans y passer la soirée.</h1>
       <p>
-        PlayNext rassemble les jeux de vos amis, propose les titres possibles et
-        organise le vote. Vous voyez ce qui est jouable avant de devoir choisir.
+        Finie la galère du choix sur Discord. PlayNext rassemble vos jeux Steam, Xbox,
+        Epic et Riot, trouve ce que vous avez tous en commun et organise un vote rapide
+        et secret pour savoir enfin à quoi jouer.
       </p>
       <div class="actions">
         <a class="button" href={downloadUrl}>Télécharger l’application</a>
-        <a class="button secondary" href="/docs">Voir le fonctionnement</a>
+        <a class="button secondary" href="/docs">Comment ça marche</a>
       </div>
-      <p class="mono">
-        Windows 10/11 · Connexion Discord · Installation par utilisateur
+      <p class="mono" style="margin-top: 24px;">
+        Windows 10/11 · Connexion Discord · Détection locale sécurisée
       </p>
     </div>
     <div class="hero-mark" aria-label="Logo PlayNext">
@@ -33,52 +34,58 @@ const downloadUrl =
 
   <section class="section">
     <div class="section-heading">
-      <h2>Trois étapes</h2>
+      <div>
+        <p class="eyebrow mb-1">Simplicité</p>
+        <h2>Comment ça marche</h2>
+      </div>
       <p>
-        Le groupe garde les informations utiles. La décision se fait dans
-        l’application, pas dans un fil de discussion interminable.
+        La décision se prend en direct dans l’application, sans débat interminable
+        dans les salons vocaux.
       </p>
     </div>
     <div class="steps">
       <article class="step">
         <span class="step-number">01</span>
         <h3>Connecter</h3>
-        <p>Chaque joueur relie son compte et synchronise ses bibliothèques.</p>
+        <p>Chacun installe l’application et synchronise ses jeux Steam, Xbox, Epic ou Riot en deux secondes.</p>
       </article>
       <article class="step">
         <span class="step-number">02</span>
-        <h3>Proposer</h3>
-        <p>Les jeux accessibles au groupe apparaissent. Chacun choisit ses candidats.</p>
+        <h3>Choisir</h3>
+        <p>Vos jeux en commun apparaissent direct. Chacun pioche discrètement ses favoris du soir.</p>
       </article>
       <article class="step">
         <span class="step-number">03</span>
         <h3>Voter</h3>
-        <p>Les bulletins restent secrets, puis le résultat désigne le jeu à lancer.</p>
+        <p>Votez tous en même temps (Chaud / Pourquoi pas / Pass). Le jeu gagnant est proclamé direct !</p>
       </article>
     </div>
   </section>
 
   <section class="section">
     <div class="section-heading">
-      <h2>Pas de choix à l’aveugle</h2>
-      <p>PlayNext répond aux questions qui bloquent habituellement le groupe.</p>
+      <div>
+        <p class="eyebrow mb-1">Efficacité</p>
+        <h2>Pas de choix à l’aveugle</h2>
+      </div>
+      <p>PlayNext règle toutes les questions qui bloquent habituellement le lancement d'une session.</p>
     </div>
     <div class="manifesto">
       <div>
         <strong>Qui peut jouer ?</strong>
-        <p>Les bibliothèques croisées écartent les jeux que personne ne possède.</p>
+        <p>Les bibliothèques croisées écartent automatiquement les jeux que tout le monde ne possède pas.</p>
       </div>
       <div>
         <strong>Qui l’a installé ?</strong>
-        <p>Vous distinguez un jeu prêt à lancer d’un jeu à télécharger.</p>
+        <p>Vous distinguez en un clin d’œil les jeux déjà installés de ceux qui demandent un téléchargement.</p>
       </div>
       <div>
-        <strong>Que vote chacun ?</strong>
-        <p>La progression est visible, mais les bulletins individuels restent privés.</p>
+        <strong>Le joker veto</strong>
+        <p>Un jeu te sort par les yeux ? Pose ton joker veto : le titre est dégagé direct de la soirée.</p>
       </div>
       <div>
-        <strong>Que lance-t-on ?</strong>
-        <p>Le résultat affiche un choix clair au lieu de relancer le débat.</p>
+        <strong>Départage automatique</strong>
+        <p>En cas d'égalité parfaite entre vos jeux préférés, la roulette tranche pour éviter tout blocage.</p>
       </div>
     </div>
   </section>
@@ -86,11 +93,13 @@ const downloadUrl =
   <section class="section">
     <div class="download-box">
       <div>
-        <p class="eyebrow">Pour commencer</p>
-        <h3>Installez, invitez, choisissez.</h3>
-        <p>Téléchargez l’application, connectez Discord et créez votre groupe.</p>
+        <p class="eyebrow">Prêt pour ce soir ?</p>
+        <h3>Installez, invitez, jouez.</h3>
+        <p>Téléchargez gratuitement l’application, connectez votre compte Discord et invitez votre bande en un clic.</p>
       </div>
-      <a class="button" href={downloadUrl}>Télécharger pour Windows</a>
+      <div class="actions" style="margin: 0;">
+        <a class="button" href={downloadUrl}>Télécharger pour Windows</a>
+      </div>
     </div>
   </section>
 </Base>

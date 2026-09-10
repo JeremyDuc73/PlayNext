@@ -7,6 +7,7 @@ import { GroupsPanel } from "./components/GroupsPanel";
 import { LibraryHub } from "./components/LibraryHub";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { OnboardingModal } from "./components/OnboardingModal";
+import { GameDetailsModal } from "./components/GameDetailsModal";
 import {
   exchangeHandoff,
   fetchMe,
@@ -216,7 +217,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.5.1",
+            version: "0.6.0",
             platform: "web-preview",
           });
         }
@@ -568,6 +569,7 @@ export default function App() {
         isOpen={onboardingOpen}
         onClose={handleCloseOnboarding}
       />
+      <GameDetailsModal />
     </div>
   );
 }

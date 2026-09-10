@@ -5,7 +5,7 @@
   "description": "PlayNext public website and Windows download page",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
     "preview": "astro preview",
     "typecheck": "astro check"
   },

@@ -2,24 +2,49 @@
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Mentions — PlayNext">
+<Base title="Mentions légales & Confidentialité — PlayNext">
   <section class="section">
-    <div class="prose">
-      <p class="eyebrow">Informations</p>
+    <div class="prose page-intro">
+      <p class="eyebrow">Informations légales</p>
       <span class="accent"></span>
-      <h1>Mentions.</h1>
-      <h3>Projet</h3>
-      <p>PlayNext est un projet personnel en cours de développement.</p>
-      <h3>Services externes</h3>
+      <h1>Mentions & Données.</h1>
+
+      <h3>Projet Open Source</h3>
       <p>
-        PlayNext peut utiliser Discord, Steam, Microsoft/Xbox, Epic et des
-        services de catalogue selon les fonctionnalités activées.
+        PlayNext est une application open source développée sous licence <strong>MIT</strong>.
+        Le code source complet, les versions et le suivi du projet sont consultables publiquement sur
+        <a href="https://github.com/JeremyDuc73/PlayNext">GitHub</a>.
       </p>
-      <h3>Données</h3>
+
+      <h3>Respect de la vie privée</h3>
       <p>
-        Consulte la documentation de l’application pour connaître les données
-        locales et les données synchronisées avec le serveur.
+        PlayNext adopte une architecture <em>local-first</em> :
       </p>
+      <ul>
+        <li>
+          <strong>Vos fichiers locaux restent chez vous :</strong> lors du scan de vos jeux installés sur votre PC,
+          aucun chemin de dossier, nom d'utilisateur Windows ou fichier de disque n'est envoyé au serveur.
+          Seuls les identifiants publics des jeux (AppID) sont synchronisés pour le calcul des jeux en commun.
+        </li>
+        <li>
+          <strong>Votes confidentiels :</strong> vos sélections et vos bulletins de vote restent strictement privés
+          jusqu’à la fin du dépouillement. Seul le résultat final agrégé est communiqué au groupe.
+        </li>
+      </ul>
+
+      <h3>Services tiers</h3>
+      <p>
+        Selon les autorisations accordées par l'utilisateur, PlayNext interagit avec :
+      </p>
+      <ul>
+        <li><strong>Discord</strong> : authentification OAuth2 sécurisée et envoi facultatif de notifications de soirées sur le salon de votre serveur.</li>
+        <li><strong>Steam Store & Web API</strong> : récupération des métadonnées publiques de jeux, prix en euros et jaquettes en haute définition.</li>
+        <li><strong>Microsoft / Xbox, Epic Games & Riot Games</strong> : détection locale ou liaison de vos licences pour croiser vos bibliothèques.</li>
+      </ul>
+
+      <div class="actions" style="margin-top: 36px;">
+        <a class="button secondary" href="/">← Retour à l’accueil</a>
+      </div>
     </div>
   </section>
 </Base>

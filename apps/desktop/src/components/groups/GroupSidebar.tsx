@@ -18,6 +18,7 @@ export type GroupSidebarProps = {
   onCreate: () => void;
   onJoin: () => void;
   onCancelComposer: () => void;
+  showActions?: boolean;
 };
 
 export function GroupSidebar({
@@ -36,31 +37,34 @@ export function GroupSidebar({
   onCreate,
   onJoin,
   onCancelComposer,
+  showActions = true,
 }: GroupSidebarProps) {
   return (
     <aside className="flex flex-col border-b border-rule-strong lg:border-b-0 lg:border-r">
-      <div className="flex items-center justify-between border-b border-rule-strong px-4 py-3">
+      <div className="flex h-14 items-center justify-between border-b border-rule-strong px-4">
         <p className="pn-data">Groupes</p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center border border-paper-2 font-data text-sm leading-none text-paper hover:border-paper hover:bg-ink-raise"
-            aria-label="Créer un groupe"
-            onClick={() => onToggleComposer("create")}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-8 items-center justify-center border border-paper-2 px-2.5 font-data text-[11px] font-medium uppercase tracking-[0.14em] text-paper hover:border-paper hover:bg-ink-raise"
-            onClick={() => onToggleComposer("join")}
-          >
-            Code
-          </button>
-        </div>
+        {showActions ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center border border-paper-2 font-data text-sm leading-none text-paper hover:border-paper hover:bg-ink-raise"
+              aria-label="Créer un groupe"
+              onClick={() => onToggleComposer("create")}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center justify-center border border-paper-2 px-2.5 font-data text-[11px] font-medium uppercase tracking-[0.14em] text-paper hover:border-paper hover:bg-ink-raise"
+              onClick={() => onToggleComposer("join")}
+            >
+              Code
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {composer !== "idle" ? (
+      {showActions && composer !== "idle" ? (
         <div className="grid gap-2 border-b border-rule-strong p-3">
           <input
             className="border border-rule-strong bg-ink-deep px-3 py-2 font-data text-[11px] tracking-[0.1em] uppercase outline-none focus:border-paper"

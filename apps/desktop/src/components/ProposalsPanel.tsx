@@ -9,6 +9,7 @@ import { Button } from "../ui/Button";
 import { GamePoster } from "../ui/GamePoster";
 import { ProposalBallot } from "../ui/ProposalBallot";
 import { SquareAvatar } from "../ui/SquareAvatar";
+import { useAppStore } from "../stores/useAppStore";
 
 type Props = {
   proposals: GameProposal[];
@@ -25,6 +26,7 @@ export function ProposalsPanel({
   onClose,
   onCreateEvening,
 }: Props) {
+  const openGameDetails = useAppStore((s) => s.openGameDetails);
   if (proposals.length === 0) return null;
 
   return (
@@ -46,14 +48,33 @@ export function ProposalsPanel({
                 externalId={proposal.externalId}
                 coverUrl={proposal.coverUrl}
                 subtitle="Steam"
+                onClick={() =>
+                  openGameDetails({
+                    launcher: proposal.launcher,
+                    externalId: proposal.externalId,
+                    name: proposal.name,
+                    coverUrl: proposal.coverUrl,
+                  })
+                }
               />
               <div className="min-w-0 flex flex-col justify-between gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-ui text-base font-bold uppercase tracking-[0.08em] text-paper">
+                      <button
+                        type="button"
+                        className="text-left font-ui text-base font-bold uppercase tracking-[0.08em] text-paper hover:underline"
+                        onClick={() =>
+                          openGameDetails({
+                            launcher: proposal.launcher,
+                            externalId: proposal.externalId,
+                            name: proposal.name,
+                            coverUrl: proposal.coverUrl,
+                          })
+                        }
+                      >
                         {proposal.name}
-                      </h4>
+                      </button>
                       <button
                         type="button"
                         className="pn-data text-smoke hover:text-paper"
@@ -77,6 +98,25 @@ export function ProposalsPanel({
                         <> · {pad2(proposal.pendingCount)} en attente</>
                       ) : null}
                     </p>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="pn-stamp text-[10px]">
+                        {proposal.proposalRule === "count"
+                          ? `Objectif : ${pad2(proposal.targetHotCount ?? 3)} chauds`
+                          : proposal.proposalRule === "majority"
+                            ? `Objectif : Majorité (${pad2(proposal.targetHotCount ?? 2)} chauds)`
+                            : "Objectif : Unanimité"}
+                      </span>
+                      {proposal.approved ? (
+                        <span className="font-data text-xs font-bold text-paper">
+                          ✓ Objectif atteint !
+                        </span>
+                      ) : proposal.rejected ? (
+                        <span className="font-data text-xs text-veto">
+                          ✕ Non retenu
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
@@ -89,7 +129,7 @@ export function ProposalsPanel({
                         Créer une soirée
                       </Button>
                     ) : proposal.approved ? (
-                      <span className="pn-stamp">Validé</span>
+                      <span className="pn-stamp border-paper text-paper bg-transparent">Validé</span>
                     ) : proposal.rejected ? (
                       <span className="pn-data text-veto">Non retenu</span>
                     ) : null}

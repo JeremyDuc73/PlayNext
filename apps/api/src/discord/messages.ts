@@ -53,6 +53,8 @@ export type DiscordNotice =
       steamUrl: string;
       priceLabel?: string | null;
       memberCount: number;
+      hotCount?: number;
+      targetHotCount?: number;
       coverUrl?: string | null;
     };
 
@@ -477,12 +479,14 @@ export function buildDiscordMessage(
         },
         {
           name: "Sondage",
-          value: `\`${pad2(notice.memberCount)} / ${pad2(notice.memberCount)}\` Chauds ✅`,
+          value: notice.targetHotCount
+            ? `\`${pad2(notice.hotCount ?? notice.targetHotCount)} / ${pad2(notice.targetHotCount)}\` Chauds ✅`
+            : `\`${pad2(notice.memberCount)} / ${pad2(notice.memberCount)}\` Chauds ✅`,
           inline: true,
         },
         {
           name: "Prêt pour la partie",
-          value: "Tout le monde est d'accord ! Vous pouvez lancer la soirée directe en un clic dans PlayNext.",
+          value: "L'objectif de votes est atteint ! Vous pouvez lancer la soirée directe en un clic dans PlayNext.",
           inline: false,
         },
       ],

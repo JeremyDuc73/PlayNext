@@ -31,6 +31,9 @@ export type GameProposal = {
   noCount?: number;
   approved?: boolean;
   rejected?: boolean;
+  proposalRule?: "unanimous" | "majority" | "count";
+  proposalThreshold?: number;
+  targetHotCount?: number;
   iOwn: boolean;
   myReply: ProposalReplyValue | null;
   canReply: boolean;

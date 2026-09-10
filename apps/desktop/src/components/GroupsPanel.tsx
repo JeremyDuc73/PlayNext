@@ -29,6 +29,7 @@ import {
   transferOwnership,
   unhideGameFromGroup,
   unlinkGroupDiscord,
+  updateGroupSettings,
   fetchGroupDiscord,
   type GroupDiscord,
   type GroupInvite,
@@ -36,6 +37,7 @@ import {
   type GroupMember,
   type GroupSummary,
   type HiddenGroupGame,
+  type ProposalApprovalRule,
 } from "../lib/groups";
 import {
   closeProposal,
@@ -306,6 +308,31 @@ export function GroupsPanel({
     }
   }
 
+  async function onUpdateProposalRule(
+    rule: ProposalApprovalRule,
+    threshold: number,
+  ) {
+    if (!selectedId || !detail) return;
+    setBusy(true);
+    try {
+      const group = await updateGroupSettings(selectedId, {
+        proposalRule: rule,
+        proposalThreshold: threshold,
+      });
+      setDetail({ ...detail, group });
+      await refreshList();
+      const updatedProposals = await listProposals(selectedId);
+      setProposals(updatedProposals);
+      onBanner("Règle de vote mise à jour.");
+    } catch (error) {
+      onBanner(
+        error instanceof Error ? error.message : "Mise à jour échouée.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const activeInvite = invites.find(
     (inv) =>
       inv.active !== false &&
@@ -560,7 +587,8 @@ export function GroupsPanel({
         sharedCount={sharedCount}
         loading={loading}
         busy={busy}
-        composer={composer}
+        showActions={focus === "group"}
+        composer={focus === "group" ? composer : "idle"}
         onToggleComposer={(mode) =>
           setComposer((c) => (c === mode ? "idle" : mode))
         }
@@ -765,6 +793,11 @@ export function GroupsPanel({
                 onCreateInvite={() => void onOpenInviteModal()}
                 lastInviteLink={lastInviteLink}
                 onRevokeInvite={(inviteId) => void onRevokeInvite(inviteId)}
+                proposalRule={detail.group.proposalRule}
+                proposalThreshold={detail.group.proposalThreshold}
+                onUpdateProposalRule={(rule, threshold) =>
+                  void onUpdateProposalRule(rule, threshold)
+                }
                 onLeave={() => void onLeave()}
                 onDelete={() => void onDelete()}
                 busy={busy}

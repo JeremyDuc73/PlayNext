@@ -15,6 +15,21 @@ export function sanitizeNotificationMessage(message: string): string {
   return clean;
 }
 
+export type GameOwnerInfo = {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  installed: boolean;
+};
+
+export type GameDetailsTarget = {
+  launcher: string;
+  externalId: string;
+  name: string;
+  coverUrl?: string | null;
+  owners?: GameOwnerInfo[];
+};
+
 export type AppState = {
   nav: NavId;
   setNav: (nav: NavId | ((prev: NavId) => NavId)) => void;
@@ -41,6 +56,10 @@ export type AppState = {
   setOnboardingOpen: (open: boolean) => void;
   openOnboarding: () => void;
   closeOnboarding: () => void;
+
+  targetGameDetails: GameDetailsTarget | null;
+  openGameDetails: (target: GameDetailsTarget) => void;
+  closeGameDetails: () => void;
 
   banner: string | null;
   setBanner: (message: string | null) => void;
@@ -82,6 +101,10 @@ export const useAppStore = create<AppState>((set) => ({
   setOnboardingOpen: (onboardingOpen) => set({ onboardingOpen }),
   openOnboarding: () => set({ onboardingOpen: true }),
   closeOnboarding: () => set({ onboardingOpen: false }),
+
+  targetGameDetails: null,
+  openGameDetails: (targetGameDetails) => set({ targetGameDetails }),
+  closeGameDetails: () => set({ targetGameDetails: null }),
 
   banner: null,
   setBanner: (banner) => set({ banner }),

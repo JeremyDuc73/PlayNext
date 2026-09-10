@@ -32,6 +32,8 @@ export const createGroupSchema = z.object({
 export const patchGroupSchema = z.object({
   name: z.string().trim().min(1).max(64).optional(),
   imageUrl: imageUrlSchema,
+  proposalRule: z.enum(["unanimous", "majority", "count"]).optional(),
+  proposalThreshold: z.number().int().min(1).max(32).optional(),
 });
 
 export const createInviteSchema = z.object({
@@ -71,12 +73,15 @@ export async function loadGroupSummary(db: Db, groupId: string) {
     name: string;
     image_url: string | null;
     owner_id: string;
+    proposal_rule: string | null;
+    proposal_threshold: number | null;
     created_at: Date;
     updated_at: Date;
     member_count: string;
   }>(
     `
-      SELECT g.id, g.name, g.image_url, g.owner_id, g.created_at, g.updated_at,
+      SELECT g.id, g.name, g.image_url, g.owner_id, g.proposal_rule, g.proposal_threshold,
+             g.created_at, g.updated_at,
              COUNT(m.user_id)::text AS member_count
       FROM groups g
       JOIN group_members m ON m.group_id = g.id
@@ -94,6 +99,8 @@ export function mapGroup(
     name: string;
     image_url: string | null;
     owner_id: string;
+    proposal_rule?: string | null;
+    proposal_threshold?: number | null;
     created_at: Date;
     updated_at: Date;
     member_count?: string;
@@ -107,6 +114,8 @@ export function mapGroup(
     ownerId: row.owner_id,
     memberCount: row.member_count ? Number(row.member_count) : undefined,
     myRole,
+    proposalRule: (row.proposal_rule as "unanimous" | "majority" | "count") ?? "unanimous",
+    proposalThreshold: row.proposal_threshold ? Number(row.proposal_threshold) : 3,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

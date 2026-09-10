@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import {
   type GroupDiscord,
   type GroupInvite,
   type GroupMember,
+  type ProposalApprovalRule,
   roleLabel,
 } from "../../lib/groups";
 import { pad2 } from "../../lib/format";
@@ -29,6 +31,12 @@ export type GroupAdminSectionProps = {
   onCreateInvite?: () => void;
   lastInviteLink?: string | null;
   onRevokeInvite: (inviteId: string) => void;
+  proposalRule?: ProposalApprovalRule;
+  proposalThreshold?: number;
+  onUpdateProposalRule?: (
+    rule: ProposalApprovalRule,
+    threshold: number,
+  ) => void;
   onLeave?: () => void;
   onDelete?: () => void;
   busy: boolean;
@@ -54,10 +62,27 @@ export function GroupAdminSection({
   onCreateInvite,
   lastInviteLink,
   onRevokeInvite,
+  proposalRule = "unanimous",
+  proposalThreshold = 3,
+  onUpdateProposalRule,
   onLeave,
   onDelete,
   busy,
 }: GroupAdminSectionProps) {
+  const [selectedRule, setSelectedRule] = useState<ProposalApprovalRule>(
+    () => proposalRule,
+  );
+  const [selectedThreshold, setSelectedThreshold] = useState<number>(
+    () => proposalThreshold,
+  );
+
+  useEffect(() => {
+    setSelectedRule(proposalRule);
+  }, [proposalRule]);
+
+  useEffect(() => {
+    setSelectedThreshold(proposalThreshold);
+  }, [proposalThreshold]);
   return (
     <div className="grid max-w-4xl gap-8">
       {/* 1. Inviter */}
@@ -204,6 +229,86 @@ export function GroupAdminSection({
             >
               Renommer
             </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {/* 4. Règle de validation des propositions */}
+      {canManage ? (
+        <section className="border border-rule-strong p-5">
+          <p className="pn-data mb-1">Règle de vote</p>
+          <h4 className="font-ui text-base font-bold uppercase tracking-[0.08em] text-paper">
+            Validation des propositions Steam
+          </h4>
+          <p className="pn-data mt-1 text-smoke">
+            Détermine le nombre de votes « Chaud » nécessaires pour valider un achat ou créer une soirée.
+          </p>
+
+          <div className="mt-4 grid gap-3">
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["unanimous", "Unanimité (défaut)"],
+                  ["majority", "Majorité (50%+)"],
+                  ["count", "Seuil fixe de joueurs"],
+                ] as const
+              ).map(([r, label]) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={
+                    selectedRule === r
+                      ? "border border-paper bg-paper px-3 py-2 font-ui text-xs font-bold uppercase tracking-[0.1em] text-ink-deep"
+                      : "border border-rule px-3 py-2 font-ui text-xs uppercase tracking-[0.1em] text-smoke hover:border-paper hover:text-paper"
+                  }
+                  onClick={() => setSelectedRule(r)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {selectedRule === "unanimous" ? (
+              <p className="pn-data text-smoke">
+                Tous les membres du groupe doivent voter et être chauds (aucun vote « Non »).
+              </p>
+            ) : selectedRule === "majority" ? (
+              <p className="pn-data text-smoke">
+                Dès que plus de la moitié des membres ({Math.floor(members.length / 2) + 1} joueurs) votent « Chaud », la proposition est validée.
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="pn-data text-paper">Nombre de potes chauds requis :</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, members.length)}
+                  value={selectedThreshold}
+                  onChange={(e) =>
+                    setSelectedThreshold(
+                      Math.max(1, Math.min(members.length, Number(e.target.value) || 1)),
+                    )
+                  }
+                  className="w-16 border border-rule-strong bg-ink-deep px-3 py-1.5 font-data text-xs text-paper outline-none focus:border-paper text-center"
+                />
+                <span className="pn-data text-smoke">
+                  Dès que {selectedThreshold} joueur{selectedThreshold > 1 ? "s sont chauds" : " est chaud"}, la soirée peut être lancée même si d’autres ont dit non.
+                </span>
+              </div>
+            )}
+
+            {selectedRule !== proposalRule ||
+            (selectedRule === "count" && selectedThreshold !== proposalThreshold) ? (
+              <div className="mt-2">
+                <Button
+                  variant="primary"
+                  disabled={busy}
+                  onClick={() => void onUpdateProposalRule?.(selectedRule, selectedThreshold)}
+                >
+                  Enregistrer la règle
+                </Button>
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}

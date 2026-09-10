@@ -10,6 +10,10 @@ import {
   steamLibraryPosterUrl,
 } from "../meta/covers.js";
 import { fetchSteamCoverAssets } from "../steam/assets.js";
+import {
+  fetchFullGameDetails,
+  type FullGameDetails,
+} from "../steam/catalog.js";
 
 type MetaRoutesOptions = {
   db: Db;
@@ -163,5 +167,74 @@ export const metaRoutes: FastifyPluginAsync<MetaRoutesOptions> = async (
     });
 
     return { ok: true, results };
+  });
+
+  const gameDetailsQuerySchema = z.object({
+    launcher: z.string().min(1).max(32),
+    externalId: z.string().min(1).max(256),
+    name: z.string().max(256).optional(),
+  });
+
+  app.get<{
+    Querystring: { launcher: string; externalId: string; name?: string };
+  }>("/meta/game-details", async (request, reply) => {
+    const userId = await requireUserId(request);
+    if (!userId) {
+      return reply.code(401).send({ ok: false, error: "unauthenticated" });
+    }
+
+    const parsed = gameDetailsQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: "invalid_query" });
+    }
+
+    const { launcher, externalId, name } = parsed.data;
+
+    // 1. Check in database first
+    const cached = await db.pool.query<{
+      details: FullGameDetails | null;
+      name: string;
+      cover_url: string | null;
+    }>(
+      `SELECT details, name, cover_url FROM game_meta WHERE launcher = $1 AND external_id = $2`,
+      [launcher, externalId],
+    );
+    if (cached.rows[0]?.details) {
+      return { ok: true, details: cached.rows[0].details };
+    }
+
+    // 2. Fetch details (with French localization from Steam Store)
+    const details = await fetchFullGameDetails({
+      launcher,
+      externalId,
+      name: name || cached.rows[0]?.name,
+    });
+
+    if (!details) {
+      return reply.code(404).send({ ok: false, error: "details_not_found" });
+    }
+
+    // Keep cached cover if details doesn't have one
+    if (!details.coverUrl && cached.rows[0]?.cover_url) {
+      details.coverUrl = cached.rows[0].cover_url;
+    }
+
+    // 3. Cache in database if rich data is present
+    if (details.summary || details.description || details.screenshots.length > 0) {
+      await db.pool
+        .query(
+          `
+            INSERT INTO game_meta (launcher, external_id, name, details, fetched_at)
+            VALUES ($1, $2, $3, $4, now())
+            ON CONFLICT (launcher, external_id) DO UPDATE SET
+              details = EXCLUDED.details,
+              fetched_at = now()
+          `,
+          [launcher, externalId, details.name, JSON.stringify(details)],
+        )
+        .catch(() => undefined);
+    }
+
+    return { ok: true, details };
   });
 };

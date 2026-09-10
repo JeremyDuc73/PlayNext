@@ -138,6 +138,10 @@ export async function migrate(db: Db): Promise<void> {
       ADD COLUMN IF NOT EXISTS discord_channel_id TEXT;
     ALTER TABLE groups
       ADD COLUMN IF NOT EXISTS discord_channel_name TEXT;
+    ALTER TABLE groups
+      ADD COLUMN IF NOT EXISTS proposal_rule TEXT NOT NULL DEFAULT 'unanimous';
+    ALTER TABLE groups
+      ADD COLUMN IF NOT EXISTS proposal_threshold INTEGER NOT NULL DEFAULT 3;
 
     CREATE TABLE IF NOT EXISTS group_members (
       group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
@@ -331,6 +335,8 @@ export async function migrate(db: Db): Promise<void> {
       ADD COLUMN IF NOT EXISTS group_playable BOOLEAN;
     ALTER TABLE game_meta
       ADD COLUMN IF NOT EXISTS group_playable_source TEXT;
+    ALTER TABLE game_meta
+      ADD COLUMN IF NOT EXISTS details JSONB;
 
     -- Ancien enrichissement : un 429 Store était gravé comme « inconnu ».
     -- Sans source, le classement peut reprendre (lents, un titre à la fois).

@@ -7,6 +7,7 @@ pub struct SteamGameDraft {
     pub name: String,
     pub installed: bool,
     pub launchable: bool,
+    pub last_owner: Option<String>,
 }
 
 /// Find the most recently logged-in SteamID64 from loginusers.vdf.
@@ -107,12 +108,14 @@ pub fn parse_app_manifest(content: &str) -> Result<SteamGameDraft, String> {
     let mut app_id = None;
     let mut name = None;
     let mut state_flags = None;
+    let mut last_owner = None;
 
     for (key, value) in iter_flat_string_pairs(content) {
         match key.to_ascii_lowercase().as_str() {
             "appid" => app_id = Some(value),
             "name" => name = Some(value),
             "stateflags" => state_flags = value.parse::<u32>().ok(),
+            "lastowner" => last_owner = Some(value),
             // installdir intentionally ignored — never leave the machine
             _ => {}
         }
@@ -129,6 +132,7 @@ pub fn parse_app_manifest(content: &str) -> Result<SteamGameDraft, String> {
         name,
         installed,
         launchable: installed,
+        last_owner,
     })
 }
 

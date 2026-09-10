@@ -86,7 +86,10 @@ export function mergeSteamLibrary(
         launchable: local.launchable || local.installed,
       });
     } else {
-      byId.set(local.externalId, { ...local, owned: true });
+      // If authoritative Steam Web API ownedGames was provided, any installed title not in that list
+      // is NOT licensed to this user (e.g. Steam Family sharing from a friend or secondary account).
+      const isOwned = ownedGames.length > 0 ? false : local.owned;
+      byId.set(local.externalId, { ...local, owned: isOwned });
     }
   }
 

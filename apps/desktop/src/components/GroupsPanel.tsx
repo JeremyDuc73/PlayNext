@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { EveningPanel } from "./EveningPanel";
 import { CalendarPanel } from "./CalendarPanel";
 import { ProposalsPanel } from "./ProposalsPanel";
+import { GroupSidebar } from "./groups/GroupSidebar";
+import { GroupAdminSection } from "./groups/GroupAdminSection";
+import { InviteModal } from "./groups/InviteModal";
+import {
+  GroupLibrarySection,
+  type LibraryFilter,
+} from "./groups/GroupLibrarySection";
 import {
   createGroup,
   createInvite,
@@ -18,7 +25,6 @@ import {
   removeMember,
   renameGroup,
   revokeInvite,
-  roleLabel,
   setMemberRole,
   transferOwnership,
   unhideGameFromGroup,
@@ -39,17 +45,13 @@ import {
   type GameProposal,
   type ProposalReplyValue,
 } from "../lib/proposals";
-import { type DirectEveningDraft } from "../lib/evenings";
+import { useAppStore } from "../stores/useAppStore";
 import { pad2 } from "../lib/format";
 import { staggerIn, useGSAP } from "../lib/motion";
-import { openExternalUrl } from "../lib/desktop-auth";
 import { AvatarStack } from "../ui/AvatarStack";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EmptyHint } from "../ui/EmptyHint";
-import { GamePoster } from "../ui/GamePoster";
-import { PosterGrid } from "../ui/PosterGrid";
-import { SquareAvatar } from "../ui/SquareAvatar";
 import { SteamSearch } from "../ui/SteamSearch";
 
 type Props = {
@@ -58,12 +60,10 @@ type Props = {
   currentUserId: string;
   pendingInviteCode: string | null;
   onPendingInviteConsumed: () => void;
-  onBanner: (message: string) => void;
+  onBanner?: (message: string) => void;
   onRequestEvening?: () => void;
   focusGroupId?: string | null;
 };
-
-type LibraryFilter = "all" | "shared" | "installed";
 
 export function GroupsPanel({
   enabled,
@@ -71,13 +71,22 @@ export function GroupsPanel({
   currentUserId,
   pendingInviteCode,
   onPendingInviteConsumed,
-  onBanner,
+  onBanner: onBannerProp,
   onRequestEvening,
   focusGroupId = null,
 }: Props) {
+  const storeOpenEvening = useAppStore((s) => s.openEvening);
+  const storeOpenDirectDraft = useAppStore((s) => s.openDirectDraft);
+  const storeSelectedGroupId = useAppStore((s) => s.selectedGroupId);
+  const setStoreSelectedGroupId = useAppStore((s) => s.setSelectedGroupId);
+  const storeNotify = useAppStore((s) => s.notify);
+  const onBanner = onBannerProp ?? storeNotify;
+
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => storeSelectedGroupId,
+  );
   const [detail, setDetail] = useState<{
     group: GroupSummary;
     members: GroupMember[];
@@ -86,10 +95,6 @@ export function GroupsPanel({
   const [hidden, setHidden] = useState<HiddenGroupGame[]>([]);
   const [proposals, setProposals] = useState<GameProposal[]>([]);
   const [proposeOpen, setProposeOpen] = useState(false);
-  const [directDraft, setDirectDraft] = useState<DirectEveningDraft | null>(
-    null,
-  );
-  const [openEveningId, setOpenEveningId] = useState<string | null>(null);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [newName, setNewName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -97,8 +102,11 @@ export function GroupsPanel({
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [composer, setComposer] = useState<"idle" | "create" | "join">("idle");
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [groupTab, setGroupTab] = useState<"library" | "proposals" | "admin">(
+    "library",
+  );
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [discord, setDiscord] = useState<GroupDiscord | null>(null);
   const [discordChannelInput, setDiscordChannelInput] = useState("");
@@ -120,8 +128,7 @@ export function GroupsPanel({
 
   async function openGroup(groupId: string) {
     setSelectedId(groupId);
-    setOpenEveningId(null);
-    setShowAdmin(false);
+    setStoreSelectedGroupId(groupId);
     setComposer("idle");
     setProposeOpen(false);
     try {
@@ -199,7 +206,7 @@ export function GroupsPanel({
   useEffect(() => {
     const role = detail?.group.myRole;
     const can = role === "owner" || role === "admin";
-    if (!showAdmin || !can || !selectedId) {
+    if (groupTab !== "admin" || !can || !selectedId) {
       setDiscord(null);
       return;
     }
@@ -214,7 +221,7 @@ export function GroupsPanel({
     return () => {
       cancelled = true;
     };
-  }, [showAdmin, selectedId, detail?.group.myRole]);
+  }, [groupTab, selectedId, detail?.group.myRole]);
 
   useEffect(() => {
     if (!enabled || !pendingInviteCode) return;
@@ -299,6 +306,23 @@ export function GroupsPanel({
     }
   }
 
+  const activeInvite = invites.find(
+    (inv) =>
+      inv.active !== false &&
+      !inv.revokedAt &&
+      (!inv.expiresAt || new Date(inv.expiresAt) > new Date()),
+  );
+  const currentInviteCode = activeInvite?.code ?? null;
+  const currentInviteLink = activeInvite?.deepLink ?? lastInviteLink;
+
+  async function onOpenInviteModal() {
+    if (!selectedId) return;
+    setInviteModalOpen(true);
+    if (!activeInvite) {
+      await onCreateInvite();
+    }
+  }
+
   async function onCreateInvite() {
     if (!selectedId) return;
     setBusy(true);
@@ -306,12 +330,7 @@ export function GroupsPanel({
       const invite = await createInvite(selectedId, { expiresInDays: 14 });
       setLastInviteLink(invite.deepLink);
       setInvites((prev) => [invite, ...prev]);
-      try {
-        await navigator.clipboard.writeText(invite.deepLink);
-        onBanner("Lien copié.");
-      } catch {
-        onBanner("Invitation créée.");
-      }
+      setInviteModalOpen(true);
     } catch (error) {
       onBanner(error instanceof Error ? error.message : "Invitation échouée.");
     } finally {
@@ -534,100 +553,25 @@ export function GroupsPanel({
         ref={rootRef}
         className="grid min-h-[70vh] border border-rule-strong lg:grid-cols-[260px_minmax(0,1fr)]"
       >
-      <aside className="border-b border-rule-strong lg:border-b-0 lg:border-r">
-        <div className="flex items-center justify-between border-b border-rule-strong px-4 py-3">
-          <p className="pn-data">Groupes</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center border border-paper-2 font-data text-sm leading-none text-paper hover:border-paper hover:bg-ink-raise"
-              aria-label="Créer un groupe"
-              onClick={() =>
-                setComposer((c) => (c === "create" ? "idle" : "create"))
-              }
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-8 items-center justify-center border border-paper-2 px-2.5 font-data text-[11px] font-medium uppercase tracking-[0.14em] text-paper hover:border-paper hover:bg-ink-raise"
-              onClick={() =>
-                setComposer((c) => (c === "join" ? "idle" : "join"))
-              }
-            >
-              Code
-            </button>
-          </div>
-        </div>
-
-        {composer !== "idle" ? (
-          <div className="grid gap-2 border-b border-rule-strong p-3">
-            <input
-              className="border border-rule-strong bg-ink-deep px-3 py-2 font-data text-[11px] tracking-[0.1em] uppercase outline-none focus:border-paper"
-              placeholder={composer === "create" ? "Nom" : "Code"}
-              value={composer === "create" ? newName : joinCode}
-              autoFocus
-              onChange={(e) =>
-                composer === "create"
-                  ? setNewName(e.target.value)
-                  : setJoinCode(e.target.value)
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter")
-                  void (composer === "create" ? onCreate() : onJoin());
-                if (e.key === "Escape") setComposer("idle");
-              }}
-            />
-            <Button
-              variant="primary"
-              disabled={
-                busy ||
-                !(composer === "create" ? newName.trim() : joinCode.trim())
-              }
-              onClick={() =>
-                void (composer === "create" ? onCreate() : onJoin())
-              }
-            >
-              {composer === "create" ? "Créer" : "Rejoindre"}
-            </Button>
-          </div>
-        ) : null}
-
-        {loading ? (
-          <p className="p-4 pn-data">Chargement…</p>
-        ) : groups.length === 0 ? (
-          <p className="p-4 pn-data">Aucun groupe</p>
-        ) : (
-          <ul className="m-0 list-none p-0">
-            {groups.map((group) => (
-              <li key={group.id} data-channel>
-                <button
-                  type="button"
-                  className={
-                    selectedId === group.id
-                      ? "pn-edge-active w-full cursor-pointer bg-ink-raise px-4 py-3.5 text-left"
-                      : "w-full cursor-pointer px-4 py-3.5 text-left hover:bg-ink-raise"
-                  }
-                  onClick={() => void openGroup(group.id)}
-                >
-                  <strong className="block font-ui text-sm font-bold uppercase tracking-[0.08em]">
-                    {group.name}
-                  </strong>
-                  <span className="pn-data mt-1 block">
-                    {pad2(group.memberCount ?? 0)} joueurs
-                    {group.myRole ? ` · ${roleLabel(group.myRole)}` : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-auto border-t border-rule-strong p-4">
-          <p className="pn-data mb-2">En commun</p>
-          <p className="pn-display text-2xl">{pad2(sharedCount)}</p>
-        </div>
-      </aside>
+      <GroupSidebar
+        groups={groups}
+        selectedId={selectedId}
+        onSelectGroup={(id) => void openGroup(id)}
+        sharedCount={sharedCount}
+        loading={loading}
+        busy={busy}
+        composer={composer}
+        onToggleComposer={(mode) =>
+          setComposer((c) => (c === mode ? "idle" : mode))
+        }
+        newName={newName}
+        onNewNameChange={setNewName}
+        joinCode={joinCode}
+        onJoinCodeChange={setJoinCode}
+        onCreate={() => void onCreate()}
+        onJoin={() => void onJoin()}
+        onCancelComposer={() => setComposer("idle")}
+      />
 
       <div className="min-w-0 p-5 md:p-6">
         {!detail ? (
@@ -641,10 +585,6 @@ export function GroupsPanel({
             canOrganize={canManage}
             isOwner={myRole === "owner"}
             onBanner={onBanner}
-            directDraft={directDraft}
-            onDirectDraftConsumed={() => setDirectDraft(null)}
-            openEveningId={openEveningId}
-            onOpenEveningConsumed={() => setOpenEveningId(null)}
           />
         ) : focus === "calendar" ? (
           <CalendarPanel
@@ -652,7 +592,7 @@ export function GroupsPanel({
             groupName={detail.group.name}
             onBanner={onBanner}
             onOpenEvening={(eveningId) => {
-              setOpenEveningId(eveningId);
+              storeOpenEvening(eveningId);
               onRequestEvening?.();
             }}
           />
@@ -668,397 +608,168 @@ export function GroupsPanel({
                 <div className="mt-3 flex items-center gap-3">
                   <AvatarStack people={detail.members} />
                   <span className="pn-data">
-                    {pad2(detail.members.length)} membres
+                    {pad2(detail.members.length)} membres · {pad2(sharedCount)} en commun
                   </span>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="primary"
-                  disabled={busy}
-                  onClick={() => setProposeOpen((open) => !open)}
-                >
-                  {proposeOpen ? "Fermer" : "Proposer un jeu"}
-                </Button>
+              <div className="flex flex-wrap items-center gap-3">
                 {canManage ? (
                   <Button
-                    variant="second"
+                    variant="primary"
                     disabled={busy}
-                    onClick={() => void onCreateInvite()}
+                    onClick={() => void onOpenInviteModal()}
                   >
                     Inviter
                   </Button>
                 ) : null}
-                <Button
-                  variant="second"
-                  onClick={() => setShowAdmin((v) => !v)}
-                >
-                  {showAdmin ? "Fermer" : "Gérer"}
-                </Button>
-                {myRole === "owner" ? (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => void onDelete()}
-                  >
-                    Supprimer
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => void onLeave()}
-                  >
-                    Quitter
-                  </Button>
-                )}
               </div>
             </header>
 
-            {proposeOpen ? (
-              <div className="grid gap-3 border border-rule-strong p-4">
-                <p className="pn-data">Store Steam</p>
-                <SteamSearch
-                  disabled={busy}
-                  onPick={(hit) => void onConfirmPropose(hit.appId)}
-                />
-              </div>
-            ) : null}
+            <nav className="flex flex-wrap gap-2 border-b border-rule-strong pb-3" aria-label="Sections du groupe">
+              <button
+                type="button"
+                className={
+                  groupTab === "library"
+                    ? "border border-paper bg-paper px-4 py-2 font-ui text-xs font-bold uppercase tracking-[0.14em] text-ink-deep"
+                    : "border border-rule px-4 py-2 font-ui text-xs uppercase tracking-[0.14em] text-smoke hover:border-paper hover:text-paper"
+                }
+                onClick={() => setGroupTab("library")}
+              >
+                Jeux du groupe ({pad2(library.length)})
+              </button>
+              <button
+                type="button"
+                className={
+                  groupTab === "proposals"
+                    ? "border border-paper bg-paper px-4 py-2 font-ui text-xs font-bold uppercase tracking-[0.14em] text-ink-deep"
+                    : "border border-rule px-4 py-2 font-ui text-xs uppercase tracking-[0.14em] text-smoke hover:border-paper hover:text-paper"
+                }
+                onClick={() => setGroupTab("proposals")}
+              >
+                Propositions {proposals.length > 0 ? `(${pad2(proposals.length)})` : ""}
+              </button>
+              <button
+                type="button"
+                className={
+                  groupTab === "admin"
+                    ? "border border-paper bg-paper px-4 py-2 font-ui text-xs font-bold uppercase tracking-[0.14em] text-ink-deep"
+                    : "border border-rule px-4 py-2 font-ui text-xs uppercase tracking-[0.14em] text-smoke hover:border-paper hover:text-paper"
+                }
+                onClick={() => setGroupTab("admin")}
+              >
+                Membres & Salon
+              </button>
+            </nav>
 
-            {lastInviteLink ? (
-              <p className="break-all font-data text-[11px] tracking-[0.08em] text-paper-2">
-                {lastInviteLink}
-              </p>
-            ) : null}
-
-            {showAdmin ? (
-              <div className="grid gap-4 border border-rule-strong p-4">
-                {canManage ? (
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      className="min-w-[200px] flex-1 border border-rule-strong bg-ink-deep px-3 py-2 font-data text-xs uppercase outline-none focus:border-paper"
-                      value={renameValue}
-                      maxLength={64}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                    />
-                    <Button
-                      variant="second"
-                      disabled={busy || !renameValue.trim()}
-                      onClick={() => void onRename()}
-                    >
-                      Valider
-                    </Button>
+            {groupTab === "library" ? (
+              <GroupLibrarySection
+                filter={filter}
+                onFilterChange={setFilter}
+                onRefreshLibrary={() => void refreshLibrary()}
+                visibleLibrary={visibleLibrary}
+                currentUserId={currentUserId}
+                onHide={(game) => void onHide(game)}
+                hidden={hidden}
+                onUnhide={(launcher, externalId) =>
+                  void onUnhide(launcher, externalId)
+                }
+                busy={busy}
+              />
+            ) : groupTab === "proposals" ? (
+              <div className="grid gap-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-rule-strong pb-4">
+                  <div>
+                    <h3 className="pn-display text-2xl">Propositions Steam</h3>
+                    <p className="pn-data mt-1 text-smoke">
+                      Sonde le groupe avant d’acheter un jeu ou de lancer une soirée.
+                    </p>
                   </div>
-                ) : null}
-                {canManage ? (
-                  <div className="border-t border-rule-strong pt-4">
-                    <p className="pn-data mb-2">Discord</p>
-                    <h3 className="pn-display text-2xl">Salon du groupe</h3>
-                    {!discord ? (
-                      <p className="pn-data mt-3">…</p>
-                    ) : !discord.configured ? (
-                      <p className="mt-3 text-sm text-paper-2">
-                        Bot non configuré.
-                      </p>
-                    ) : discord.linked ? (
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                        <p className="pn-data text-paper">
-                          {discord.guildName}
-                          {discord.channelName
-                            ? ` · ${discord.channelName}`
-                            : ""}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => void onUnlinkDiscord()}
-                        >
-                          Délier
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="mt-3 grid gap-3">
-                        <p className="text-sm text-paper-2">
-                          D’abord sur le serveur Discord, ensuite le salon.
-                        </p>
-                        {discord.inviteUrl ? (
-                          <Button
-                            variant="primary"
-                            onClick={() =>
-                              void openExternalUrl(discord.inviteUrl!)
-                            }
-                          >
-                            Inviter le bot
-                          </Button>
-                        ) : null}
-                        <div className="flex flex-wrap gap-2">
-                          <input
-                            className="min-w-[200px] flex-1 border border-rule-strong bg-ink-deep px-3 py-2 font-data text-xs outline-none focus:border-paper"
-                            placeholder="Lien ou identifiant du salon"
-                            value={discordChannelInput}
-                            onChange={(event) =>
-                              setDiscordChannelInput(event.target.value)
-                            }
-                          />
-                          <Button
-                            variant="second"
-                            disabled={busy || !discordChannelInput.trim()}
-                            onClick={() => void onLinkDiscord()}
-                          >
-                            Lier
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-                <ul className="m-0 list-none p-0">
-                  {detail.members.map((member, i) => (
-                    <li key={member.id} className="pn-ledger-row">
-                      <span className="pn-data text-smoke-dim">
-                        {pad2(i + 1)}
-                      </span>
-                      <SquareAvatar
-                        name={member.displayName}
-                        avatarUrl={member.avatarUrl}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">{member.displayName}</p>
-                        <p className="pn-data">{roleLabel(member.role)}</p>
-                      </div>
-                      {canManage && member.id !== currentUserId ? (
-                        <div className="flex flex-wrap gap-2">
-                          {myRole === "owner" && member.role === "member" ? (
-                            <button
-                              type="button"
-                              className="pn-data hover:text-paper"
-                              disabled={busy}
-                              onClick={() =>
-                                void setMemberRole(
-                                  selectedId!,
-                                  member.id,
-                                  "admin",
-                                )
-                                  .then(() => openGroup(selectedId!))
-                                  .catch((e: Error) => onBanner(e.message))
-                              }
-                            >
-                              Promouvoir
-                            </button>
-                          ) : null}
-                          {myRole === "owner" && member.role === "admin" ? (
-                            <button
-                              type="button"
-                              className="pn-data hover:text-paper"
-                              disabled={busy}
-                              onClick={() =>
-                                void setMemberRole(
-                                  selectedId!,
-                                  member.id,
-                                  "member",
-                                )
-                                  .then(() => openGroup(selectedId!))
-                                  .catch((e: Error) => onBanner(e.message))
-                              }
-                            >
-                              Membre
-                            </button>
-                          ) : null}
-                          {(myRole === "owner" && member.role !== "owner") ||
-                          (myRole === "admin" && member.role === "member") ? (
-                            <button
-                              type="button"
-                              className="pn-data hover:text-paper"
-                              disabled={busy}
-                              onClick={() =>
-                                void removeMember(selectedId!, member.id)
-                                  .then(() => openGroup(selectedId!))
-                                  .catch((e: Error) => onBanner(e.message))
-                              }
-                            >
-                              Retirer
-                            </button>
-                          ) : null}
-                          {myRole === "owner" && member.role !== "owner" ? (
-                            <button
-                              type="button"
-                              className="pn-data hover:text-paper"
-                              disabled={busy}
-                              onClick={() =>
-                                void transferOwnership(selectedId!, member.id)
-                                  .then(() => openGroup(selectedId!))
-                                  .catch((e: Error) => onBanner(e.message))
-                              }
-                            >
-                              Céder
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-                {canManage && invites.length > 0 ? (
-                  <ul className="m-0 list-none p-0">
-                    {invites.map((invite) => (
-                      <li
-                        key={invite.id}
-                        className="flex flex-wrap items-center justify-between gap-2 border-b border-rule py-2"
-                      >
-                        <code className="font-data text-[11px]">
-                          {invite.code}
-                        </code>
-                        {invite.active !== false && !invite.revokedAt ? (
-                          <button
-                            type="button"
-                            className="pn-data hover:text-paper"
-                            disabled={busy}
-                            onClick={() => void onRevokeInvite(invite.id)}
-                          >
-                            Révoquer
-                          </button>
-                        ) : (
-                          <span className="pn-data">Révoquée</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
-
-            <ProposalsPanel
-              proposals={proposals}
-              busy={busy}
-              onReply={(proposalId, value) =>
-                void onReplyProposal(proposalId, value)
-              }
-              onClose={(proposalId) => void onCloseProposal(proposalId)}
-              onCreateEvening={(proposal) => {
-                setDirectDraft({
-                  appId: proposal.externalId,
-                  name: proposal.name,
-                  coverUrl: proposal.coverUrl,
-                  steamUrl: proposal.steamUrl,
-                  priceLabel: proposal.priceLabel ?? undefined,
-                });
-                onRequestEvening?.();
-              }}
-            />
-
-            <div>
-              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
-                <h3 className="pn-display text-2xl">Jeux du groupe</h3>
-                <div className="flex flex-wrap gap-3">
-                  {(
-                    [
-                      ["all", "Tous"],
-                      ["shared", "Commun"],
-                      ["installed", "Installés"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className={
-                        filter === key
-                          ? "bg-paper px-2 py-1 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-ink-deep"
-                          : "pn-data hover:text-paper"
-                      }
-                      onClick={() => setFilter(key)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="pn-data hover:text-paper"
+                  <Button
+                    variant={proposeOpen ? "second" : "primary"}
                     disabled={busy}
-                    onClick={() => void refreshLibrary()}
+                    onClick={() => setProposeOpen((open) => !open)}
                   >
-                    Sync
-                  </button>
+                    {proposeOpen ? "Fermer la recherche" : "+ Proposer un jeu"}
+                  </Button>
                 </div>
+
+                {proposeOpen ? (
+                  <div className="border border-rule-strong bg-ink-deep p-4">
+                    <p className="pn-data mb-3 text-paper">Rechercher sur le Store Steam</p>
+                    <SteamSearch
+                      disabled={busy}
+                      onPick={(hit) => {
+                        void onConfirmPropose(hit.appId);
+                        setProposeOpen(false);
+                      }}
+                    />
+                  </div>
+                ) : null}
+
+                {proposals.length === 0 && !proposeOpen ? (
+                  <EmptyHint
+                    title="Aucune proposition"
+                    body="Aucune proposition en cours. Propose un jeu Steam pour sonder le groupe."
+                  />
+                ) : (
+                  <ProposalsPanel
+                    proposals={proposals}
+                    busy={busy}
+                    onReply={(proposalId, value) =>
+                      void onReplyProposal(proposalId, value)
+                    }
+                    onClose={(proposalId) => void onCloseProposal(proposalId)}
+                    onCreateEvening={(proposal) => {
+                      storeOpenDirectDraft({
+                        appId: proposal.externalId,
+                        name: proposal.name,
+                        coverUrl: proposal.coverUrl,
+                        steamUrl: proposal.steamUrl,
+                        priceLabel: proposal.priceLabel ?? undefined,
+                      });
+                      onRequestEvening?.();
+                    }}
+                  />
+                )}
               </div>
-
-              {visibleLibrary.length === 0 ? (
-                <EmptyHint title="Rien ici" body="Scannez vos bibliothèques." />
-              ) : (
-                <PosterGrid
-                  label="Bibliothèque du groupe"
-                  density="compact"
-                  animateKey={`${filter}:${visibleLibrary.length}`}
-                >
-                  {visibleLibrary.map((game, index) => {
-                    const mine = game.owners.find(
-                      (o) => o.userId === currentUserId,
-                    );
-                    return (
-                      <div key={game.key} role="listitem">
-                        <GamePoster
-                          name={game.name}
-                          launcher={game.launcher}
-                          externalId={game.externalId}
-                          coverUrl={game.coverUrl}
-                          priority={index < 24}
-                          subtitle={`${pad2(game.ownedCount)}/${pad2(game.memberCount)} · ${game.launcher}`}
-                          footer={
-                            mine ? (
-                              <button
-                                type="button"
-                                className="pn-data mt-1 hover:text-paper"
-                                disabled={busy}
-                                onClick={() => void onHide(game)}
-                              >
-                                Masquer
-                              </button>
-                            ) : null
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </PosterGrid>
-              )}
-
-              {hidden.length > 0 ? (
-                <>
-                  <p className="pn-data mt-8 mb-3">
-                    Masqués · {pad2(hidden.length)}
-                  </p>
-                  <PosterGrid
-                    label="Jeux masqués"
-                    density="compact"
-                    animateKey={`hidden:${hidden.length}`}
-                  >
-                    {hidden.map((game) => (
-                      <div
-                        key={`${game.launcher}:${game.externalId}`}
-                        role="listitem"
-                      >
-                        <GamePoster
-                          name={game.name}
-                          launcher={game.launcher}
-                          externalId={game.externalId}
-                          footer={
-                            <button
-                              type="button"
-                              className="pn-data mt-1 hover:text-paper"
-                              disabled={busy}
-                              onClick={() =>
-                                void onUnhide(game.launcher, game.externalId)
-                              }
-                            >
-                              Réafficher
-                            </button>
-                          }
-                        />
-                      </div>
-                    ))}
-                  </PosterGrid>
-                </>
-              ) : null}
-            </div>
+            ) : (
+              <GroupAdminSection
+                canManage={canManage}
+                renameValue={renameValue}
+                onRenameChange={setRenameValue}
+                onRename={() => void onRename()}
+                discord={discord}
+                discordChannelInput={discordChannelInput}
+                onDiscordChannelInputChange={setDiscordChannelInput}
+                onLinkDiscord={() => void onLinkDiscord()}
+                onUnlinkDiscord={() => void onUnlinkDiscord()}
+                members={detail.members}
+                currentUserId={currentUserId}
+                myRole={myRole ?? null}
+                onSetMemberRole={(userId, role) =>
+                  void setMemberRole(selectedId!, userId, role)
+                    .then(() => openGroup(selectedId!))
+                    .catch((e: Error) => onBanner(e.message))
+                }
+                onRemoveMember={(userId) =>
+                  void removeMember(selectedId!, userId)
+                    .then(() => openGroup(selectedId!))
+                    .catch((e: Error) => onBanner(e.message))
+                }
+                onTransferOwnership={(userId) =>
+                  void transferOwnership(selectedId!, userId)
+                    .then(() => openGroup(selectedId!))
+                    .catch((e: Error) => onBanner(e.message))
+                }
+                invites={invites}
+                onCreateInvite={() => void onOpenInviteModal()}
+                lastInviteLink={lastInviteLink}
+                onRevokeInvite={(inviteId) => void onRevokeInvite(inviteId)}
+                onLeave={() => void onLeave()}
+                onDelete={() => void onDelete()}
+                busy={busy}
+              />
+            )}
           </div>
         )}
       </div>
@@ -1076,6 +787,15 @@ export function GroupsPanel({
           {`Le groupe « ${detail.group.name} » et ses soirées seront supprimés.`}
         </ConfirmDialog>
       ) : null}
+      <InviteModal
+        isOpen={inviteModalOpen}
+        groupName={detail?.group.name ?? ""}
+        code={currentInviteCode}
+        link={currentInviteLink}
+        busy={busy}
+        onClose={() => setInviteModalOpen(false)}
+        onGenerateNew={() => void onCreateInvite()}
+      />
     </>
   );
 }

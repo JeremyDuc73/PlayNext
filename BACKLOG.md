@@ -214,7 +214,7 @@ Doc : `docs/EVENINGS.md`
 - [x] Relancer un tour en retirant refusés
 - [-] Lancement du jeu gagnant — abandonné : l’affichage du résultat suffit
 
-- [~] Temps réel : polling UI 2,5 s (soirée live + idle + autres onglets) ; WebSocket plus tard
+- [x] Temps réel : flux SSE (`/evenings/:id/stream`) avec push instantané des votes et présences + repli polling 10 s
 
 ---
 

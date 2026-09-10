@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { GroupsPanel } from "./components/GroupsPanel";
 import { LibraryHub } from "./components/LibraryHub";
 import { ProfilePanel } from "./components/ProfilePanel";
+import { OnboardingModal } from "./components/OnboardingModal";
 import {
   exchangeHandoff,
   fetchMe,
@@ -20,6 +21,10 @@ import {
 } from "./lib/desktop-auth";
 import { fetchOpenEvenings, isLiveEveningStatus } from "./lib/evenings";
 import { gsap, prefersReducedMotion, useGSAP, viewSwap } from "./lib/motion";
+import {
+  useAppStore,
+  type NavId,
+} from "./stores/useAppStore";
 import { Banner } from "./ui/Banner";
 import { BrandMark } from "./ui/BrandMark";
 import { Button } from "./ui/Button";
@@ -45,25 +50,11 @@ function microsoftErrorMessage(reason: string): string {
   return `Lien Microsoft échoué (${reason}).`;
 }
 
-function notificationMessage(message: string): string {
-  const clean = message.trim();
-  if (
-    /duplicate key|failed to fetch|unauthenticated|epic_token_|microsoft_disconnect_|_failed_|_error_|_timeout|_cancelled|invalid_state|^HTTP \d/i.test(
-      clean,
-    )
-  ) {
-    return "Action impossible. Réessaie.";
-  }
-  return clean;
-}
-
 type HealthResponse = {
   ok: boolean;
   service: string;
   database: "up" | "down";
 };
-
-type NavId = "evening" | "calendar" | "group" | "library" | "profile";
 
 const TABS: { id: NavId; label: string }[] = [
   { id: "evening", label: "Soirée" },
@@ -86,14 +77,21 @@ export default function App() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [authBanner, setAuthBanner] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
   const [microsoftLinkedSignal, setMicrosoftLinkedSignal] = useState(0);
   const [epicLinkedSignal, setEpicLinkedSignal] = useState(0);
-  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(
-    null,
-  );
-  const [nav, setNav] = useState<NavId>("evening");
+
+  const nav = useAppStore((s) => s.nav);
+  const setNav = useAppStore((s) => s.setNav);
+  const banner = useAppStore((s) => s.banner);
+  const setBanner = useAppStore((s) => s.setBanner);
+  const notify = useAppStore((s) => s.notify);
+  const pendingInviteCode = useAppStore((s) => s.pendingInviteCode);
+  const setPendingInviteCode = useAppStore((s) => s.setPendingInviteCode);
+  const onboardingOpen = useAppStore((s) => s.onboardingOpen);
+  const setOnboardingOpen = useAppStore((s) => s.setOnboardingOpen);
+  const closeOnboarding = useAppStore((s) => s.closeOnboarding);
+
   const [openEveningGroupId, setOpenEveningGroupId] = useState<string | null>(
     null,
   );
@@ -104,8 +102,6 @@ export default function App() {
   const isDesktop = runningInDesktopShell();
   const shellRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
-  const notify = (message: string) =>
-    setAuthBanner(notificationMessage(message));
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -113,14 +109,14 @@ export default function App() {
     const xbox = params.get("xbox");
     const invite = params.get("invite");
     if (auth === "ok") {
-      setAuthBanner("Connexion Discord réussie.");
+      setBanner("Connexion Discord réussie.");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (auth === "error") {
       const reason = params.get("reason") ?? "unknown";
       notify(`Connexion Discord échouée (${reason}).`);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (xbox === "ok") {
-      setAuthBanner("Compte Microsoft / Xbox lié.");
+      setBanner("Compte Microsoft / Xbox lié.");
       setMicrosoftLinkedSignal((n) => n + 1);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (xbox === "error") {
@@ -130,7 +126,7 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (invite) {
       setPendingInviteCode(invite);
-      setAuthBanner("Invitation détectée — connexion requise.");
+      setBanner("Invitation détectée — connexion requise.");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -145,7 +141,7 @@ export default function App() {
       if (parsed.kind === "invite") {
         if (!cancelled) {
           setPendingInviteCode(parsed.code);
-          setAuthBanner("Invitation reçue.");
+          setBanner("Invitation reçue.");
         }
         return;
       }
@@ -156,7 +152,7 @@ export default function App() {
             notify(microsoftErrorMessage(parsed.error));
             setMicrosoftLinkedSignal((n) => n + 1);
           } else if (parsed.ok) {
-            setAuthBanner("Compte Microsoft / Xbox lié.");
+            setBanner("Compte Microsoft / Xbox lié.");
             setMicrosoftLinkedSignal((n) => n + 1);
           }
         }
@@ -178,7 +174,7 @@ export default function App() {
           const nextUser = await exchangeHandoff(parsed.handoff);
           if (!cancelled) {
             setUser(nextUser);
-            setAuthBanner("Connexion Discord réussie.");
+            setBanner("Connexion Discord réussie.");
             setLoginPending(false);
           }
         } catch (error) {
@@ -220,7 +216,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.4.2",
+            version: "0.5.0",
             platform: "web-preview",
           });
         }
@@ -306,7 +302,7 @@ export default function App() {
         setOpenEveningGroupId(open.groupId);
         if (seenOpenEveningId.current === open.id) return;
         seenOpenEveningId.current = open.id;
-        setNav((current) => {
+        setNav((current: NavId) => {
           if (current === "evening" || current === "calendar") return current;
           if (open.status === "lobby") notify("Lobby ouvert.");
           else if (open.status === "selection") notify("Sélection en cours.");
@@ -329,6 +325,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user) return;
+    const key = `playnext_onboarding_${user.id}`;
+    if (localStorage.getItem(key) !== "completed") {
+      setOnboardingOpen(true);
+    }
+  }, [user?.id, setOnboardingOpen]);
+
+  function handleCloseOnboarding() {
+    if (user) {
+      localStorage.setItem(`playnext_onboarding_${user.id}`, "completed");
+    }
+    closeOnboarding();
+  }
+
   useGSAP(
     () => {
       viewSwap(viewRef.current);
@@ -338,7 +349,7 @@ export default function App() {
 
   async function onLoginClick() {
     setLoginPending(true);
-    setAuthBanner(isDesktop ? "Fenêtre Discord ouverte." : null);
+    setBanner(isDesktop ? "Fenêtre Discord ouverte." : null);
     try {
       const payload = await startDiscordLogin();
       if (!payload || payload.kind !== "discord") return;
@@ -347,12 +358,12 @@ export default function App() {
         return;
       }
       if (!payload.handoff) {
-        setAuthBanner("Retour Discord introuvable.");
+        setBanner("Retour Discord introuvable.");
         return;
       }
       const nextUser = await exchangeHandoff(payload.handoff);
       setUser(nextUser);
-      setAuthBanner("Connexion Discord réussie.");
+      setBanner("Connexion Discord réussie.");
     } catch (error) {
       notify(
         error instanceof Error
@@ -367,7 +378,7 @@ export default function App() {
   async function logout() {
     await logoutRequest();
     setUser(null);
-    setAuthBanner("Déconnecté.");
+    setBanner("Déconnecté.");
     setLoginPending(false);
   }
 
@@ -483,10 +494,10 @@ export default function App() {
                 onDismiss={() => setUpdateDismissed(true)}
               />
             ) : null}
-            {authBanner ? (
+            {banner ? (
               <div className="mb-5">
-                <Banner onDismiss={() => setAuthBanner(null)}>
-                  {authBanner}
+                <Banner onDismiss={() => setBanner(null)}>
+                  {banner}
                 </Banner>
               </div>
             ) : null}
@@ -552,6 +563,11 @@ export default function App() {
           <span className="pn-data">Choisir ensemble.</span>
         </footer>
       </div>
+
+      <OnboardingModal
+        isOpen={onboardingOpen}
+        onClose={handleCloseOnboarding}
+      />
     </div>
   );
 }

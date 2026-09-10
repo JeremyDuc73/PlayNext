@@ -101,4 +101,68 @@ describe("buildDiscordMessage", () => {
       true,
     );
   });
+
+  it("builds a linked channel welcome embed", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "linked",
+      guildName: "Serveur Discord",
+      channelName: "annonces-jeux",
+    });
+    assert.match(payload.embeds[0]?.title ?? "", /SALON D’ANNONCES LIÉ/);
+    assert.match(payload.embeds[0]?.description ?? "", /#annonces-jeux/);
+    assert.equal(payload.components?.[0]?.components[0]?.label, "Télécharger PlayNext ↗");
+  });
+
+  it("builds a voting notice embed with candidates", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "voting",
+      playerCount: 4,
+      candidateCount: 3,
+      candidateNames: ["Deep Rock Galactic", "Valheim", "Terraria"],
+    });
+    assert.match(payload.embeds[0]?.title ?? "", /LE VOTE EST OUVERT/);
+    assert.match(payload.content, /Vote ouvert/);
+    assert.equal(
+      payload.embeds[0]?.fields?.some((f) => f.name === "Sélection retenue"),
+      true,
+    );
+  });
+
+  it("builds an approved proposal embed", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "proposal_approved",
+      gameName: "Abiotic Factor",
+      steamUrl: "https://store.steampowered.com/app/427410/",
+      memberCount: 4,
+      priceLabel: "24,99 €",
+    });
+    assert.match(payload.embeds[0]?.title ?? "", /PROPOSITION VALIDÉE/);
+    assert.match(payload.content, /Proposition validée/);
+  });
+
+  it("includes votes tally and relative timestamp in chosen notice", () => {
+    const payload = buildDiscordMessage("Les Copains", {
+      kind: "chosen",
+      gameName: "Abiotic Factor",
+      scheduledAt: "2026-09-10T19:00:00.000Z",
+      eveningKind: "ritual",
+      hotVotes: 3,
+      maybeVotes: 1,
+      playerCount: 4,
+      usedRoulette: true,
+      coverUrl: "https://example.com/cover.jpg",
+      steamUrl: "https://store.steampowered.com/app/427410/",
+    });
+    assert.equal(payload.embeds[0]?.title, "Abiotic Factor");
+    assert.equal(payload.embeds[0]?.image?.url, "https://example.com/cover.jpg");
+    assert.equal(
+      payload.embeds[0]?.fields?.some((f) => f.name === "Dépouillement"),
+      true,
+    );
+    assert.equal(
+      payload.embeds[0]?.fields?.some((f) => f.name === "Départage"),
+      true,
+    );
+    assert.equal(payload.components?.[0]?.components[0]?.url, "https://store.steampowered.com/app/427410/");
+  });
 });

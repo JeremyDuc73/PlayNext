@@ -28,6 +28,7 @@ import {
 import { Button } from "../ui/Button";
 import { PlayableStamp } from "../ui/PlayableStamp";
 import { SquareAvatar } from "../ui/SquareAvatar";
+import { useAppStore } from "../stores/useAppStore";
 
 type Props = {
   user: User;
@@ -46,6 +47,8 @@ export function ProfilePanel({
   onConnectionChanged,
   onBanner,
 }: Props) {
+  const openOnboarding = useAppStore((s) => s.openOnboarding);
+
   const [microsoftConfigured, setMicrosoftConfigured] = useState(false);
   const [microsoftLinked, setMicrosoftLinked] = useState(false);
   const [epicLinked, setEpicLinked] = useState(false);
@@ -416,6 +419,21 @@ export function ProfilePanel({
             </ul>
           </>
         ) : null}
+      </section>
+
+      <section className="border border-rule-strong p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="pn-data mb-1">Guide de démarrage</p>
+            <h3 className="pn-display text-2xl">Protocole d’accueil</h3>
+            <p className="mt-2 max-w-xl text-sm text-paper-2">
+              Revoir les règles du rituel décisionnel, le fonctionnement du vote secret, du veto et des bibliothèques locales.
+            </p>
+          </div>
+          <Button variant="second" onClick={openOnboarding}>
+            Revoir le protocole
+          </Button>
+        </div>
       </section>
 
       <section className="border border-rule-strong p-4">

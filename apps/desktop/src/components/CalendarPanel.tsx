@@ -1,29 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   eveningDisplayTitle,
-  isLiveEveningStatus,
   listCalendarEvenings,
-  type EveningKind,
-  type EveningStatus,
   type EveningSummary,
 } from "../lib/evenings";
 import { pad2 } from "../lib/format";
 import {
   formatParisMonthTitle,
+  isEveningPast,
   parisMonthCells,
   parisYmd,
   parisYearMonth,
   shiftYearMonth,
 } from "../lib/paris";
-import { Button } from "../ui/Button";
 import { EmptyHint } from "../ui/EmptyHint";
+import { useAppStore } from "../stores/useAppStore";
 
 const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
 
 type Props = {
   groupId: string;
   groupName: string;
-  onBanner: (message: string) => void;
+  onBanner?: (message: string) => void;
   onOpenEvening?: (eveningId: string) => void;
 };
 
@@ -35,11 +33,20 @@ function calendarGame(item: EveningSummary): string {
   );
 }
 
-function calendarStatus(kind: EveningKind, status: EveningStatus): string {
-  if (status === "voting") return "Vote";
-  if (status === "revealed") return "Résultat";
-  if (status === "closed") return "Terminée";
-  if (kind === "direct") return "Direct";
+function calendarStatus(item: EveningSummary): string {
+  if (item.status === "voting") return "Vote";
+  if (item.status === "selection") return "Sélection";
+  if (item.status === "lobby") return "Lobby";
+  if (item.status === "revealed") {
+    return item.kind === "direct" ? "Confirmée" : "Résultat";
+  }
+  if (item.status === "closed") {
+    return isEveningPast(item.scheduledAt, item.createdAt)
+      ? "Terminée"
+      : "Confirmée";
+  }
+  if (item.status === "cancelled") return "Annulée";
+  if (item.kind === "direct") return "Confirmée";
   return "—";
 }
 
@@ -61,6 +68,10 @@ export function CalendarPanel({
   onBanner,
   onOpenEvening,
 }: Props) {
+  const storeNotify = useAppStore((s) => s.notify);
+  const storeOpenEvening = useAppStore((s) => s.openEvening);
+  const triggerBanner = onBanner ?? storeNotify;
+
   const today = parisYmd();
   const initial = parisYearMonth();
   const [year, setYear] = useState(initial.year);
@@ -79,7 +90,7 @@ export function CalendarPanel({
           if (!cancelled) setEvenings(list);
         })
         .catch((error: Error) => {
-          if (!cancelled) onBanner(error.message);
+          if (!cancelled) triggerBanner(error.message);
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -144,14 +155,28 @@ export function CalendarPanel({
           </h2>
           <span className="pn-accent mt-3" />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="ghost" onClick={() => go(-1)}>
-            Précédent
-          </Button>
-          <p className="pn-display text-2xl">{monthTitle}</p>
-          <Button variant="ghost" onClick={() => go(1)}>
-            Suivant
-          </Button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            aria-label="Mois précédent"
+            title="Mois précédent"
+            className="flex h-9 w-9 items-center justify-center border border-rule-strong bg-ink-deep font-data text-base font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-2px] active:translate-y-[-2px]"
+          >
+            ←
+          </button>
+          <p className="pn-display text-xl sm:text-2xl uppercase tracking-[-0.02em] text-paper min-w-[200px] text-center">
+            {monthTitle}
+          </p>
+          <button
+            type="button"
+            onClick={() => go(1)}
+            aria-label="Mois suivant"
+            title="Mois suivant"
+            className="flex h-9 w-9 items-center justify-center border border-rule-strong bg-ink-deep font-data text-base font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-2px] active:translate-y-[-2px]"
+          >
+            →
+          </button>
         </div>
       </header>
 
@@ -229,13 +254,11 @@ export function CalendarPanel({
         />
       ) : (
         <ul className="m-0 list-none border border-rule-strong p-0">
-          {selected.map((item) => {
-            const live = isLiveEveningStatus(item.status);
-            return (
-              <li
-                key={item.id}
-                className="grid grid-cols-[auto_minmax(0,1.4fr)_auto_auto] items-center gap-4 border-b border-rule px-4 py-3 last:border-b-0"
-              >
+          {selected.map((item) => (
+            <li
+              key={item.id}
+              className="grid grid-cols-[auto_minmax(0,1.4fr)_auto_auto] items-center gap-4 border-b border-rule px-4 py-3 last:border-b-0"
+            >
                 <span className="font-data text-[10px] tracking-[0.12em] text-smoke-dim">
                   {parisHm(item.scheduledAt)}
                 </span>
@@ -243,13 +266,16 @@ export function CalendarPanel({
                   {calendarGame(item)}
                 </span>
                 <span className="pn-data uppercase">
-                  {calendarStatus(item.kind, item.status)}
+                  {calendarStatus(item)}
                 </span>
-                {live && onOpenEvening ? (
+                {item.status !== "cancelled" ? (
                   <button
                     type="button"
-                    className="pn-data hover:text-paper"
-                    onClick={() => onOpenEvening(item.id)}
+                    className="pn-data font-bold hover:text-paper"
+                    onClick={() => {
+                      if (onOpenEvening) onOpenEvening(item.id);
+                      else storeOpenEvening(item.id);
+                    }}
                   >
                     Ouvrir
                   </button>
@@ -257,8 +283,7 @@ export function CalendarPanel({
                   <span className="pn-data">—</span>
                 )}
               </li>
-            );
-          })}
+            ))}
         </ul>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch, getApiUrl, getStoredSessionToken } from "./api";
 
 export type VoteValue = "hot" | "maybe" | "pass" | "veto";
 export type EveningStatus =
@@ -225,6 +225,34 @@ export async function fetchEvening(eveningId: string): Promise<Evening> {
   if (!response.ok) throw new Error(await readError(response));
   const data = (await response.json()) as { evening: Evening };
   return data.evening;
+}
+
+export function subscribeEveningStream(
+  eveningId: string,
+  onSync: (evening: Evening) => void,
+  onError?: (error: Event) => void,
+): () => void {
+  const token = getStoredSessionToken();
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  const url = `${getApiUrl()}/evenings/${eveningId}/stream${query}`;
+  const source = new EventSource(url, { withCredentials: true });
+
+  source.addEventListener("sync", (event) => {
+    try {
+      const evening = JSON.parse(event.data) as Evening;
+      onSync(evening);
+    } catch {
+      // Ignore parse error
+    }
+  });
+
+  if (onError) {
+    source.onerror = onError;
+  }
+
+  return () => {
+    source.close();
+  };
 }
 
 export async function fetchOpenEvenings(): Promise<OpenEvening[]> {

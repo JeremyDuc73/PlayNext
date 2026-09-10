@@ -161,9 +161,14 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
 
     const ownedCount = people.filter((person) => person.owns).length;
     const missing = people.filter((person) => !person.owns);
+    const hotCount = people.filter((person) => person.status === "hot").length;
+    const noCount = people.filter((person) => person.status === "no").length;
     const pendingCount = people.filter(
       (person) => person.status === "pending",
     ).length;
+    const approved = pendingCount === 0 && noCount === 0 && hotCount > 0;
+    const rejected = pendingCount === 0 && noCount > 0;
+
     const viewer = people.find((person) => person.userId === viewerId);
     const iOwn = Boolean(viewer?.owns);
     const myReply = replies.get(viewerId) ?? null;
@@ -184,12 +189,16 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
       memberCount: people.length,
       missingCount: missing.length,
       pendingCount,
+      hotCount,
+      noCount,
+      approved,
+      rejected,
       iOwn,
       myReply,
       canReply: proposal.status === "open",
       canCreateEvening:
         proposal.status === "open" &&
-        pendingCount === 0 &&
+        approved &&
         proposal.created_by === viewerId,
       canClose:
         proposal.status === "open" &&
@@ -353,6 +362,8 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
           userId,
           membership.role,
         );
+        const proposer = members.find((m) => m.user_id === userId);
+        const proposerName = proposer ? displayName(proposer) : null;
         void notifyGroupDiscord(db, config, request.params.groupId, {
           kind: "proposal",
           gameName: game.name,
@@ -362,6 +373,7 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
           memberCount: view.memberCount,
           missingNames: missing.map(displayName),
           coverUrl,
+          proposerName,
         }).catch((error) => {
           request.log.warn(
             { err: error, groupId: request.params.groupId },
@@ -428,6 +440,12 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         loadOwnedGames(request.params.groupId),
       ]);
 
+      const prevReplies = await loadReplies([proposal.id]);
+      const prevRepliesMap = prevReplies.get(proposal.id) ?? new Map();
+      const prevWasApproved =
+        members.length > 0 &&
+        members.every((m) => prevRepliesMap.get(m.user_id) === "hot");
+
       await db.pool.query(
         `
           INSERT INTO game_proposal_replies (proposal_id, user_id, value, updated_at)
@@ -439,16 +457,31 @@ export const proposalsRoutes: FastifyPluginAsync<ProposalsRoutesOptions> = async
         [proposal.id, userId, parsed.data.value],
       );
       const replies = await loadReplies([proposal.id]);
+      const view = serializeProposal(
+        proposal,
+        members,
+        owned,
+        replies.get(proposal.id) ?? new Map(),
+        userId,
+        membership.role,
+      );
+
+      if (view.approved && !prevWasApproved) {
+        void notifyGroupDiscord(db, config, request.params.groupId, {
+          kind: "proposal_approved",
+          gameName: proposal.name,
+          steamUrl: proposal.steam_url,
+          priceLabel: proposal.price_label,
+          memberCount: members.length,
+          coverUrl: proposal.cover_url,
+        }).catch((err) => {
+          request.log.warn({ err }, "discord_proposal_approved_notify_failed");
+        });
+      }
+
       return {
         ok: true,
-        proposal: serializeProposal(
-          proposal,
-          members,
-          owned,
-          replies.get(proposal.id) ?? new Map(),
-          userId,
-          membership.role,
-        ),
+        proposal: view,
       };
     },
   );

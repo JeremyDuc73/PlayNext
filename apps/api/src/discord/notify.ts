@@ -29,6 +29,6 @@ export async function notifyGroupDiscord(
   await postDiscordMessage(
     config.DISCORD_BOT_TOKEN,
     group.discord_channel_id,
-    buildDiscordMessage(group.name, notice),
+    buildDiscordMessage(group.name, notice, config.WEB_URL),
   );
 }

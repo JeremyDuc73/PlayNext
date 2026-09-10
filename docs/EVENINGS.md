@@ -89,6 +89,7 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 | DELETE | `/groups/:groupId/evenings/history` (propriétaire, terminées / annulées) |
 | GET | `/me/open-evenings` |
 | GET | `/evenings/:id` |
+| GET | `/evenings/:id/stream` (SSE temps réel, sync instantanée) |
 | POST | `/evenings/:id/ready` |
 | POST | `/evenings/:id/open-selection` |
 | POST | `/evenings/:id/selections` |
@@ -103,8 +104,7 @@ Votes individuels des autres restent privés après révélation (tu vois seulem
 | POST | `/evenings/:id/cancel` |
 | DELETE | `/evenings/:id` (propriétaire, terminée / annulée) |
 
-Polling UI ~2,5 s (soirée) ; calendrier ~8 s.
-(`GET /me/open-evenings`). WebSocket plus tard.
+Temps réel : flux SSE sur la soirée active (`GET /evenings/:id/stream`), synchronisation immédiate (< 10 ms). Filet de secours polling ~10 s si déconnexion ; calendrier ~8 s.
 
 `GET /groups/:groupId/evenings` renvoie aussi `winnerName`, `kind`, `scheduledAt`, `gameName`.
 Sans titre saisi, l’UI affiche **Soirée du JJ/MM/AAAA** (date prévue).

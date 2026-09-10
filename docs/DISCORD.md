@@ -34,10 +34,13 @@ Délier n’expulse pas le bot du serveur.
 
 ## Messages
 
-Embed vermillon, pied « PlayNext ». Notification courte + carte :
+Embeds vermillon (`#e2402c`), pied « PlayNext · Ce soir, on décide. », en-tête de groupe et boutons d’action directs.
 
-- Lobby : groupe, horaire, nombre de joueurs, « Soirée ouverte » ; soirée directe : jeu + bouton Store
-- Jeu choisi : titre du jeu, groupe, jaquette si connue
-- Proposition : titre, prix Store, qui possède / qui n’a pas, bouton Store Steam
+- **Salon lié** : message de bienvenue récapitulant les fonctionnalités activées et lien d'installation.
+- **Lobby ouvert** : horaire avec compte à rebours dynamique Discord (`<t:unix:F> (<t:unix:R>)`), joueurs convoqués, ambiance, durée ou jaquette du jeu direct + boutons Store Steam / Ouvrir PlayNext.
+- **Vote ouvert** : annonce du début du dépouillement secret, liste des jeux sélectionnés du tour, rappel des règles (1 veto) + bouton direct pour voter.
+- **Jeu retenu (résultat)** : grande affiche officielle, horaire de session, détail du dépouillement (`Chaud` / `Pourquoi pas`), mention de la roulette en cas d’égalité + bouton Store Steam.
+- **Proposition Steam** : vignette du jeu, prix Store EUR, compteur de possession, joueurs sans le jeu + boutons Store Steam et Voter dans PlayNext.
+- **Proposition validée** : annonce de l'unanimité du groupe dès que tous les membres ont voté Chaud.
 
-Pas de votes individuels. Si Discord est down, la soirée continue.
+Pas de votes individuels divulgués. Si Discord est indisponible, la soirée et les votes continuent normalement dans l'application.

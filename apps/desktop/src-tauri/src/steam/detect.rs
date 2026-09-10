@@ -64,7 +64,7 @@ pub fn scan_steam_libraries() -> SteamScanResult {
         match collect_manifests(&steamapps) {
             Ok(found) => {
                 for draft in found {
-                    games.push(to_scanned(draft));
+                    games.push(to_scanned(draft, steam_id.as_deref()));
                 }
             }
             Err(_) => warnings.push("Une bibliothèque Steam n’a pas pu être lue.".into()),
@@ -97,13 +97,20 @@ fn read_steam_id(steam_root: &Path, warnings: &mut Vec<String>) -> Option<String
     }
 }
 
-fn to_scanned(draft: SteamGameDraft) -> ScannedSteamGame {
+fn to_scanned(draft: SteamGameDraft, active_steam_id: Option<&str>) -> ScannedSteamGame {
+    let owned = match (draft.last_owner.as_deref(), active_steam_id) {
+        (Some(owner), Some(active)) if !owner.is_empty() && owner != "0" => {
+            owner == active
+        }
+        _ => true,
+    };
+
     ScannedSteamGame {
         launcher: "steam",
         external_id: draft.app_id,
         name: draft.name,
         installed: draft.installed,
-        owned: true,
+        owned,
         launchable: draft.launchable,
     }
 }

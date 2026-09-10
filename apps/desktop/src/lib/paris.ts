@@ -78,6 +78,21 @@ export function formatParisShort(value: string | Date | null | undefined): strin
   return `${day} · ${time}`;
 }
 
+export function isEveningPast(
+  scheduledAt: string | Date | null | undefined,
+  createdAt?: string | Date | null,
+  durationMinutes?: number | null,
+): boolean {
+  const value = scheduledAt ?? createdAt;
+  if (!value) return false;
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return false;
+
+  // An evening is considered past only after the scheduled time + duration (min 3 hours buffer for the night)
+  const durationMs = (durationMinutes ?? 180) * 60 * 1000;
+  return Date.now() > date.getTime() + Math.max(durationMs, 3 * 3600 * 1000);
+}
+
 export function formatParisWhen(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;

@@ -27,6 +27,10 @@ export type GameProposal = {
   memberCount: number;
   missingCount: number;
   pendingCount: number;
+  hotCount?: number;
+  noCount?: number;
+  approved?: boolean;
+  rejected?: boolean;
   iOwn: boolean;
   myReply: ProposalReplyValue | null;
   canReply: boolean;

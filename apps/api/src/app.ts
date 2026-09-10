@@ -82,6 +82,7 @@ export async function buildApp(config: Env, db: Db) {
       eveningHistory: "DELETE /groups/:groupId/evenings/history",
       groupCalendar: "GET /groups/:groupId/calendar",
       evening: "GET /evenings/:eveningId",
+      eveningStream: "GET /evenings/:eveningId/stream",
       deleteEvening: "DELETE /evenings/:eveningId",
       openEvenings: "GET /me/open-evenings",
       eveningReady: "POST /evenings/:eveningId/ready",

@@ -56,6 +56,40 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
+
+  /* Scrollbars personnalisées DA BULLETIN (rayon 0, aucun dégradé, teintes encre/papier) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-rule-strong) var(--color-ink-deep);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-ink-deep);
+    border: 1px solid var(--color-rule);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-rule-strong);
+    border: 1px solid var(--color-rule);
+    border-radius: 0 !important;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-smoke);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--color-paper);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: var(--color-ink-deep);
+  }
 }
 
 @layer components {

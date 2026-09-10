@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchGameDetails, type FullGameDetails } from "../lib/api";
 import { openExternalUrl } from "../lib/desktop-auth";
 import { pad2 } from "../lib/format";
@@ -6,6 +6,146 @@ import { useAppStore } from "../stores/useAppStore";
 import { Button } from "../ui/Button";
 import { GamePoster } from "../ui/GamePoster";
 import { SquareAvatar } from "../ui/SquareAvatar";
+
+function cleanCategories(categories: string[] = []): string[] {
+  const result: string[] = [];
+
+  let hasController = false;
+  let hasOnlineCoop = false;
+  let hasLanCoop = false;
+  let hasSplitScreen = false;
+  let hasOnlinePvp = false;
+  let hasPvp = false;
+  let hasCrossplay = false;
+  let hasMultiplayer = false;
+  let hasSolo = false;
+  let hasMmo = false;
+  let hasVr = false;
+
+  for (const raw of categories) {
+    const c = raw.trim();
+    if (!c) continue;
+    const lower = c.toLowerCase();
+
+    // Normalisation contrôleur / manette
+    if (
+      lower.includes("contrôleur") ||
+      lower.includes("controller") ||
+      lower.includes("manette") ||
+      lower.includes("dualshock") ||
+      lower.includes("dualsense")
+    ) {
+      hasController = true;
+      continue;
+    }
+
+    // VR
+    if (lower.includes("vr") || lower.includes("réalité virtuelle")) {
+      hasVr = true;
+      continue;
+    }
+
+    // Crossplay
+    if (lower.includes("multiplateforme") || lower.includes("cross-platform")) {
+      hasCrossplay = true;
+      continue;
+    }
+
+    // Écran partagé / Coop local
+    if (
+      lower.includes("écran partagé") ||
+      lower.includes("partage d'écran") ||
+      lower.includes("split screen") ||
+      lower.includes("local coop") ||
+      lower.includes("coop en local")
+    ) {
+      hasSplitScreen = true;
+      continue;
+    }
+
+    // Coop en ligne
+    if (
+      (lower.includes("coop") || lower.includes("coopération")) &&
+      (lower.includes("ligne") || lower.includes("online"))
+    ) {
+      hasOnlineCoop = true;
+      continue;
+    }
+
+    // Coop en LAN
+    if (
+      (lower.includes("coop") || lower.includes("coopération")) &&
+      lower.includes("lan")
+    ) {
+      hasLanCoop = true;
+      continue;
+    }
+
+    // JcJ en ligne
+    if (
+      (lower.includes("jcj") || lower.includes("pvp")) &&
+      (lower.includes("ligne") || lower.includes("online"))
+    ) {
+      hasOnlinePvp = true;
+      continue;
+    }
+
+    // JcJ générique
+    if (lower === "jcj" || lower === "pvp") {
+      hasPvp = true;
+      continue;
+    }
+
+    // MMO
+    if (lower.includes("mmo") || lower.includes("massivement")) {
+      hasMmo = true;
+      continue;
+    }
+
+    // Multijoueur générique
+    if (
+      lower === "multijoueur" ||
+      lower === "multi-player" ||
+      lower === "multiplayer"
+    ) {
+      hasMultiplayer = true;
+      continue;
+    }
+
+    // Solo
+    if (
+      lower === "solo" ||
+      lower === "single-player" ||
+      lower === "singleplayer"
+    ) {
+      hasSolo = true;
+      continue;
+    }
+
+    // Modes spécifiques personnalisés (ex: Riot)
+    if (lower.includes("compétitif") || lower.includes("contre bots")) {
+      result.push(c);
+      continue;
+    }
+  }
+
+  // Ordre clair et hiérarchisé des modes
+  if (hasOnlineCoop) result.push("Coop en ligne");
+  else if (hasLanCoop || hasSplitScreen) result.push("Coopération");
+
+  if (hasMultiplayer) result.push("Multijoueur");
+  if (hasCrossplay) result.push("Crossplay");
+  if (hasSplitScreen) result.push("Écran partagé");
+  if (hasLanCoop) result.push("Coop LAN");
+  if (hasOnlinePvp) result.push("JcJ en ligne");
+  else if (hasPvp) result.push("JcJ");
+  if (hasMmo) result.push("MMO");
+  if (hasSolo) result.push("Solo");
+  if (hasController) result.push("Compatible manette");
+  if (hasVr) result.push("VR");
+
+  return Array.from(new Set(result));
+}
 
 export function GameDetailsModal() {
   const target = useAppStore((s) => s.targetGameDetails);
@@ -59,6 +199,53 @@ export function GameDetailsModal() {
   const screenshots = details?.screenshots ?? [];
   const owners = target.owners ?? [];
   const installedOwners = owners.filter((o) => o.installed);
+
+  const thumbnailsContainerRef = useRef<HTMLDivElement>(null);
+
+  const activeIndex = screenshots.findIndex((s) => s === activeScreenshot);
+  const currentScreenshotIdx = activeIndex >= 0 ? activeIndex : 0;
+
+  function switchScreenshot(delta: number) {
+    if (screenshots.length < 2) return;
+    const nextIdx =
+      (currentScreenshotIdx + delta + screenshots.length) % screenshots.length;
+    const nextUrl = screenshots[nextIdx]!;
+    setActiveScreenshot(nextUrl);
+
+    // Faire défiler la miniature dans la vue
+    const container = thumbnailsContainerRef.current;
+    const thumb = container?.children[nextIdx] as HTMLElement | undefined;
+    thumb?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        switchScreenshot(-1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        switchScreenshot(1);
+      } else if (e.key === "Escape") {
+        close();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  const usefulModes = useMemo(
+    () => cleanCategories(details?.categories),
+    [details?.categories],
+  );
+  const usefulGenres = useMemo(
+    () => (details?.genres ?? []).slice(0, 5),
+    [details?.genres],
+  );
 
   function handleCreateEvening() {
     if (!target) return;
@@ -201,10 +388,9 @@ export function GameDetailsModal() {
           ) : null}
 
           {/* Categories / Genres Tags */}
-          {((details?.categories && details.categories.length > 0) ||
-            (details?.genres && details.genres.length > 0)) && (
+          {(usefulModes.length > 0 || usefulGenres.length > 0) && (
             <div className="flex flex-wrap gap-2">
-              {details?.categories?.map((cat) => (
+              {usefulModes.map((cat) => (
                 <span
                   key={cat}
                   className="border border-paper bg-ink-raise px-2.5 py-1 font-ui text-[11px] font-bold uppercase tracking-[0.1em] text-paper"
@@ -212,10 +398,10 @@ export function GameDetailsModal() {
                   {cat}
                 </span>
               ))}
-              {details?.genres?.map((genre) => (
+              {usefulGenres.map((genre) => (
                 <span
                   key={genre}
-                  className="border border-rule px-2.5 py-1 font-ui text-[11px] uppercase tracking-[0.1em] text-smoke"
+                  className="border border-rule bg-ink-deep px-2.5 py-1 font-ui text-[11px] uppercase tracking-[0.1em] text-smoke"
                 >
                   {genre}
                 </span>
@@ -256,19 +442,71 @@ export function GameDetailsModal() {
           {/* Screenshots Gallery */}
           {screenshots.length > 0 ? (
             <section className="border border-rule-strong p-5">
-              <p className="pn-data text-paper font-bold mb-3">Captures d'écran</p>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="pn-data font-bold text-paper">Captures d'écran</p>
+                {screenshots.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-data text-xs text-smoke tabular-nums">
+                      {pad2(currentScreenshotIdx + 1)} / {pad2(screenshots.length)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => switchScreenshot(-1)}
+                      aria-label="Capture précédente"
+                      title="Capture précédente (Flèche gauche)"
+                      className="flex h-7 w-7 items-center justify-center border border-rule-strong bg-ink-deep font-data text-xs font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-1px] active:translate-y-[-1px]"
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => switchScreenshot(1)}
+                      aria-label="Capture suivante"
+                      title="Capture suivante (Flèche droite)"
+                      className="flex h-7 w-7 items-center justify-center border border-rule-strong bg-ink-deep font-data text-xs font-bold text-paper transition-all duration-90 hover:border-paper hover:bg-paper hover:text-ink-deep active:translate-x-[-1px] active:translate-y-[-1px]"
+                    >
+                      →
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
               {activeScreenshot ? (
-                <div className="relative aspect-video w-full overflow-hidden border border-rule-strong bg-ink-deep">
+                <div className="group relative aspect-video w-full overflow-hidden border border-rule-strong bg-ink-deep select-none">
                   <img
                     src={activeScreenshot}
                     alt={name}
                     className="h-full w-full object-cover"
                   />
+
+                  {screenshots.length > 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => switchScreenshot(-1)}
+                        aria-label="Capture précédente"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center border border-paper bg-ink-deep/90 font-data text-base font-bold text-paper shadow-press transition-all duration-90 hover:bg-paper hover:text-ink-deep active:translate-x-[-1px] active:translate-y-[-1px] opacity-80 group-hover:opacity-100 cursor-pointer"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => switchScreenshot(1)}
+                        aria-label="Capture suivante"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center border border-paper bg-ink-deep/90 font-data text-base font-bold text-paper shadow-press transition-all duration-90 hover:bg-paper hover:text-ink-deep active:translate-x-[-1px] active:translate-y-[-1px] opacity-80 group-hover:opacity-100 cursor-pointer"
+                      >
+                        →
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
 
               {screenshots.length > 1 ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                <div
+                  ref={thumbnailsContainerRef}
+                  className="mt-3 flex gap-2 overflow-x-auto pb-2"
+                >
                   {screenshots.map((s, index) => (
                     <button
                       key={s}
@@ -277,7 +515,7 @@ export function GameDetailsModal() {
                       className={
                         activeScreenshot === s
                           ? "h-16 w-28 shrink-0 border-2 border-paper overflow-hidden"
-                          : "h-16 w-28 shrink-0 border border-rule overflow-hidden opacity-60 hover:opacity-100"
+                          : "h-16 w-28 shrink-0 border border-rule overflow-hidden opacity-60 hover:opacity-100 transition-opacity"
                       }
                     >
                       <img

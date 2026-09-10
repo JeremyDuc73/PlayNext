@@ -94,6 +94,146 @@ export function stripHtml(html: string | undefined | null): string | null {
   return text || null;
 }
 
+export function cleanSteamCategories(categories: string[]): string[] {
+  const result: string[] = [];
+
+  let hasController = false;
+  let hasOnlineCoop = false;
+  let hasLanCoop = false;
+  let hasSplitScreen = false;
+  let hasOnlinePvp = false;
+  let hasPvp = false;
+  let hasCrossplay = false;
+  let hasMultiplayer = false;
+  let hasSolo = false;
+  let hasMmo = false;
+  let hasVr = false;
+
+  for (const raw of categories) {
+    const c = raw.trim();
+    if (!c) continue;
+    const lower = c.toLowerCase();
+
+    // Normalisation contrôleur / manette
+    if (
+      lower.includes("contrôleur") ||
+      lower.includes("controller") ||
+      lower.includes("manette") ||
+      lower.includes("dualshock") ||
+      lower.includes("dualsense")
+    ) {
+      hasController = true;
+      continue;
+    }
+
+    // VR
+    if (lower.includes("vr") || lower.includes("réalité virtuelle")) {
+      hasVr = true;
+      continue;
+    }
+
+    // Crossplay
+    if (lower.includes("multiplateforme") || lower.includes("cross-platform")) {
+      hasCrossplay = true;
+      continue;
+    }
+
+    // Écran partagé / Coop local
+    if (
+      lower.includes("écran partagé") ||
+      lower.includes("partage d'écran") ||
+      lower.includes("split screen") ||
+      lower.includes("local coop") ||
+      lower.includes("coop en local")
+    ) {
+      hasSplitScreen = true;
+      continue;
+    }
+
+    // Coop en ligne
+    if (
+      (lower.includes("coop") || lower.includes("coopération")) &&
+      (lower.includes("ligne") || lower.includes("online"))
+    ) {
+      hasOnlineCoop = true;
+      continue;
+    }
+
+    // Coop en LAN
+    if (
+      (lower.includes("coop") || lower.includes("coopération")) &&
+      lower.includes("lan")
+    ) {
+      hasLanCoop = true;
+      continue;
+    }
+
+    // JcJ en ligne
+    if (
+      (lower.includes("jcj") || lower.includes("pvp")) &&
+      (lower.includes("ligne") || lower.includes("online"))
+    ) {
+      hasOnlinePvp = true;
+      continue;
+    }
+
+    // JcJ générique
+    if (lower === "jcj" || lower === "pvp") {
+      hasPvp = true;
+      continue;
+    }
+
+    // MMO
+    if (lower.includes("mmo") || lower.includes("massivement")) {
+      hasMmo = true;
+      continue;
+    }
+
+    // Multijoueur générique
+    if (
+      lower === "multijoueur" ||
+      lower === "multi-player" ||
+      lower === "multiplayer"
+    ) {
+      hasMultiplayer = true;
+      continue;
+    }
+
+    // Solo
+    if (
+      lower === "solo" ||
+      lower === "single-player" ||
+      lower === "singleplayer"
+    ) {
+      hasSolo = true;
+      continue;
+    }
+
+    // Modes spécifiques personnalisés (ex: Riot)
+    if (lower.includes("compétitif") || lower.includes("contre bots")) {
+      result.push(c);
+      continue;
+    }
+  }
+
+  // Ordre clair et hiérarchisé des modes
+  if (hasOnlineCoop) result.push("Coop en ligne");
+  else if (hasLanCoop || hasSplitScreen) result.push("Coopération");
+
+  if (hasMultiplayer) result.push("Multijoueur");
+  if (hasCrossplay) result.push("Crossplay");
+  if (hasSplitScreen) result.push("Écran partagé");
+  if (hasLanCoop) result.push("Coop LAN");
+  if (hasOnlinePvp) result.push("JcJ en ligne");
+  else if (hasPvp) result.push("JcJ");
+  if (hasMmo) result.push("MMO");
+  if (hasSolo) result.push("Solo");
+  if (hasController) result.push("Compatible manette");
+  if (hasVr) result.push("VR");
+
+  return Array.from(new Set(result));
+}
+
 function cleanAppId(value: string): string {
   return value.replace(/[^\d]/g, "");
 }
@@ -236,7 +376,7 @@ export async function fetchSteamAppFullDetails(
 
     const raw = app.data;
     if (!raw?.name) return { status: "miss" };
-    const categories = (raw.categories ?? [])
+    const rawCategories = (raw.categories ?? [])
       .map((c) => c.description?.trim() ?? "")
       .filter(Boolean);
     const genres = (raw.genres ?? [])
@@ -253,7 +393,8 @@ export async function fetchSteamAppFullDetails(
       finalCents: raw.price_overview?.final,
     });
 
-    const groupPlayable = groupPlayableFromSteamCategories(categories, genres);
+    const groupPlayable = groupPlayableFromSteamCategories(rawCategories, genres);
+    const categories = cleanSteamCategories(rawCategories);
 
     const details: FullGameDetails = {
       launcher: "steam",

@@ -195,7 +195,7 @@ import Base from "../layouts/Base.astro";
         <table class="admin-table">
           <thead>
             <tr>
-              <th style="width: 50px;">AVATAR</th>
+              <th style="width: 56px;">AVATAR</th>
               <th>JOUEUR</th>
               <th>STATUT / DERNIÈRE ACTIVITÉ</th>
               <th>JEUX BIBLIO</th>
@@ -229,7 +229,7 @@ import Base from "../layouts/Base.astro";
   </div>
 </Base>
 
-<style>
+<style is:global>
   /* Porte d'accès sécurisée */
   .gate-box {
     max-width: 620px;
@@ -434,54 +434,65 @@ import Base from "../layouts/Base.astro";
     letter-spacing: 0.08em;
   }
 
-  /* Timeline chart */
+  /* Timeline chart — 14 colonnes égales, filets, barres en hauteur px */
   .admin-timeline-chart {
     border: 1px solid var(--rule-strong);
     background: var(--ink);
-    padding: 24px 20px 16px 20px;
+    overflow-x: auto;
   }
 
-  .timeline-bars-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    height: 140px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--rule-strong);
+  .timeline-plot {
+    display: grid;
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    min-width: 720px;
+    min-height: 220px;
   }
 
   .timeline-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100%;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-rows: 22px 1fr 28px;
     min-width: 0;
+    min-height: 220px;
+    padding: 10px 4px 0;
+    border-right: 1px solid var(--rule);
   }
 
-  .timeline-bar-wrap {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    flex: 1;
+  .timeline-col:last-child {
+    border-right: 0;
+  }
+
+  .timeline-col.is-today {
+    background: var(--ink-raise);
+    box-shadow: inset 0 -2px 0 0 var(--veto);
   }
 
   .timeline-count {
+    display: block;
+    text-align: center;
     font: 10px/1 "IBM Plex Mono", monospace;
     color: var(--smoke);
-    margin-bottom: 4px;
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+  }
+
+  .timeline-col.has-activity .timeline-count,
+  .timeline-col.is-today .timeline-count {
+    color: var(--paper);
+  }
+
+  .timeline-track {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    min-height: 148px;
+    padding-bottom: 8px;
   }
 
   .timeline-bar {
     width: 100%;
-    max-width: 38px;
+    max-width: 22px;
+    height: 4px;
     background: var(--rule-strong);
-    min-height: 3px;
-    transition: height 180ms ease, background 90ms ease;
   }
 
   .timeline-col.has-activity .timeline-bar {
@@ -493,11 +504,47 @@ import Base from "../layouts/Base.astro";
   }
 
   .timeline-date {
-    margin-top: 8px;
+    display: block;
+    text-align: center;
+    padding: 8px 0 10px;
+    border-top: 1px solid var(--rule);
     font: 10px/1 "IBM Plex Mono", monospace;
     color: var(--smoke);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     white-space: nowrap;
+  }
+
+  .timeline-col.is-today .timeline-date {
+    color: var(--paper);
+  }
+
+  .timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--rule-strong);
+    font: 10px/1.4 "IBM Plex Mono", monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--smoke);
+  }
+
+  .timeline-legend i {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 8px;
+    vertical-align: -1px;
+    background: var(--rule-strong);
+  }
+
+  .timeline-legend i.paper {
+    background: var(--paper);
+  }
+
+  .timeline-legend i.today {
+    background: var(--veto);
   }
 
   /* Table registre */
@@ -524,10 +571,15 @@ import Base from "../layouts/Base.astro";
   }
 
   .admin-table td {
-    padding: 14px 18px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--rule);
     font-size: 13px;
     vertical-align: middle;
+  }
+
+  .admin-table td:first-child {
+    width: 56px;
+    padding-right: 8px;
   }
 
   .admin-table tr:hover td {
@@ -535,8 +587,12 @@ import Base from "../layouts/Base.astro";
   }
 
   .avatar-box {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     background: var(--ink-deep);
     border: 1px solid var(--rule-strong);
     display: flex;
@@ -546,9 +602,12 @@ import Base from "../layouts/Base.astro";
   }
 
   .avatar-box img {
-    width: 100%;
-    height: 100%;
+    width: 40px;
+    height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     object-fit: cover;
+    object-position: center;
     display: block;
   }
 
@@ -807,6 +866,22 @@ import Base from "../layouts/Base.astro";
     }
   }
 
+  function todayStamp(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function normalizeDiscordAvatar(url: string | null | undefined): string | null {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      parsed.searchParams.set("size", "64");
+      return parsed.toString();
+    } catch {
+      return url;
+    }
+  }
+
   function renderTimeline(timeline: Array<{ date: string; label: string; activeCount: number }>) {
     const container = document.getElementById("timeline-container");
     if (!container) return;
@@ -817,16 +892,28 @@ import Base from "../layouts/Base.astro";
     }
 
     const maxCount = Math.max(...timeline.map((d) => d.activeCount), 1);
+    const today = todayStamp();
+    const barMax = 140;
 
     const barsHtml = timeline
       .map((day) => {
-        const heightPercent = Math.max(Math.round((day.activeCount / maxCount) * 100), 4);
         const hasActivity = day.activeCount > 0;
+        const heightPx = hasActivity
+          ? Math.max(8, Math.round((day.activeCount / maxCount) * barMax))
+          : 4;
+        const isToday = day.date === today;
+        const classes = [
+          "timeline-col",
+          hasActivity ? "has-activity" : "",
+          isToday ? "is-today" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
         return `
-          <div class="timeline-col ${hasActivity ? "has-activity" : ""}" title="${day.date} : ${day.activeCount} actif(s)">
-            <div class="timeline-bar-wrap">
-              <span class="timeline-count">${pad2(day.activeCount)}</span>
-              <div class="timeline-bar" style="height: ${heightPercent}%;"></div>
+          <div class="${classes}" title="${day.date} : ${pad2(day.activeCount)} actif(s)">
+            <span class="timeline-count">${pad2(day.activeCount)}</span>
+            <div class="timeline-track">
+              <div class="timeline-bar" style="height: ${heightPx}px"></div>
             </div>
             <span class="timeline-date">${day.label}</span>
           </div>
@@ -834,7 +921,14 @@ import Base from "../layouts/Base.astro";
       })
       .join("");
 
-    container.innerHTML = `<div class="timeline-bars-row">${barsHtml}</div>`;
+    container.innerHTML = `
+      <div class="timeline-plot">${barsHtml}</div>
+      <div class="timeline-legend">
+        <span><i></i> Aucune activité</span>
+        <span><i class="paper"></i> Joueurs actifs</span>
+        <span><i class="today"></i> Aujourd’hui</span>
+      </div>
+    `;
   }
 
   function renderUsersTable(users: Array<any>) {
@@ -855,8 +949,9 @@ import Base from "../layouts/Base.astro";
     tbody.innerHTML = users
       .map((u) => {
         const initial = (u.displayName?.charAt(0) || u.username?.charAt(0) || "?").toUpperCase();
-        const avatarHtml = u.avatarUrl
-          ? `<img src="${u.avatarUrl}" alt="${u.displayName}" loading="lazy" />`
+        const avatarSrc = normalizeDiscordAvatar(u.avatarUrl);
+        const avatarHtml = avatarSrc
+          ? `<img src="${avatarSrc}" alt="" width="40" height="40" loading="lazy" decoding="async" />`
           : `<span class="avatar-initial">${initial}</span>`;
 
         const statusTag = u.isOnline

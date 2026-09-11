@@ -58,7 +58,7 @@ export const authMicrosoftRoutes: FastifyPluginAsync<
         ok: false,
         error: "microsoft_not_configured",
         message:
-          "MICROSOFT_CLIENT_ID is required. See docs/XBOX.md to register an Entra app.",
+          "MICROSOFT_CLIENT_ID is required. Register a public Entra app (mobile/desktop + PKCE).",
       });
     }
 

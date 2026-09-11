@@ -31,8 +31,8 @@ https://api.playnext.jeremyduc.dev/auth/discord/callback
 Les valeurs de production sont dans `deploy/.env.production.example`.
 Ne jamais copier `.env` dans Git.
 
-Bot de notifications : même application, token Bot, voir
-[`docs/DISCORD.md`](../docs/DISCORD.md).
+Bot de notifications : même application Discord, token Bot
+(`DISCORD_BOT_TOKEN`).
 
 ## Caddy sur l’hôte
 

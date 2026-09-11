@@ -41,13 +41,13 @@ type AppInfo = {
 
 function microsoftErrorMessage(reason: string): string {
   if (reason === "enable_public_client") {
-    return "Lien Microsoft échoué : plateforme Mobile/desktop + public client (docs/XBOX.md).";
+    return "Lien Microsoft échoué : l’application Entra doit être un client public (plateforme Mobile et ordinateur de bureau).";
   }
   if (reason === "code_expired") {
     return "Lien Microsoft échoué : code déjà utilisé. Réessaie une seule fois.";
   }
   if (reason === "xbox_link_failed") {
-    return "Lien Microsoft échoué. Vérifie docs/XBOX.md.";
+    return "Lien Microsoft échoué. Vérifie la configuration Microsoft.";
   }
   return `Lien Microsoft échoué (${reason}).`;
 }

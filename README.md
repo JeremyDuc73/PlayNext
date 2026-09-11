@@ -1,43 +1,62 @@
-# PlayNext
+<p align="center">
+  <img src="apps/web/public/playnext.svg" width="88" height="88" alt="PlayNext">
+</p>
 
-Application Windows desktop-first pour aider un groupe d’amis à choisir un jeu rapidement : détection locale, bibliothèques croisées, votes masqués, veto, Discord.
+<h1 align="center">PlayNext</h1>
 
-Cahier des charges : `PlayNext_Cahier_des_charges_PC_V1.1.pdf`  
-Suivi produit / anti-oubli : [`BACKLOG.md`](./BACKLOG.md)
+<p align="center">
+  <strong>Ce soir, on décide.</strong><br>
+  Application Windows pour choisir un jeu entre amis,<br>
+  sans débat interminable sur Discord.
+</p>
 
-Licence : [MIT](./LICENSE)
+<p align="center">
+  <a href="https://playnext.jeremyduc.dev">Site</a>
+  ·
+  <a href="https://github.com/JeremyDuc73/PlayNext/releases/latest/download/PlayNext-Setup.exe">Télécharger</a>
+  ·
+  <a href="https://github.com/JeremyDuc73/PlayNext/releases">Versions</a>
+</p>
 
-## Structure
+---
 
-```
-apps/
-  desktop/   # Tauri 2 + React + TypeScript (produit principal)
-  api/       # Fastify + PostgreSQL
-  web/       # Site Astro public (présentation, téléchargement, docs)
-docker-compose.yml
-```
+PlayNext rassemble vos bibliothèques **Steam, Xbox, Epic et Riot**, trouve les jeux que tout le monde peut lancer, et organise un vote secret. Un bulletin, pas un launcher.
 
-## Prérequis
+## Le rituel
 
-- Node.js 20+
-- Docker (Postgres + Redis)
-- Rust + dépendances Tauri pour lancer l’app native  
-  - Windows : cible principale V1  
-  - Linux/WSL : utile pour l’API ; `tauri dev` nécessite les libs WebKit GTK
+1. **Shortlist** — chacun pioche 1 à 5 jeux parmi les titres en commun.
+2. **Bulletins secrets** — Chaud, Pourquoi pas ou Pass, sans voir les autres.
+3. **Veto** — un joker pour écarter un titre de la soirée.
+4. **Résultat** — le jeu retenu est proclamé. En cas d’égalité, la roulette tranche.
 
-### Rust local (optionnel, déjà utilisable dans ce repo)
+## Bibliothèques
 
-Si besoin d’un toolchain dans le projet :
+- Détection locale des jeux installés. Les chemins de fichiers restent sur le PC.
+- Possession Steam, Xbox et Epic pour distinguer « on l’a » et « on l’a installé ».
+- Steam Family : seuls les jeux jouables en même temps apparaissent en commun.
+- Les solos sont écartés des propositions. On garde le multijoueur.
+- Ajout manuel depuis le catalogue si un titre manque.
 
-```bash
-export RUSTUP_HOME="$PWD/.tools/rustup"
-export CARGO_HOME="$PWD/.tools/cargo"
-source "$CARGO_HOME/env"
-```
+## Groupe
 
-`.tools/` est ignoré par git.
+- Connexion Discord, invitations par lien, rôles.
+- Bibliothèque croisée du groupe, jeux masqués.
+- Bot Discord : lobby ouvert, vote, jeu retenu, propositions Steam — sans divulguer les bulletins.
+- Propositions d’achat : Chaud ou Non, unanimité, majorité ou quorum.
 
-## Démarrage rapide
+## Télécharger
+
+Windows 10 / 11, 64-bit. Installation par utilisateur, sans droits administrateur.
+
+**[Télécharger PlayNext-Setup.exe](https://github.com/JeremyDuc73/PlayNext/releases/latest/download/PlayNext-Setup.exe)**
+
+À la première ouverture, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur ». Cliquer **Informations complémentaires**, puis **Exécuter quand même**. Une seule fois.
+
+Licence [MIT](./LICENSE). Sans publicité, sans revente de données.
+
+## Développement
+
+Monorepo : app Windows (Tauri 2 + React), API (Fastify + PostgreSQL), site public (Astro).
 
 ```bash
 cp .env.example .env
@@ -46,71 +65,11 @@ npm run docker:up
 npm run dev:api
 ```
 
-Dans un autre terminal (UI navigateur, sans shell Tauri) :
-
-```bash
-npm run dev:ui
-```
-
-Site public Astro :
-
-```bash
-npm run dev -w @playnext/web
-```
-
-App native (quand la toolchain Tauri est prête) :
-
-```bash
-npm run dev:desktop
-```
-
-## Endpoints API utiles
-
-| Route | Rôle |
-|-------|------|
-| `GET /health` | Santé API + Postgres |
-| `GET /auth/discord/status` | Discord configuré ? |
-| `GET /auth/discord` | Démarre OAuth Discord |
-| `GET /auth/me` | Session courante |
-| `POST /auth/microsoft/start` | Démarre lien Microsoft / Xbox (session requise) |
-| `POST /library/sync` | Sync Steam |
-| `POST /library/riot/sync` | Sync Riot local |
-| `POST /library/xbox/sync` | Sync Xbox (title history + installés) |
-| `POST /auth/epic/exchange` | Échange interne du code Epic capturé par l’application |
-| `POST /library/epic/sync` | Sync Epic (possédés + installés) |
-| `GET /library/me` | Bibliothèque sync |
-| `GET /me/open-evenings` | Soirées en cours (lobby / vote) |
-| `POST /evenings/:id/ready` | Tampon prêt au Lobby |
-| `POST /evenings/:id/open-selection` | Orga : lancer sans les absents |
-| `GET /groups/:id/discord` | Salon Discord lié |
-| `PUT /groups/:id/discord` | Lier un salon Discord |
-| `GET /groups/:id/proposals` | Propositions Steam du groupe |
-| `POST /library/manual/search` | Recherche manuelle IGDB |
-| `POST /library/manual` | Ajout d’un jeu catalogue à la bibliothèque |
-| `DELETE /library/manual/:externalId` | Suppression d’un jeu ajouté manuellement |
-
-Renseigner Discord (+ optionnel Steam / Microsoft) dans `.env`.  
-Xbox : [`docs/XBOX.md`](./docs/XBOX.md) · Epic : [`docs/EPIC.md`](./docs/EPIC.md) ·
-Bot : [`docs/DISCORD.md`](./docs/DISCORD.md).
-
-## Scripts root
-
-| Script | Action |
-|--------|--------|
-| `npm run dev:api` | API en watch |
-| `npm run dev:ui` | Frontend Vite |
-| `npm run dev:desktop` | Tauri dev |
-| `npm run docker:up` | Postgres + Redis |
+| Commande | Rôle |
+|----------|------|
+| `npm run dev:ui` | Interface dans le navigateur |
+| `npm run dev:desktop` | App native Tauri |
+| `npm run dev -w @playnext/web` | Site public |
 | `npm run typecheck` | Types API + desktop |
-| `npm run build -w @playnext/web` | Build du site public |
 
-## Phase en cours
-
-**P5 — Mise en ligne** : API, site public et workflow Windows prêts ; VPS,
-signature et recette finale restent à valider.
-
-Déroulé complet : [`BACKLOG.md`](./BACKLOG.md) (section *Déroulé recommandé*).  
-Build Windows : [`docs/WINDOWS.md`](./docs/WINDOWS.md).  
-Xbox : [`docs/XBOX.md`](./docs/XBOX.md).
-Mise en ligne : [`deploy/README.md`](./deploy/README.md).
-Documentation : [`docs/README.md`](./docs/README.md).
+Prérequis : Node.js 20+, Docker (Postgres + Redis). Rust + WebView2 pour le shell Windows.

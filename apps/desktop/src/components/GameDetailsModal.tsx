@@ -155,6 +155,7 @@ export function GameDetailsModal() {
   const [details, setDetails] = useState<FullGameDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeScreenshot, setActiveScreenshot] = useState<string | null>(null);
+  const thumbnailsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!target) {
@@ -191,17 +192,7 @@ export function GameDetailsModal() {
     };
   }, [target]);
 
-  if (!target) return null;
-
-  const name = details?.name || target.name;
-  const launcher = target.launcher.toUpperCase();
-  const coverUrl = details?.coverUrl ?? target.coverUrl;
   const screenshots = details?.screenshots ?? [];
-  const owners = target.owners ?? [];
-  const installedOwners = owners.filter((o) => o.installed);
-
-  const thumbnailsContainerRef = useRef<HTMLDivElement>(null);
-
   const activeIndex = screenshots.findIndex((s) => s === activeScreenshot);
   const currentScreenshotIdx = activeIndex >= 0 ? activeIndex : 0;
 
@@ -223,6 +214,7 @@ export function GameDetailsModal() {
   }
 
   useEffect(() => {
+    if (!target) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -236,7 +228,7 @@ export function GameDetailsModal() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  }, [target, currentScreenshotIdx, screenshots, close]);
 
   const usefulModes = useMemo(
     () => cleanCategories(details?.categories),
@@ -246,6 +238,14 @@ export function GameDetailsModal() {
     () => (details?.genres ?? []).slice(0, 5),
     [details?.genres],
   );
+
+  if (!target) return null;
+
+  const name = details?.name || target.name;
+  const launcher = target.launcher.toUpperCase();
+  const coverUrl = details?.coverUrl ?? target.coverUrl;
+  const owners = target.owners ?? [];
+  const installedOwners = owners.filter((o) => o.installed);
 
   function handleCreateEvening() {
     if (!target) return;

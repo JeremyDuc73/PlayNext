@@ -8,6 +8,7 @@ import { LibraryHub } from "./components/LibraryHub";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { OnboardingModal } from "./components/OnboardingModal";
 import { GameDetailsModal } from "./components/GameDetailsModal";
+import { AppBootSplash } from "./components/AppBootSplash";
 import {
   exchangeHandoff,
   fetchMe,
@@ -100,6 +101,7 @@ export default function App() {
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [booting, setBooting] = useState(true);
   const isDesktop = runningInDesktopShell();
   const shellRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
@@ -217,7 +219,7 @@ export default function App() {
         if (!cancelled) {
           setAppInfo({
             name: "PlayNext",
-            version: "0.6.1",
+            version: "0.6.2",
             platform: "web-preview",
           });
         }
@@ -570,6 +572,9 @@ export default function App() {
         onClose={handleCloseOnboarding}
       />
       <GameDetailsModal />
+      {booting ? (
+        <AppBootSplash onComplete={() => setBooting(false)} />
+      ) : null}
     </div>
   );
 }

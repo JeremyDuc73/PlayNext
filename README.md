@@ -5,9 +5,9 @@
 <h1 align="center">PlayNext</h1>
 
 <p align="center">
-  <strong>Ce soir, on décide.</strong><br>
+  <strong>Fini le « on joue à quoi ce soir ? »</strong><br>
   Application Windows pour choisir un jeu entre amis,<br>
-  sans débat interminable sur Discord.
+  sans y passer la moitié de la soirée sur Discord.
 </p>
 
 <p align="center">
@@ -22,12 +22,12 @@
 
 PlayNext rassemble vos bibliothèques **Steam, Xbox, Epic et Riot**, trouve les jeux que tout le monde peut lancer, et organise un vote secret. Un bulletin, pas un launcher.
 
-## Le rituel
+## Comment ça marche
 
-1. **Shortlist** — chacun pioche 1 à 5 jeux parmi les titres en commun.
-2. **Bulletins secrets** — Chaud, Pourquoi pas ou Pass, sans voir les autres.
-3. **Veto** — un joker pour écarter un titre de la soirée.
-4. **Résultat** — le jeu retenu est proclamé. En cas d’égalité, la roulette tranche.
+1. **Vous piochez** — chacun met de côté 1 à 5 jeux parmi ceux que tout le monde a.
+2. **Vous votez** — Chaud, Pourquoi pas ou Pass, tout le monde en même temps, sans se spoiler.
+3. **Le veto** — un jeu te saoule ? Tu le sors de la soirée, et c’est réglé.
+4. **On lance** — le jeu qui met tout le monde d’accord l’emporte. Égalité ? La roulette tranche.
 
 ## Bibliothèques
 

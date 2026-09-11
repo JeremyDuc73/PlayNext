@@ -27,11 +27,172 @@ const downloadUrl =
         Windows 10/11 · Connexion Discord · Détection locale sécurisée
       </p>
     </div>
-    <div class="hero-mark" aria-label="Logo PlayNext">
-      <img src="/playnext.svg" alt="PlayNext" />
+    <div class="hero-preview" aria-label="Aperçu de l'application PlayNext">
+      <div class="hero-preview-window">
+        <div class="hero-preview-bar">
+          <span class="mono">PLAYNEXT · WINDOWS 10 / 11</span>
+          <div class="hero-preview-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+        <a href="/bibliotheque.png" target="_blank" rel="noopener" title="Agrandir la capture d'écran">
+          <img
+            src="/bibliotheque.png"
+            alt="Interface de l'application PlayNext sur Windows"
+            loading="eager"
+            width="2880"
+            height="1716"
+          />
+        </a>
+      </div>
     </div>
   </section>
 
+  <!-- L'APPLICATION EN IMAGES -->
+  <section class="section">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow mb-1">Aperçu de l’interface</p>
+        <h2>L’application en images</h2>
+      </div>
+      <p>
+        Voici à quoi ressemble PlayNext une fois lancé sur votre PC : une interface sombre,
+        rapide et pensée pour décider sans prise de tête.
+      </p>
+    </div>
+
+    <!-- Capture principale (Bibliothèque) -->
+    <div class="showcase-featured">
+      <div class="showcase-bar">
+        <span>PlayNext · Bibliothèque partagée (Steam, Xbox, Epic, Riot)</span>
+        <a class="showcase-link mono" href="/bibliotheque.png" target="_blank" rel="noopener">
+          Agrandir l’image ↗
+        </a>
+      </div>
+      <a href="/bibliotheque.png" target="_blank" rel="noopener" title="Ouvrir la capture de la bibliothèque">
+        <img
+          src="/bibliotheque.png"
+          alt="Bibliothèque partagée de jeux Steam, Xbox, Epic et Riot dans PlayNext"
+          loading="lazy"
+          width="2880"
+          height="1716"
+        />
+      </a>
+      <div class="showcase-caption">
+        <div>
+          <span class="mono" style="color: var(--veto); font-size: 11px;">VUE PRINCIPALE</span>
+          <h3 style="margin-top: 6px;">Toutes vos bibliothèques réunies au même endroit</h3>
+          <p>
+            Détection automatique de vos jeux installés et possédés sur vos différents launchers.
+            Filtrez en un clic pour n’afficher que les jeux multijoueur jouables ensemble ce soir.
+          </p>
+        </div>
+        <a class="button secondary" href={downloadUrl}>Installer l’app</a>
+      </div>
+    </div>
+
+    <!-- Grille de captures secondaires -->
+    <div class="showcase-grid">
+      <article class="showcase-card">
+        <a href="/detail-jeu.png" target="_blank" rel="noopener" title="Voir la fiche détaillée">
+          <div class="showcase-bar">
+            <span>Fiche du jeu · Abiotic Factor</span>
+            <span class="showcase-link mono">Agrandir ↗</span>
+          </div>
+          <div class="showcase-card-media">
+            <img
+              src="/detail-jeu.png"
+              alt="Fiche détaillée d’un jeu dans PlayNext"
+              loading="lazy"
+            />
+          </div>
+        </a>
+        <div class="showcase-card-body">
+          <span class="mono" style="color: var(--veto);">01 · FICHE DÉTAILLÉE</span>
+          <h3>Toutes les infos utiles en un coup d'œil</h3>
+          <p>
+            Modes coop et multi (en ligne, LAN, crossplay), résumé officiel en français,
+            date de sortie et liste des membres du groupe qui possèdent déjà le titre.
+          </p>
+        </div>
+      </article>
+
+      <article class="showcase-card">
+        <a href="/groupe.png" target="_blank" rel="noopener" title="Voir l'espace groupe">
+          <div class="showcase-bar">
+            <span>Espace groupe · Membres & jeux</span>
+            <span class="showcase-link mono">Agrandir ↗</span>
+          </div>
+          <div class="showcase-card-media">
+            <img
+              src="/groupe.png"
+              alt="Gestion du groupe et liste des membres dans PlayNext"
+              loading="lazy"
+            />
+          </div>
+        </a>
+        <div class="showcase-card-body">
+          <span class="mono" style="color: var(--veto);">02 · VOTRE BANDE</span>
+          <h3>Vos amis réunis autour de vos jeux communs</h3>
+          <p>
+            Rejoignez ou créez votre groupe avec un code d'invitation direct.
+            PlayNext croise instantanément vos jeux pour isoler ce que vous avez tous en commun.
+          </p>
+        </div>
+      </article>
+
+      <article class="showcase-card">
+        <a href="/calendrier.png" target="_blank" rel="noopener" title="Voir le calendrier">
+          <div class="showcase-bar">
+            <span>Calendrier · Sessions du groupe</span>
+            <span class="showcase-link mono">Agrandir ↗</span>
+          </div>
+          <div class="showcase-card-media">
+            <img
+              src="/calendrier.png"
+              alt="Calendrier des sessions de jeu dans PlayNext"
+              loading="lazy"
+            />
+          </div>
+        </a>
+        <div class="showcase-card-body">
+          <span class="mono" style="color: var(--veto);">03 · PLANNING</span>
+          <h3>Bloquer les dates de vos prochaines soirées</h3>
+          <p>
+            Organisez vos sessions pour ce soir ou pour le week-end prochain.
+            Chacun sait quand se connecter et quel jeu a été retenu pour la soirée.
+          </p>
+        </div>
+      </article>
+
+      <article class="showcase-card">
+        <a href="/jeu-choisi-discord.png" target="_blank" rel="noopener" title="Voir l'annonce Discord">
+          <div class="showcase-bar">
+            <span>Bot Discord · Résultat du vote</span>
+            <span class="showcase-link mono">Agrandir ↗</span>
+          </div>
+          <div class="showcase-card-media">
+            <img
+              src="/jeu-choisi-discord.png"
+              alt="Message automatique du bot Discord avec le jeu gagnant"
+              loading="lazy"
+              class="fit-contain"
+            />
+          </div>
+        </a>
+        <div class="showcase-card-body">
+          <span class="mono" style="color: var(--veto);">04 · DISCORD CONNECTÉ</span>
+          <h3>Notifications et résultat en direct dans votre salon</h3>
+          <p>
+            Le bot Discord annonce le début du vote secret, donne le compte à rebours de session
+            et affiche l'affiche officielle du jeu gagnant pour que tout le monde soit prévenu.
+          </p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- COMMENT ÇA MARCHE -->
   <section class="section">
     <div class="section-heading">
       <div>
@@ -57,7 +218,7 @@ const downloadUrl =
       <article class="step">
         <span class="step-number">03</span>
         <h3>Voter</h3>
-        <p>Votez tous en même temps (Chaud / Pourquoi pas / Pass). Le jeu gagnant est proclamé direct !</p>
+        <p>Votez tous en même temps (Chaud / Pourquoi pas / Pass). Le jeu qui met tout le monde d’accord l’emporte !</p>
       </article>
     </div>
   </section>
@@ -84,8 +245,8 @@ const downloadUrl =
         <p>Un jeu te sort par les yeux ? Pose ton joker veto : le titre est dégagé direct de la soirée.</p>
       </div>
       <div>
-        <strong>Départage automatique</strong>
-        <p>En cas d'égalité parfaite entre vos jeux préférés, la roulette tranche pour éviter tout blocage.</p>
+        <strong>Départage équitable</strong>
+        <p>En cas d'égalité entre vos jeux préférés, vous pouvez relancer un vote ou trancher à la roulette.</p>
       </div>
     </div>
   </section>

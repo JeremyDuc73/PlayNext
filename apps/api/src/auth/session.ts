@@ -58,12 +58,13 @@ export async function upsertDiscordUser(
 ): Promise<SessionUserRow> {
   const result = await db.pool.query<SessionUserRow>(
     `
-      INSERT INTO users (discord_id, username, global_name, avatar)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO users (discord_id, username, global_name, avatar, last_seen_at)
+      VALUES ($1, $2, $3, $4, now())
       ON CONFLICT (discord_id) DO UPDATE SET
         username = EXCLUDED.username,
         global_name = EXCLUDED.global_name,
         avatar = EXCLUDED.avatar,
+        last_seen_at = now(),
         updated_at = now()
       RETURNING id AS user_id, discord_id, username, global_name, avatar
     `,
@@ -117,6 +118,19 @@ export async function findUserBySessionToken(
   );
 
   const row = result.rows[0];
+  if (row) {
+    void db.pool
+      .query(
+        `
+          UPDATE users
+          SET last_seen_at = now()
+          WHERE id = $1
+            AND (last_seen_at IS NULL OR last_seen_at < now() - interval '2 minutes')
+        `,
+        [row.user_id],
+      )
+      .catch(() => {});
+  }
   return row ? toPublicUser(row) : null;
 }
 

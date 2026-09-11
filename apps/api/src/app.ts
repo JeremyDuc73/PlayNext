@@ -14,6 +14,7 @@ import { libraryRoutes } from "./routes/library.js";
 import { manualLibraryRoutes } from "./routes/manual-library.js";
 import { metaRoutes } from "./routes/meta.js";
 import { proposalsRoutes } from "./routes/proposals.js";
+import { statsRoutes } from "./routes/stats.js";
 import { steamRoutes } from "./routes/steam.js";
 
 export async function buildApp(config: Env, db: Db) {
@@ -31,6 +32,8 @@ export async function buildApp(config: Env, db: Db) {
   const corsOrigins = [
     config.APP_URL,
     config.WEB_URL,
+    "http://localhost:4321",
+    "http://127.0.0.1:4321",
     "https://tauri.localhost",
     "http://tauri.localhost",
     "tauri://localhost",
@@ -53,12 +56,15 @@ export async function buildApp(config: Env, db: Db) {
   await app.register(steamRoutes, { db });
   await app.register(eveningsRoutes, { db, config });
   await app.register(metaRoutes, { db });
+  await app.register(statsRoutes, { db });
 
   app.get("/", async () => ({
     ok: true,
     name: "PlayNext API",
     docs: {
       health: "/health",
+      stats: "/stats",
+      statsActive: "/stats/active",
       discordStatus: "/auth/discord/status",
       discordLogin: "/auth/discord",
       microsoftStatus: "/auth/microsoft/status",

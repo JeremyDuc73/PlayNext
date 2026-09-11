@@ -7,6 +7,7 @@ Site vitrine PlayNext (Astro).
 - `/` — présentation et parcours produit ;
 - `/download` — téléchargement du setup Windows GitHub ;
 - `/docs` — fonctionnement et données ;
+- `/admin` — compteurs d’utilisateurs actifs et statistiques ;
 - `/legal` — informations du projet.
 
 ## Développement

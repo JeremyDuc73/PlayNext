@@ -12,6 +12,10 @@ export async function migrate(db: Db): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+    CREATE INDEX IF NOT EXISTS users_last_seen_at_idx ON users(last_seen_at);
+
     CREATE TABLE IF NOT EXISTS sessions (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

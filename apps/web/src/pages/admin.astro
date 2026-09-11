@@ -1,0 +1,937 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Administration & Statistiques — PlayNext"
+  description="Compteurs d’utilisateurs actifs et métriques d’usage de l’application PlayNext."
+>
+  <!-- PORTAIL DE VERROUILLAGE / CODE D'ACCÈS -->
+  <section class="section" id="admin-gate">
+    <div class="gate-box">
+      <div class="admin-top-bar" style="margin-bottom: 20px;">
+        <p class="eyebrow" style="margin: 0;">Sécurité · Accès restreint</p>
+        <span class="admin-badge">Zone réservée</span>
+      </div>
+      <span class="accent"></span>
+      <h1 class="gate-title">Code d’accès requis</h1>
+      <p class="gate-desc">
+        Cette section est protégée par un code administrateur. Entrez votre clé d’accès pour
+        consulter les compteurs d’utilisateurs en direct et les métriques de l’application.
+      </p>
+
+      <form id="gate-form" class="gate-form" autocomplete="off">
+        <div class="gate-input-wrap">
+          <input
+            type="password"
+            id="gate-code-input"
+            class="gate-input"
+            placeholder="Entrez le code d’accès"
+            autocomplete="current-password"
+            autofocus
+            required
+          />
+          <button type="submit" class="button">Déverrouiller</button>
+        </div>
+        <div id="gate-error" class="gate-error" style="display: none;">
+          Code d’accès incorrect.
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- TABLEAU DE BORD (DÉVERROUILLÉ) -->
+  <div id="admin-dashboard" style="display: none;">
+    <section class="section">
+      <div class="prose page-intro">
+        <div class="admin-top-bar">
+          <p class="eyebrow" style="margin: 0;">Tableau de bord · Suivi en direct</p>
+          <span class="admin-badge">Compte nashoba_ exclu</span>
+        </div>
+        <span class="accent"></span>
+        <h1>Statistiques & Utilisateurs</h1>
+        <p>
+          Compteurs en temps réel de l’activité sur l’application Windows PlayNext.
+          Les actions et sessions du compte administrateur sont automatiquement exclues.
+        </p>
+
+        <div class="admin-controls">
+          <div class="admin-sync-indicator">
+            <span class="admin-pulse" id="sync-dot"></span>
+            <span class="mono" id="sync-status">Connexion à l’API...</span>
+          </div>
+          <div class="admin-btn-group">
+            <button type="button" class="button secondary" id="btn-lock">Verrouiller</button>
+            <button type="button" class="button" id="btn-refresh">Actualiser</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Message d'erreur si l'API est injoignable -->
+    <div id="admin-error" class="section" style="display: none;">
+      <div class="admin-error-box">
+        <strong>Impossible de contacter l’API PlayNext</strong>
+        <p id="admin-error-msg">Vérifiez que le serveur API est bien démarré.</p>
+        <button type="button" class="button secondary" id="btn-retry">Réessayer</button>
+      </div>
+    </div>
+
+    <!-- COMPTEUR UTILISATEURS ACTIFS -->
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow mb-1">Fréquentation</p>
+          <h2>Utilisateurs actifs</h2>
+        </div>
+        <p>
+          Joueurs utilisant actuellement l’application ou actifs récemment sur le réseau.
+        </p>
+      </div>
+
+      <div class="admin-counters-grid">
+        <div class="admin-counter-card highlight">
+          <span class="step-number" style="margin-bottom: 12px;">EN DIRECT</span>
+          <strong class="counter-val" id="stat-active-now">--</strong>
+          <p class="counter-label">Actifs ces 15 dernières minutes</p>
+        </div>
+        <div class="admin-counter-card">
+          <span class="step-number" style="margin-bottom: 12px;">24 HEURES</span>
+          <strong class="counter-val" id="stat-active-24h">--</strong>
+          <p class="counter-label">Utilisateurs actifs aujourd’hui</p>
+        </div>
+        <div class="admin-counter-card">
+          <span class="step-number" style="margin-bottom: 12px;">7 JOURS</span>
+          <strong class="counter-val" id="stat-active-7d">--</strong>
+          <p class="counter-label">Utilisateurs actifs cette semaine</p>
+        </div>
+        <div class="admin-counter-card">
+          <span class="step-number" style="margin-bottom: 12px;">30 JOURS</span>
+          <strong class="counter-val" id="stat-active-30d">--</strong>
+          <p class="counter-label">Utilisateurs actifs ce mois-ci</p>
+        </div>
+        <div class="admin-counter-card">
+          <span class="step-number" style="margin-bottom: 12px;">TOTAL INSCRITS</span>
+          <strong class="counter-val" id="stat-total-users">--</strong>
+          <p class="counter-label">Comptes joueurs enregistrés</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MÉTRIQUES USAGE PRODUIT -->
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow mb-1">Usage produit</p>
+          <h2>Activité & Groupes</h2>
+        </div>
+        <p>
+          Volume des décisions prises et utilisation des fonctionnalités collaboratives.
+        </p>
+      </div>
+
+      <div class="admin-stats-grid">
+        <div class="admin-stat-item">
+          <span class="mono">SOIRÉES ORGANISÉES</span>
+          <strong class="stat-number" id="stat-total-evenings">--</strong>
+          <p class="stat-sub" id="stat-evenings-breakdown">-- terminées · -- en cours</p>
+        </div>
+        <div class="admin-stat-item">
+          <span class="mono">VOTES & BULLETINS</span>
+          <strong class="stat-number" id="stat-total-votes">--</strong>
+          <p class="stat-sub">Bulletins secrets déposés</p>
+        </div>
+        <div class="admin-stat-item">
+          <span class="mono">GROUPES FORMÉS</span>
+          <strong class="stat-number" id="stat-total-groups">--</strong>
+          <p class="stat-sub">Groupes d’amis actifs</p>
+        </div>
+        <div class="admin-stat-item">
+          <span class="mono">JEUX SYNCHRONISÉS</span>
+          <strong class="stat-number" id="stat-total-games">--</strong>
+          <p class="stat-sub" id="stat-unique-games">-- titres uniques détectés</p>
+        </div>
+        <div class="admin-stat-item">
+          <span class="mono">PROPOSITIONS STEAM</span>
+          <strong class="stat-number" id="stat-total-proposals">--</strong>
+          <p class="stat-sub">Soumissions au groupe pour achat</p>
+        </div>
+        <div class="admin-stat-item">
+          <span class="mono">FILTRE STATS</span>
+          <strong class="stat-number" style="font-size: 20px; line-height: 1.3; color: var(--paper);">ACTIF</strong>
+          <p class="stat-sub">Exclusion : <code>230720809218342912</code></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIQUE 14 JOURS -->
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow mb-1">Tendance</p>
+          <h2>Activité sur 14 jours</h2>
+        </div>
+        <p>Nombre d’utilisateurs distincts actifs chaque jour.</p>
+      </div>
+
+      <div class="admin-timeline-chart" id="timeline-container">
+        <p class="mono" style="padding: 24px; text-align: center;">Chargement de l’historique...</p>
+      </div>
+    </section>
+
+    <!-- REGISTRE UTILISATEURS -->
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow mb-1">Communauté</p>
+          <h2>Derniers utilisateurs actifs</h2>
+        </div>
+        <p>
+          Liste des derniers comptes ayant synchronisé ou utilisé l’application Windows.
+        </p>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">AVATAR</th>
+              <th>JOUEUR</th>
+              <th>STATUT / DERNIÈRE ACTIVITÉ</th>
+              <th>JEUX BIBLIO</th>
+              <th>GROUPES</th>
+              <th>INSCRIT LE</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body">
+            <tr>
+              <td colspan="6" class="mono" style="text-align: center; padding: 32px;">
+                Chargement des joueurs...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- NOTE ADMINISTRATIVE -->
+    <section class="section" style="border-bottom: none;">
+      <div class="admin-notice">
+        <span class="admin-notice-tag">RÈGLE D’EXCLUSION</span>
+        <p>
+          Le compte Discord <strong>nashoba_</strong> (identifiant <code>230720809218342912</code>)
+          est automatiquement filtré à la source dans la base de données.
+          Ses lancements d’application, connexions, votes, groupes créés et jeux synchronisés ne sont
+          pas comptabilisés dans les chiffres ci-dessus pour refléter l’usage réel des autres joueurs.
+        </p>
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  /* Porte d'accès sécurisée */
+  .gate-box {
+    max-width: 620px;
+    margin: 40px auto;
+    padding: clamp(32px, 5vw, 48px);
+    border: 1px solid var(--rule-strong);
+    background: var(--ink);
+  }
+
+  .gate-title {
+    font-size: clamp(32px, 5vw, 54px);
+    margin: 12px 0 16px 0;
+  }
+
+  .gate-desc {
+    color: var(--paper-2);
+    font-size: 16px;
+    line-height: 1.55;
+    margin: 0 0 28px 0;
+  }
+
+  .gate-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .gate-input-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .gate-input {
+    flex: 1;
+    min-width: 220px;
+    min-height: 52px;
+    padding: 0 18px;
+    background: var(--ink-deep);
+    border: 1px solid var(--rule-strong);
+    color: var(--paper);
+    font: 14px "IBM Plex Mono", monospace;
+    letter-spacing: 0.12em;
+    outline: none;
+    transition: border-color 90ms ease;
+  }
+
+  .gate-input:focus {
+    border-color: var(--paper);
+    outline: 2px solid var(--veto);
+    outline-offset: -2px;
+  }
+
+  .gate-error {
+    padding: 12px 16px;
+    border: 1px solid var(--veto);
+    background: var(--ink-deep);
+    color: var(--veto);
+    font: 700 11px/1.4 "IBM Plex Mono", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .admin-top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .admin-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--rule-strong);
+    color: var(--paper-2);
+    font: 700 10px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule);
+  }
+
+  .admin-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule-strong);
+  }
+
+  .admin-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .admin-sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .admin-pulse {
+    width: 8px;
+    height: 8px;
+    background: var(--smoke);
+    display: inline-block;
+  }
+
+  .admin-pulse.live {
+    background: var(--paper);
+    box-shadow: 0 0 0 2px var(--veto);
+  }
+
+  .admin-error-box {
+    padding: 24px;
+    border: 1px solid var(--veto);
+    background: var(--ink);
+  }
+
+  .admin-error-box strong {
+    display: block;
+    color: var(--veto);
+    font: 18px/1 "Archivo Black", sans-serif;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .admin-error-box p {
+    color: var(--paper-2);
+    margin: 0 0 16px 0;
+  }
+
+  /* Grille des compteurs actifs */
+  .admin-counters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--rule-strong);
+    border: 1px solid var(--rule-strong);
+  }
+
+  .admin-counter-card {
+    padding: 28px 24px;
+    background: var(--ink-deep);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .admin-counter-card.highlight {
+    background: var(--ink);
+    border-left: 3px solid var(--veto);
+  }
+
+  .counter-val {
+    font: 400 clamp(42px, 5vw, 64px)/0.9 "Archivo Black", sans-serif;
+    letter-spacing: -0.04em;
+    color: var(--paper);
+    margin: 12px 0 16px 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .counter-label {
+    margin: 0;
+    color: var(--smoke);
+    font: 11px/1.4 "IBM Plex Mono", monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Grille stats produit */
+  .admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--rule-strong);
+    border: 1px solid var(--rule-strong);
+  }
+
+  .admin-stat-item {
+    padding: 24px;
+    background: var(--ink);
+  }
+
+  .stat-number {
+    display: block;
+    margin: 12px 0 6px 0;
+    font: 400 clamp(28px, 3.5vw, 42px)/1 "Archivo Black", sans-serif;
+    color: var(--paper);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-sub {
+    margin: 0;
+    color: var(--smoke);
+    font: 11px/1.4 "IBM Plex Mono", monospace;
+    letter-spacing: 0.08em;
+  }
+
+  /* Timeline chart */
+  .admin-timeline-chart {
+    border: 1px solid var(--rule-strong);
+    background: var(--ink);
+    padding: 24px 20px 16px 20px;
+  }
+
+  .timeline-bars-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 140px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+
+  .timeline-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .timeline-bar-wrap {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+  }
+
+  .timeline-count {
+    font: 10px/1 "IBM Plex Mono", monospace;
+    color: var(--smoke);
+    margin-bottom: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timeline-bar {
+    width: 100%;
+    max-width: 38px;
+    background: var(--rule-strong);
+    min-height: 3px;
+    transition: height 180ms ease, background 90ms ease;
+  }
+
+  .timeline-col.has-activity .timeline-bar {
+    background: var(--paper);
+  }
+
+  .timeline-col:hover .timeline-bar {
+    background: var(--veto);
+  }
+
+  .timeline-date {
+    margin-top: 8px;
+    font: 10px/1 "IBM Plex Mono", monospace;
+    color: var(--smoke);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  /* Table registre */
+  .admin-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule-strong);
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--ink);
+    text-align: left;
+  }
+
+  .admin-table th {
+    padding: 14px 18px;
+    background: var(--ink-deep);
+    border-bottom: 1px solid var(--rule-strong);
+    color: var(--smoke);
+    font: 700 10px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .admin-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  .admin-table tr:hover td {
+    background: var(--ink-raise);
+  }
+
+  .avatar-box {
+    width: 32px;
+    height: 32px;
+    background: var(--ink-deep);
+    border: 1px solid var(--rule-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .avatar-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .avatar-initial {
+    font: 700 12px/1 "IBM Plex Mono", monospace;
+    color: var(--paper-2);
+  }
+
+  .user-primary {
+    font-weight: 700;
+    color: var(--paper);
+    display: block;
+    line-height: 1.2;
+  }
+
+  .user-sub {
+    font: 11px/1.3 "IBM Plex Mono", monospace;
+    color: var(--smoke);
+    display: block;
+  }
+
+  .status-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    font: 700 10px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .status-tag.online {
+    background: var(--paper);
+    color: var(--ink-deep);
+  }
+
+  .status-tag.offline {
+    background: transparent;
+    border: 1px solid var(--rule-strong);
+    color: var(--smoke);
+  }
+
+  /* Note admin */
+  .admin-notice {
+    padding: 24px;
+    border: 1px solid var(--rule-strong);
+    background: var(--ink);
+  }
+
+  .admin-notice-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--veto);
+    color: var(--ink-deep);
+    font: 700 10px/1 "Archivo Black", sans-serif;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .admin-notice p {
+    margin: 0;
+    color: var(--paper-2);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .admin-notice code {
+    background: var(--ink-deep);
+    border: 1px solid var(--rule-strong);
+    padding: 2px 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--paper);
+  }
+</style>
+
+<script>
+  const EXPECTED_CODE = "fidjie";
+  const STORAGE_KEY = "pn_admin_code";
+
+  function pad2(n: number): string {
+    return String(Math.max(0, Math.floor(n))).padStart(2, "0");
+  }
+
+  function formatRelative(isoDate: string): string {
+    const diffMs = Date.now() - new Date(isoDate).getTime();
+    if (diffMs < 0) return "À l’instant";
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1) return "À l’instant";
+    if (min < 60) return `Il y a ${pad2(min)} min`;
+    const hours = Math.floor(min / 60);
+    if (hours < 24) return `Il y a ${pad2(hours)} h`;
+    const days = Math.floor(hours / 24);
+    return `Il y a ${pad2(days)} j`;
+  }
+
+  function formatDateShort(isoDate: string): string {
+    const d = new Date(isoDate);
+    const day = pad2(d.getDate());
+    const month = pad2(d.getMonth() + 1);
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  const API_BASE =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+      ? "http://localhost:3001"
+      : "https://api.playnext.jeremyduc.dev";
+
+  const gateSection = document.getElementById("admin-gate");
+  const dashboardContainer = document.getElementById("admin-dashboard");
+  const gateForm = document.getElementById("gate-form");
+  const gateInput = document.getElementById("gate-code-input") as HTMLInputElement | null;
+  const gateError = document.getElementById("gate-error");
+  const btnLock = document.getElementById("btn-lock");
+
+  function getActiveCode(): string | null {
+    try {
+      return sessionStorage.getItem(STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function setActiveCode(code: string): void {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, code);
+    } catch {
+      // ignore
+    }
+  }
+
+  function clearActiveCode(): void {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  function lockUI(errorMessage?: string) {
+    clearActiveCode();
+    if (dashboardContainer) dashboardContainer.style.display = "none";
+    if (gateSection) gateSection.style.display = "block";
+    if (gateInput) {
+      gateInput.value = "";
+      gateInput.focus();
+    }
+    if (gateError) {
+      if (errorMessage) {
+        gateError.textContent = errorMessage;
+        gateError.style.display = "block";
+      } else {
+        gateError.style.display = "none";
+      }
+    }
+  }
+
+  function unlockUI() {
+    if (gateSection) gateSection.style.display = "none";
+    if (dashboardContainer) dashboardContainer.style.display = "block";
+    if (gateError) gateError.style.display = "none";
+  }
+
+  async function loadStats() {
+    const currentCode = getActiveCode();
+    if (!currentCode || currentCode.trim().toLowerCase() !== EXPECTED_CODE) {
+      lockUI();
+      return;
+    }
+
+    const syncDot = document.getElementById("sync-dot");
+    const syncStatus = document.getElementById("sync-status");
+    const errorBox = document.getElementById("admin-error");
+    const errorMsg = document.getElementById("admin-error-msg");
+
+    if (syncStatus) syncStatus.textContent = "Actualisation...";
+    if (syncDot) syncDot.classList.remove("live");
+
+    try {
+      const url = new URL(`${API_BASE}/stats`);
+      url.searchParams.set("code", currentCode);
+
+      const res = await fetch(url.toString(), {
+        headers: {
+          Accept: "application/json",
+          "x-admin-key": currentCode,
+        },
+      });
+
+      if (res.status === 401) {
+        lockUI("Code d’accès refusé par l'API.");
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(`Erreur serveur (${res.status})`);
+      }
+
+      const data = await res.json();
+      if (!data.ok) throw new Error("Réponse API invalide");
+
+      // Cacher l'erreur si affichée
+      if (errorBox) errorBox.style.display = "none";
+
+      // Compteurs actifs
+      const elNow = document.getElementById("stat-active-now");
+      const el24h = document.getElementById("stat-active-24h");
+      const el7d = document.getElementById("stat-active-7d");
+      const el30d = document.getElementById("stat-active-30d");
+      const elTotal = document.getElementById("stat-total-users");
+
+      if (elNow) elNow.textContent = pad2(data.activeUsers.now);
+      if (el24h) el24h.textContent = pad2(data.activeUsers.last24h);
+      if (el7d) el7d.textContent = pad2(data.activeUsers.last7d);
+      if (el30d) el30d.textContent = pad2(data.activeUsers.last30d);
+      if (elTotal) elTotal.textContent = pad2(data.activeUsers.total);
+
+      // Métriques produit
+      const elEvenings = document.getElementById("stat-total-evenings");
+      const elEveningsBreakdown = document.getElementById("stat-evenings-breakdown");
+      const elVotes = document.getElementById("stat-total-votes");
+      const elGroups = document.getElementById("stat-total-groups");
+      const elGames = document.getElementById("stat-total-games");
+      const elUniqueGames = document.getElementById("stat-unique-games");
+      const elProposals = document.getElementById("stat-total-proposals");
+
+      if (elEvenings) elEvenings.textContent = pad2(data.overview.totalEvenings);
+      if (elEveningsBreakdown) {
+        elEveningsBreakdown.textContent = `${pad2(data.overview.completedEvenings)} terminées · ${pad2(data.overview.liveEvenings)} en cours`;
+      }
+      if (elVotes) elVotes.textContent = pad2(data.overview.totalVotes);
+      if (elGroups) elGroups.textContent = pad2(data.overview.totalGroups);
+      if (elGames) elGames.textContent = pad2(data.overview.totalUserGames);
+      if (elUniqueGames) {
+        elUniqueGames.textContent = `${pad2(data.overview.uniqueGames)} titres uniques`;
+      }
+      if (elProposals) elProposals.textContent = pad2(data.overview.totalProposals);
+
+      // Graphique timeline 14 jours
+      renderTimeline(data.timeline);
+
+      // Table des joueurs récents
+      renderUsersTable(data.recentUsers);
+
+      // Statut de synchro
+      const now = new Date();
+      const timeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+      if (syncStatus) syncStatus.textContent = `En ligne · Synchro ${timeStr}`;
+      if (syncDot) syncDot.classList.add("live");
+    } catch (err: any) {
+      if (errorBox) errorBox.style.display = "block";
+      if (errorMsg) errorMsg.textContent = err.message || "Erreur inconnue";
+      if (syncStatus) syncStatus.textContent = "Erreur de connexion";
+      if (syncDot) syncDot.classList.remove("live");
+    }
+  }
+
+  function renderTimeline(timeline: Array<{ date: string; label: string; activeCount: number }>) {
+    const container = document.getElementById("timeline-container");
+    if (!container) return;
+
+    if (!timeline || timeline.length === 0) {
+      container.innerHTML = '<p class="mono" style="padding: 24px; text-align: center;">Aucune donnée sur la période.</p>';
+      return;
+    }
+
+    const maxCount = Math.max(...timeline.map((d) => d.activeCount), 1);
+
+    const barsHtml = timeline
+      .map((day) => {
+        const heightPercent = Math.max(Math.round((day.activeCount / maxCount) * 100), 4);
+        const hasActivity = day.activeCount > 0;
+        return `
+          <div class="timeline-col ${hasActivity ? "has-activity" : ""}" title="${day.date} : ${day.activeCount} actif(s)">
+            <div class="timeline-bar-wrap">
+              <span class="timeline-count">${pad2(day.activeCount)}</span>
+              <div class="timeline-bar" style="height: ${heightPercent}%;"></div>
+            </div>
+            <span class="timeline-date">${day.label}</span>
+          </div>
+        `;
+      })
+      .join("");
+
+    container.innerHTML = `<div class="timeline-bars-row">${barsHtml}</div>`;
+  }
+
+  function renderUsersTable(users: Array<any>) {
+    const tbody = document.getElementById("users-table-body");
+    if (!tbody) return;
+
+    if (!users || users.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="mono" style="text-align: center; padding: 32px; color: var(--smoke);">
+            Aucun utilisateur pour le moment (hors administrateur).
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = users
+      .map((u) => {
+        const initial = (u.displayName?.charAt(0) || u.username?.charAt(0) || "?").toUpperCase();
+        const avatarHtml = u.avatarUrl
+          ? `<img src="${u.avatarUrl}" alt="${u.displayName}" loading="lazy" />`
+          : `<span class="avatar-initial">${initial}</span>`;
+
+        const statusTag = u.isOnline
+          ? `<span class="status-tag online">EN LIGNE</span>`
+          : `<span class="status-tag offline">${formatRelative(u.lastActiveAt)}</span>`;
+
+        return `
+          <tr>
+            <td>
+              <div class="avatar-box">${avatarHtml}</div>
+            </td>
+            <td>
+              <span class="user-primary">${u.displayName}</span>
+              <span class="user-sub">@${u.username}</span>
+            </td>
+            <td>${statusTag}</td>
+            <td class="mono" style="font-variant-numeric: tabular-nums;">
+              ${pad2(u.gamesCount)} jeux
+            </td>
+            <td class="mono" style="font-variant-numeric: tabular-nums;">
+              ${pad2(u.groupsCount)} groupe(s)
+            </td>
+            <td class="mono" style="color: var(--smoke);">
+              ${formatDateShort(u.createdAt)}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
+  // Soumission du formulaire de déverrouillage
+  gateForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const candidate = gateInput?.value.trim().toLowerCase() || "";
+    if (candidate === EXPECTED_CODE) {
+      setActiveCode(candidate);
+      unlockUI();
+      void loadStats();
+    } else {
+      if (gateError) {
+        gateError.textContent = "Code d’accès incorrect.";
+        gateError.style.display = "block";
+      }
+      gateInput?.focus();
+    }
+  });
+
+  // Bouton de verrouillage
+  btnLock?.addEventListener("click", () => {
+    lockUI();
+  });
+
+  // Bouton refresh & retry
+  document.getElementById("btn-refresh")?.addEventListener("click", () => void loadStats());
+  document.getElementById("btn-retry")?.addEventListener("click", () => void loadStats());
+
+  // Vérification de la session existante au chargement
+  const existingCode = getActiveCode();
+  if (existingCode && existingCode.trim().toLowerCase() === EXPECTED_CODE) {
+    unlockUI();
+    void loadStats();
+  } else {
+    lockUI();
+  }
+
+  // Auto-refresh toutes les 30 secondes quand déverrouillé
+  const timer = setInterval(() => {
+    const code = getActiveCode();
+    if (code && code.trim().toLowerCase() === EXPECTED_CODE) {
+      void loadStats();
+    }
+  }, 30000);
+
+  window.addEventListener("beforeunload", () => {
+    clearInterval(timer);
+  });
+</script>

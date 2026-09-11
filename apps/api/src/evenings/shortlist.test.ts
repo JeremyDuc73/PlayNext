@@ -169,48 +169,44 @@ describe("scoring", () => {
           ownedCount: 2,
         },
       ],
-      () => 0,
     );
     assert.equal(result.winnerId, "a");
     assert.equal(result.usedRoulette, false);
   });
 
-  it("uses roulette on hard ties", () => {
-    const result = resolveWinner(
-      [
-        {
-          candidateId: "a",
-          tally: {
-            hot: 1,
-            maybe: 0,
-            pass: 0,
-            veto: 0,
-            score: 3,
-            eliminated: false,
-            eliminatedReason: null,
-          },
-          installedCount: 1,
-          ownedCount: 2,
+  it("leaves winner unset on hard ties", () => {
+    const result = resolveWinner([
+      {
+        candidateId: "a",
+        tally: {
+          hot: 1,
+          maybe: 0,
+          pass: 0,
+          veto: 0,
+          score: 3,
+          eliminated: false,
+          eliminatedReason: null,
         },
-        {
-          candidateId: "b",
-          tally: {
-            hot: 1,
-            maybe: 0,
-            pass: 0,
-            veto: 0,
-            score: 3,
-            eliminated: false,
-            eliminatedReason: null,
-          },
-          installedCount: 1,
-          ownedCount: 2,
+        installedCount: 1,
+        ownedCount: 2,
+      },
+      {
+        candidateId: "b",
+        tally: {
+          hot: 1,
+          maybe: 0,
+          pass: 0,
+          veto: 0,
+          score: 3,
+          eliminated: false,
+          eliminatedReason: null,
         },
-      ],
-      () => 0.9,
-    );
-    assert.equal(result.winnerId, "b");
-    assert.equal(result.usedRoulette, true);
+        installedCount: 1,
+        ownedCount: 2,
+      },
+    ]);
+    assert.equal(result.winnerId, null);
+    assert.equal(result.usedRoulette, false);
     assert.deepEqual(result.tiedIds.sort(), ["a", "b"]);
   });
 

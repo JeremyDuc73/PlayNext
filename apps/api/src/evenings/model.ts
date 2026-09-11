@@ -464,6 +464,11 @@ export async function serializeEvening(
       ? {
           ...resolution!,
           winnerId: evening.winner_candidate_id ?? resolution!.winnerId,
+          usedRoulette: Boolean(
+            evening.winner_candidate_id &&
+              resolution!.tiedIds.length >= 2 &&
+              resolution!.tiedIds.includes(evening.winner_candidate_id),
+          ),
         }
       : null,
   };

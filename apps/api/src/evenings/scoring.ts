@@ -57,12 +57,10 @@ export type ResolveResult = {
 
 /**
  * Pick a winner among non-eliminated candidates.
- * Tie-break: score → installed → owned → optional roulette among remaining ties.
+ * Tie-break: score → installed → owned. Remaining ties stay unresolved
+ * until the organizer revotes or draws.
  */
-export function resolveWinner(
-  candidates: ScoredCandidate[],
-  random: () => number = Math.random,
-): ResolveResult {
+export function resolveWinner(candidates: ScoredCandidate[]): ResolveResult {
   const alive = candidates.filter((c) => !c.tally.eliminated);
   if (alive.length === 0) {
     return {
@@ -91,12 +89,10 @@ export function resolveWinner(
     };
   }
 
-  const idx = Math.floor(random() * pool.length);
-  const pick = pool[idx]!;
   return {
-    winnerId: pick.candidateId,
+    winnerId: null,
     tiedIds: pool.map((c) => c.candidateId),
-    usedRoulette: true,
+    usedRoulette: false,
     allEliminated: false,
   };
 }

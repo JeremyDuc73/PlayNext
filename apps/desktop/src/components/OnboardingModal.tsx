@@ -44,7 +44,7 @@ const STEPS: Step[] = [
         code: "04",
         headline: "Le grand gagnant",
         detail:
-          "Le jeu qui met tout le monde d'accord l'emporte direct. Et en cas d’égalité parfaite, la roulette tranche !",
+          "Le jeu qui met tout le monde d'accord l'emporte. En cas d’égalité, vous revotez ou vous lancez un tirage.",
       },
     ],
     stamp: "CE SOIR, ON JOUE",

@@ -60,6 +60,8 @@ export function registerEveningResolutionRoutes(
       }
 
       let winnerId = parsed.data.candidateId ?? evening.winner_candidate_id;
+      const snapshot = await serializeEvening(db, evening, userId);
+      const usedRoulette = Boolean(snapshot.resolution?.usedRoulette);
       if (winnerId) {
         const ok = await db.pool.query(
           `
@@ -135,6 +137,7 @@ export function registerEveningResolutionRoutes(
             hotVotes: Number(votesTally.rows[0]?.hot ?? 0),
             maybeVotes: Number(votesTally.rows[0]?.maybe ?? 0),
             playerCount: Number(presentCount.rows[0]?.count ?? 0),
+            usedRoulette,
           }).catch((error) => {
             app.log.warn(
               { err: error, groupId: closed.group_id },
@@ -174,17 +177,9 @@ export function registerEveningResolutionRoutes(
       }
 
       const snapshot = await serializeEvening(db, evening, userId);
-      const tied =
-        snapshot.resolution?.tiedIds?.length
-          ? snapshot.resolution.tiedIds
-          : snapshot.candidates
-              .filter((c) => c.tally && !c.tally.eliminated)
-              .sort((a, b) => (b.tally!.score ?? 0) - (a.tally!.score ?? 0))
-              .slice(0, 3)
-              .map((c) => c.id);
-
-      if (tied.length === 0) {
-        return reply.code(400).send({ ok: false, error: "no_pool" });
+      const tied = snapshot.resolution?.tiedIds ?? [];
+      if (tied.length < 2) {
+        return reply.code(400).send({ ok: false, error: "no_tie" });
       }
       const pick = tied[Math.floor(Math.random() * tied.length)]!;
       const updated = await db.pool.query<EveningRow>(

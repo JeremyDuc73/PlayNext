@@ -10,7 +10,6 @@ import {
   isLiveEveningStatus,
   listEvenings,
   markEveningReady,
-  newEveningRound,
   openEveningSelection,
   revoteTie,
   rouletteEvening,
@@ -706,7 +705,7 @@ export function EveningPanel({
               .catch((e: Error) => onBanner(e.message))
           }
         />
-      ) : (evening.status === "revealed" || evening.status === "closed") && winner ? (
+      ) : evening.status === "revealed" || evening.status === "closed" ? (
         <ResultView
           evening={evening}
           winner={winner}
@@ -725,17 +724,18 @@ export function EveningPanel({
               .catch((e: Error) => onBanner(e.message))
           }
           onRoulette={() =>
-            void rouletteEvening(evening.id)
-              .then((next) => applyEvening(next))
-              .catch((e: Error) => onBanner(e.message))
+            rouletteEvening(evening.id)
+              .then((next) => {
+                applyEvening(next);
+                return next;
+              })
+              .catch((e: Error) => {
+                onBanner(e.message);
+                throw e;
+              })
           }
           onRevoteTie={() =>
             void revoteTie(evening.id)
-              .then((next) => applyEvening(next))
-              .catch((e: Error) => onBanner(e.message))
-          }
-          onNewRound={() =>
-            void newEveningRound(evening.id)
               .then((next) => applyEvening(next))
               .catch((e: Error) => onBanner(e.message))
           }

@@ -7,6 +7,15 @@ import { coverCandidates, fallbackPosterStyle } from "../../lib/covers";
 import { useCoverSrc } from "../../lib/useCoverSrc";
 import { gsap, prefersReducedMotion, useGSAP } from "../../lib/motion";
 import { Button } from "../../ui/Button";
+import {
+  buildEveningSummaryText,
+  copyToClipboard,
+  getLauncherLabel,
+  getStoreUrl,
+  installGame,
+  launchGame,
+} from "../../lib/launchers";
+import { openExternalUrl } from "../../lib/desktop-auth";
 
 const EASE_SLIDE = "cubic-bezier(0.16, 1, 0.3, 1)";
 const REEL_COPIES = 10;
@@ -98,6 +107,8 @@ export function ResultView(props: ResultViewProps) {
   const loopTween = useRef<gsap.core.Tween | null>(null);
   const shownWinnerId = useRef(props.winner?.id ?? null);
   const [spinning, setSpinning] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   const tied = useMemo(() => {
     const ids = props.evening.resolution?.tiedIds ?? [];
@@ -245,6 +256,33 @@ export function ResultView(props: ResultViewProps) {
     },
     { dependencies: [spinning, winner?.id, tiedKey] },
   );
+
+  const storeUrl = winner ? getStoreUrl(winner.launcher, winner.externalId) : null;
+
+  async function onCopySummary() {
+    if (!winner) return;
+    const text = buildEveningSummaryText(props.evening, winner);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    }
+  }
+
+  async function onLaunchWinner() {
+    if (!winner || launching) return;
+    setLaunching(true);
+    try {
+      await launchGame(winner.launcher, winner.externalId);
+    } finally {
+      window.setTimeout(() => setLaunching(false), 1200);
+    }
+  }
+
+  async function onInstallWinner() {
+    if (!winner) return;
+    await installGame(winner.launcher, winner.externalId);
+  }
 
   function onDraw() {
     if (spinning || props.busy) return;
@@ -396,7 +434,77 @@ export function ResultView(props: ResultViewProps) {
             <TallyList tally={winner.tally} />
           </div>
         ) : null}
-        <div className="mt-auto flex flex-col gap-4 pt-10">
+        <div className="mt-auto flex flex-col gap-5 pt-8">
+          {winner && !unresolvedTie && !spinning ? (
+            <div className="border border-rule-strong bg-ink-deep p-4">
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-rule pb-2">
+                <p className="pn-data font-bold text-paper">
+                  {props.evening.status === "closed" ? "Soirée confirmée · En jeu" : "Jeu sélectionné"}
+                </p>
+                <p className="pn-data text-smoke">
+                  {getLauncherLabel(winner.launcher).toUpperCase()}
+                  {winner.installedByMe ? " · INSTALLÉ" : ""}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {props.evening.status !== "closed" && props.iOrganize ? (
+                  <Button
+                    variant="primary"
+                    disabled={props.busy}
+                    onClick={props.onConfirm}
+                  >
+                    Confirmer
+                  </Button>
+                ) : null}
+
+                {winner.launcher === "steam" && !winner.installedByMe ? (
+                  <>
+                    <Button
+                      variant={props.evening.status === "closed" ? "primary" : "second"}
+                      onClick={() => void onInstallWinner()}
+                    >
+                      Installer sur Steam
+                    </Button>
+                    <Button
+                      variant="second"
+                      disabled={launching}
+                      onClick={() => void onLaunchWinner()}
+                    >
+                      {launching ? "Lancement…" : "Lancer le jeu"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant={props.evening.status === "closed" ? "primary" : "second"}
+                    disabled={launching}
+                    onClick={() => void onLaunchWinner()}
+                  >
+                    {launching
+                      ? "Lancement…"
+                      : `Lancer sur ${getLauncherLabel(winner.launcher)}`}
+                  </Button>
+                )}
+
+                <Button
+                  variant="second"
+                  onClick={() => void onCopySummary()}
+                >
+                  {copied ? "Copié ✓" : "Copier le récapitulatif"}
+                </Button>
+
+                {storeUrl ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => void openExternalUrl(storeUrl)}
+                  >
+                    Store ↗
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-4">
             {props.onBack ? (
               <Button variant="second" onClick={props.onBack}>
@@ -410,23 +518,17 @@ export function ResultView(props: ResultViewProps) {
                   ? "Soirée archivée"
                   : "Choix validé · Soirée confirmée"}
               </span>
-            ) : props.iOrganize ? (
-              winner && !unresolvedTie && !spinning ? (
-                <Button
-                  variant="primary"
-                  disabled={props.busy}
-                  onClick={props.onConfirm}
-                >
-                  Confirmer
-                </Button>
-              ) : null
-            ) : (
+            ) : !props.iOrganize && (!winner || unresolvedTie || spinning) ? (
               <p className="pn-data">
                 {unresolvedTie
                   ? "Égalité · en attente de l’organisateur"
                   : "En attente de l’organisateur"}
               </p>
-            )}
+            ) : !props.iOrganize ? (
+              <p className="pn-data">
+                En attente de confirmation
+              </p>
+            ) : null}
 
             {props.iOrganize && props.evening.status !== "closed" ? (
               <button

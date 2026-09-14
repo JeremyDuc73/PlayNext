@@ -140,6 +140,52 @@ export async function fetchViewerOwnedKeys(
   };
 }
 
+export async function fetchViewerInstalledKeys(
+  db: Db,
+  evening: EveningRow,
+  userId: string,
+): Promise<{ exact: Set<string>; titles: Set<string> }> {
+  const result = await db.pool.query<{
+    launcher: string;
+    external_id: string;
+    name: string;
+  }>(
+    `
+      SELECT ug.launcher, ug.external_id, ug.name
+      FROM user_games ug
+      WHERE ug.user_id = $1
+        AND ug.installed = true
+        AND ug.hidden = false
+        AND NOT EXISTS (
+          SELECT 1
+          FROM group_hidden_games h
+          WHERE h.group_id = $2
+            AND h.user_id = ug.user_id
+            AND h.launcher = ug.launcher
+            AND h.external_id = ug.external_id
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_hidden_games uh
+          WHERE uh.user_id = ug.user_id
+            AND uh.launcher = ug.launcher
+            AND uh.external_id = ug.external_id
+        )
+    `,
+    [userId, evening.group_id],
+  );
+  return {
+    exact: new Set(
+      result.rows.map((row) => `${row.launcher}:${row.external_id}`),
+    ),
+    titles: new Set(
+      result.rows
+        .map((row) => normalizeGameTitle(row.name))
+        .filter(Boolean),
+    ),
+  };
+}
+
 export function isOwnedByViewer(
   candidate: { launcher: string; external_id: string; name: string },
   owned: { exact: Set<string>; titles: Set<string> },
@@ -257,6 +303,7 @@ export async function serializeEvening(
     [evening.id, viewerId, evening.round],
   );
   const viewerOwned = await fetchViewerOwnedKeys(db, evening, viewerId);
+  const viewerInstalled = await fetchViewerInstalledKeys(db, evening, viewerId);
 
   const currentCandidate =
     evening.status === "voting"
@@ -454,6 +501,7 @@ export async function serializeEvening(
         ? (tallies?.[row.id]?.eliminatedReason ?? row.eliminated_reason)
         : row.eliminated_reason,
       ownedByMe: isOwnedByViewer(row, viewerOwned),
+      installedByMe: isOwnedByViewer(row, viewerInstalled),
       selectedByMe: mySelections.rows.some(
         (selection) => selection.candidate_id === row.id,
       ),

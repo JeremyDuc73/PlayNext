@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchGameDetails, type FullGameDetails } from "../lib/api";
 import { openExternalUrl } from "../lib/desktop-auth";
+import { getLauncherLabel, installGame, launchGame } from "../lib/launchers";
 import { pad2 } from "../lib/format";
 import { useAppStore } from "../stores/useAppStore";
 import { Button } from "../ui/Button";
@@ -333,9 +334,23 @@ export function GameDetailsModal() {
                     Lancer une soirée avec ce jeu
                   </Button>
                 )}
-                {details?.steamUrl ? (
+                <Button
+                  variant="second"
+                  onClick={() => void launchGame(target.launcher, target.externalId)}
+                >
+                  Lancer sur {getLauncherLabel(target.launcher)}
+                </Button>
+                {target.launcher === "steam" && (
                   <Button
                     variant="second"
+                    onClick={() => void installGame(target.launcher, target.externalId)}
+                  >
+                    Installer sur Steam
+                  </Button>
+                )}
+                {details?.steamUrl ? (
+                  <Button
+                    variant="ghost"
                     onClick={() => void openExternalUrl(details.steamUrl!)}
                   >
                     Page Store Steam ↗

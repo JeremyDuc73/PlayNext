@@ -29,6 +29,7 @@ export type EveningCandidate = {
   eliminated: boolean;
   eliminatedReason: string | null;
   ownedByMe: boolean;
+  installedByMe?: boolean;
   selectedByMe: boolean;
   myVote: VoteValue | null;
   tally: {
